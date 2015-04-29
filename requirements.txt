@@ -1,0 +1,11 @@
+werkzeug
+flask
+flask-restful
+Flask-Testing
+requests
+flask-discoverer
+httpretty
+SQLAlchemy
+psycopg2
+testing.postgresql
+nose
