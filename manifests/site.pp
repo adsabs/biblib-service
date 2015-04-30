@@ -1,6 +1,6 @@
 # Some const. variables
 $path_var = "/usr/bin:/usr/sbin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
-$build_packages = ['python', 'python-dev', 'python-pip', 'libpq-dev', 'postgresql']
+$build_packages = ['python', 'python-dev', 'python-pip', 'libpq-dev', 'postgresql', 'graphviz']
 $pip_requirements = "/vagrant/requirements.txt"
 
 # Update package list
