@@ -50,12 +50,13 @@ class TestJobEpic(TestCase):
         """
 
         # Mary creates a private library and
-        #   1. Gives it a name.
-        #   2. Gives it a description.
-        #   3. Makes it public to view.
+        #   XXX 1. Gives it a name.
+        #   XXX 2. Gives it a description.
+        #   XXX 3. Makes it public to view.
 
         url = url_for('gut.createlibrary', user=1234)
         response = self.client.get(url)
+
         self.assertEqual(response.status_code, 200)
         self.assertTrue('user' in response.json)
         self.assertTrue(response.json['user'] == 1234)

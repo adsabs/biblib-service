@@ -17,6 +17,8 @@ SAMPLE_APPLICATION_PARAM = {
 }
 SAMPLE_APPLICATION_ADSWS_API_URL = 'https://api.adsabs.harvard.edu'
 
+# Database for microservice
+SQLALCHEMY_DATABASE_URI = 'sqlite:////tmp/test.db'
 
 # These lines are necessary only if the app needs to be a client of the
 # adsws-api

@@ -4,7 +4,6 @@ from sqlalchemy.dialects.postgresql import JSON, ARRAY
 from app import create_app
 
 app = create_app()
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/test.db'
 db = SQLAlchemy(app)
 
 
