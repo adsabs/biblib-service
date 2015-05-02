@@ -8,6 +8,7 @@ from flask import Flask
 from views import UnixTime, PrintArg, ExampleApiUsage, CreateLibrary
 from flask.ext.restful import Api
 from flask.ext.discoverer import Discoverer
+from models import db
 
 __author__ = 'V. Sudilovsky'
 __maintainer__ = 'V. Sudilovsky'
@@ -59,6 +60,8 @@ def create_app(blueprint_only=False):
     api.add_resource(UnixTime, '/time')
     api.add_resource(PrintArg, '/print/<string:arg>')
     api.add_resource(ExampleApiUsage, '/search')
+
+    db.init_app(app)
 
     if blueprint_only:
         return blueprint
