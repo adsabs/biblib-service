@@ -43,7 +43,7 @@ class Library(db.Model):
     biblist = db.Column(ARRAY(db.String(50)))
     data = db.Column(JSON)
     grouplibraries = db.relationship('grouplibraries', backref='library')
-    
+
     def __rep__(self):
         return '<Library, name: {0}, number of bibcodes: {1}, data keys: {2}>'\
             .format(self.name, len(self.biblist), self.data.keys())

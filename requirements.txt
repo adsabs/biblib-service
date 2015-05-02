@@ -2,8 +2,9 @@ werkzeug
 flask
 flask-restful
 Flask-Testing
-requests
+flask-sqlalchemy
 flask-discoverer
+requests
 httpretty
 SQLAlchemy
 psycopg2
