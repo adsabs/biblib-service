@@ -1,55 +1,35 @@
-from sqlalchemy import create_engine, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, String, Integer
-from sqlalchemy.orm import sessionmaker, relationship, backref
+from flask.ext.sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.postgresql import JSON, ARRAY
 
-engine = create_engine('sqlite:///:memory:', echo=True)
+db = SQLAlchemy()
 
-Base = declarative_base()
-
-Session = sessionmaker(bind=engine)
-
-
-class User(Base):
-    __tablename__ = 'users'
-
-    id = Column(Integer, primary_key=True)
-    user_uid = Column(Integer)
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    absolute_uid = db.Column(db.Integer, unique=True)
 
     def __repr__(self):
-        return '<User(user_uid={0})>'.format(
-            self.user_uid
-        )
+        return '<User {0}>'.format(self.name)
 
 
-class Library(Base):
-    __tablename__ = 'library'
+class Library(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50))
+    biblist = db.Column(ARRAY(db.String(50)))
+    data = db.Column(JSON)
+    grouplibraries = db.relationship('grouplibraries', backref='library')
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
-
-    user = relationship('User', backref=backref('library', order_by=id))
-
-    def __repr__(self):
-        return '<Library(id={0}, user_id={1})>'.format(
-            self.id, self.user_uid
-        )
+    def __rep__(self):
+        return '<Library, name: {0}, number of bibcodes: {1}, data keys: {2}>'\
+            .format(self.name, len(self.biblist), self.data.keys())
 
 
-class Group(Base):
-    __tablename__ = 'group'
+class Permissions(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    permission = db.Column(db.String(50))
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    group_id = db.Column(db.Integer, db.ForeignKey('group.id'))
 
-    user = relationship('User')
-
-Base.metadata.create_all(engine)
-
-
-ed_user = User(user_uid=1234)
-session = Session()
-session.add(ed_user)
-# session.commit()
-our_user = session.query(User).filter_by(user_uid=1234).first()
-print(our_user)
+    def __rep__(self):
+        return '<UserGroup, user: {0}, group: {1}, permission: {2}'\
+            .format(self.user_id, self.group_id, self.permission)
