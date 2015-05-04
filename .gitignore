@@ -1,2 +1,7 @@
 .vagrant
 *.pyc
+local_config.py
+*.dot
+*.plantuml
+*.ps
+*.pdf
