@@ -54,13 +54,14 @@ def create_app(blueprint_only=False):
     except IOError:
         pass
 
+    # Initiate the blueprint
     blueprint = _create_blueprint_()
     api = Api(blueprint)
-    api.add_resource(CreateLibrary, '/create/<int:user>')
-    api.add_resource(UnixTime, '/time')
-    api.add_resource(PrintArg, '/print/<string:arg>')
-    api.add_resource(ExampleApiUsage, '/search')
 
+    # Add the end resource end points
+    api.add_resource(CreateLibrary, '/create/<int:user>')
+
+    # Initiate the database from the SQL Alchemy model
     db.init_app(app)
 
     if blueprint_only:

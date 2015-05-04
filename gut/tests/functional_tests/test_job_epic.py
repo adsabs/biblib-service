@@ -22,6 +22,7 @@ PROJECT_HOME = os.path.abspath(
 sys.path.append(PROJECT_HOME)
 
 import app
+from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
 
@@ -36,9 +37,24 @@ class TestJobEpic(TestCase):
 
         :return: application instance
         """
-        app_ = app.create_app()
-        self.app_ = app_
-        return app_
+        return app.create_app()
+
+    def setUp(self):
+        """
+        Set up the database for use
+
+        :return: no return
+        """
+        db.create_all()
+
+    def tearDown(self):
+        """
+        Remove/delete the database and the relevant connections
+
+        :return: no return
+        """
+        db.session.remove()
+        db.drop_all()
 
     def test_job_epic(self):
         """
@@ -55,7 +71,7 @@ class TestJobEpic(TestCase):
         #   XXX 3. Makes it public to view.
 
         url = url_for('gut.createlibrary', user=1234)
-        response = self.client.get(url)
+        response = self.client.post(url)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue('user' in response.json)
