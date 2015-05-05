@@ -5,3 +5,4 @@ local_config.py
 *.plantuml
 *.ps
 *.pdf
+*.png
