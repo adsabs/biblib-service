@@ -2,47 +2,27 @@
 Application
 """
 
-import os
-from flask import Blueprint
 from flask import Flask
-from views import UnixTime, PrintArg, ExampleApiUsage, CreateLibrary
+from views import CreateLibraryView, GetLibraryView
 from flask.ext.restful import Api
 from flask.ext.discoverer import Discoverer
 from models import db
 
-__author__ = 'V. Sudilovsky'
-__maintainer__ = 'V. Sudilovsky'
-__copyright__ = 'ADS Copyright 2014, 2015'
+__author__ = 'J. Elliott'
+__maintainer__ = 'J. Elliott'
+__copyright__ = 'ADS Copyright 2015'
 __version__ = '1.0'
 __email__ = 'ads@cfa.harvard.edu'
 __status__ = 'Production'
+__credit__ = ['V. Sudilovsky']
 __license__ = 'MIT'
 
 
-def _create_blueprint_():
-    """
-    Returns an initialized Flask.Blueprint instance; This should be in a closure
-    instead of the top level of a module because a blueprint can only be
-    registered once. Having it at the top level creates a problem with unittests
-    in that the app is created/destroyed at every test, but its blueprint is
-    still the same object which was already registered.
-
-    :return: an instantiated object of the Blueprint class
-    """
-
-    return Blueprint(
-        'gut',
-        __name__,
-        static_folder=None,
-    )
-
-
-def create_app(blueprint_only=False):
+def create_app():
     """
     Create the application and return it to the user
 
-    :param blueprint_only: if only the blue print is wanted
-    :return: blue print or application, depending upon blueprint_only
+    :return: application
     """
 
     app = Flask(__name__, static_folder=None)
@@ -55,22 +35,18 @@ def create_app(blueprint_only=False):
         pass
 
     # Initiate the blueprint
-    blueprint = _create_blueprint_()
-    api = Api(blueprint)
+    api = Api(app)
 
     # Add the end resource end points
-    api.add_resource(CreateLibrary, '/create/<int:user>')
+    api.add_resource(CreateLibraryView, '/create/<int:user>')
+    api.add_resource(GetLibraryView, '/retrieve/<int:user>')
 
     # Initiate the database from the SQL Alchemy model
     db.init_app(app)
-
-    if blueprint_only:
-        return blueprint
-    app.register_blueprint(blueprint)
 
     discoverer = Discoverer(app)
     return app
 
 if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True, use_reloader=False)
+    app_ = create_app()
+    app_.run(debug=True, use_reloader=False)

@@ -2,89 +2,27 @@
 Test webservices
 """
 
-__author__ = 'V. Sudilovsky'
-__maintainer__ = 'V. Sudilovsky'
-__copyright__ = 'ADS Copyright 2014, 2015'
+__author__ = 'J. Elliott'
+__maintainer__ = 'J. Elliott'
+__copyright__ = 'ADS Copyright 2015'
 __version__ = '1.0'
 __email__ = 'ads@cfa.harvard.edu'
 __status__ = 'Production'
+__credit__ = ['V. Sudilovsky']
 __license__ = 'MIT'
 
 import sys
 import os
+
 PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
 
-import unittest
-import time
-import json
 import app
+import unittest
 from flask.ext.testing import TestCase
 from flask import url_for
-from httpretty import HTTPretty
-
-
-class MockADSWSAPI:
-    """
-    Mock the ADSWS API
-    """
-    def __init__(self, api_endpoint):
-        """
-        Constructor
-
-        :param api_endpoint: name of the API end point
-        :return: no return
-        """
-
-        self.api_endpoint = api_endpoint
-
-        def request_callback(request, uri, headers):
-            """
-
-            :param request: HTTP request
-            :param uri: URI/URL to send the request
-            :param headers: header of the HTTP request
-            :return:
-            """
-            resp = json.dumps(
-                {
-                    'api-response': 'success',
-                    'token': request.headers.get(
-                        'Authorization', 'No Authorization header passed!'
-                    )
-                }
-            )
-            return 200, headers, resp
-
-        HTTPretty.register_uri(
-            HTTPretty.GET,
-            self.api_endpoint,
-            body=request_callback,
-            content_type="application/json"
-        )
-
-    def __enter__(self):
-        """
-        Defines the behaviour for __enter__
-
-        :return: no return
-        """
-
-        HTTPretty.enable()
-
-    def __exit__(self, etype, value, traceback):
-        """
-        Defines the behaviour for __exit__
-
-        :param etype: exit type
-        :param value: exit value
-        :param traceback: the traceback for the exit
-        :return: no return
-        """
-
-        HTTPretty.reset()
-        HTTPretty.disable()
+from models import db
 
 
 class TestWebservices(TestCase):
@@ -101,6 +39,25 @@ class TestWebservices(TestCase):
         app_ = app.create_app()
         return app_
 
+    def setUp(self):
+        """
+        Set up the database for use
+
+        :return: no return
+        """
+
+        db.create_all()
+
+    def tearDown(self):
+        """
+        Remove/delete the database and the relevant connections
+
+        :return: no return
+        """
+
+        db.session.remove()
+        db.drop_all()
+
     def test_create_library_resource(self):
         """
         Test the /create route
@@ -109,12 +66,16 @@ class TestWebservices(TestCase):
         """
 
         # Make the library
-        url = url_for('gut.createlibrary', user=1234)
-        r = self.client.get(url)
+        url = url_for('createlibraryview', user=1234)
+        r = self.client.post(url)
         self.assertEqual(r.status_code, 200)
         self.assertIn('user', r.json)
 
         # Check the library exists in the database
+        url = url_for('getlibraryview', user=1234)
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('Library1', r.json['libraries'])
 
 
 if __name__ == '__main__':
