@@ -12,6 +12,39 @@ __credit__ = ['V. Sudilovsky']
 __license__ = 'MIT'
 
 
+class StubDataDocument(object):
+    """
+    Generator class for creating and returning stub data for testing the
+    users. It may be over kill currently, but I foresee its use will grow.
+    """
+
+    def __init__(self):
+        """
+        Class constructor
+
+        :return: no return
+        """
+
+        self.name = 'Stub Data for User'
+
+    def get_document(self):
+        """
+        Generate a fake document, e.g., a bibcode
+
+        :return: document in string format
+        """
+
+        return '2015MNRAS...111...1'
+
+    def make_stub(self):
+        """
+        Makes relevant stub data
+
+        :return: stub data for a document
+        """
+        return self.get_document()
+
+
 class StubDataUser(object):
     """
     Generator class for creating and returning stub data for testing the

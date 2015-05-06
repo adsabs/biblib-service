@@ -26,7 +26,7 @@ import json
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
-from tests.stubdata.stub_data import StubDataLibrary
+from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
 
 
 class TestJobEpic(TestCase):
@@ -49,6 +49,7 @@ class TestJobEpic(TestCase):
         """
         db.create_all()
         self.stub_library, self.stub_uid = StubDataLibrary().make_stub()
+        self.stub_document = StubDataDocument().make_stub()
 
     def tearDown(self):
         """
@@ -74,14 +75,22 @@ class TestJobEpic(TestCase):
         #   3. Makes it public to view.
 
         # Make the library
-        url = url_for('createlibraryview', user=self.stub_uid)
+        url = url_for('userview', user=self.stub_uid)
         response = self.client.post(url, data=json.dumps(self.stub_library))
 
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue('user' in response.json)
-        self.assertTrue(response.json['user'] == self.stub_uid)
+        self.assertEqual(response.status_code, 200, response)
+        self.assertTrue('name' in response.json)
+        self.assertTrue(response.json['name'] == self.stub_library['name'])
 
         # Mary searches for an article and then adds it to her private library.
+        # First she picks which library to add it to.
+        url = url_for('userview', user=self.stub_uid)
+        response = self.client.get(url)
+        library_id = response.json['libraries'][0]['id']
+
+        url = url_for('libraryview', user=self.stub_uid, library=library_id)
+        response = self.client.post(url, data=json.dumps(self.stub_document))
+        self.assertEqual(response.status_code, 200, response)
 
         # Mary realises she added one that is not hers and goes back to her list
         # and deletes it from her library.

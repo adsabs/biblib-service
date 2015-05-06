@@ -19,7 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from utils import get_post_data
 
 
-class CreateLibraryView(Resource):
+class UserView(Resource):
     """
     End point to create a library for a given user
 
@@ -27,9 +27,8 @@ class CreateLibraryView(Resource):
     XXX: public/private
     XXX: name of the library already exists
     XXX: must give the library name/missing input function saves time
-    XXX: should implement correct rollbacks - can this be tested?
-    XXX: have a helper function for absolute_uid_2_local_uid
     """
+
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = ['scope1', 'scope2']
     rate_limit = [1000, 60*60*24]
@@ -105,6 +104,8 @@ class CreateLibraryView(Resource):
             current_app.logger.info('Library: "{0}" created, user_service: {1:d}'
                                     .format(library.name, user.id))
 
+            return library
+
         except IntegrityError as error:
             # Roll back the changes
             db.session.rollback()
@@ -128,7 +129,33 @@ class CreateLibraryView(Resource):
         user = User.query.filter(User.absolute_uid == absolute_uid).one()
         return user.id
 
+    def get_libraries(self, absolute_uid):
+        """
+        Get all the libraries a user has
+        :param absolute_uid: api UID of the user
+
+        :return: list of libraries in json format
+        """
+        user_libraries = \
+            Library.query.filter(User.absolute_uid == absolute_uid).all()
+
+        output_libraries = []
+        for library in user_libraries:
+            payload = {
+                'name': library.name,
+                'id': library.id,
+                'description': library.description,
+            }
+            output_libraries.append(payload)
+
+        return output_libraries
+
     # Methods
+    def get(self, user):
+        # XXX: Check that user is not anon
+        user_libraries = self.get_libraries(absolute_uid=user)
+        return {'libraries': user_libraries}, 200
+
     def post(self, user):
         """
         HTTP POST request that creates a library for a given user
@@ -152,34 +179,23 @@ class CreateLibraryView(Resource):
 
         # Create the library
         data = get_post_data(request)
-        self.create_library(service_uid=service_uid, library_data=data)
+        library = \
+            self.create_library(service_uid=service_uid, library_data=data)
 
-        return {'user': user}, 200
+        return {'name': library.name,
+                'id': library.id,
+                'description': library.description}, 200
 
 
-class GetLibraryView(Resource):
+class LibraryView(Resource):
     """
-    Returns the library requested for a given user.
+    End point to interact with a specific library, by adding content and
+    removing content
 
-    XXX: Check that user is not anon
+    XXX: need to ignore the anon user, they should not be able to do anything
+    XXX: document already exists
+
     """
-
-    def get_libraries(self, absolute_uid):
-
-        user_libraries = \
-            Library.query.filter(User.absolute_uid == absolute_uid).all()
-
-        output_libraries = []
-        for library in user_libraries:
-            payload = dict(
-                name=library.name,
-                description=library.description,
-            )
-            output_libraries.append(payload)
-
-        return output_libraries
-
-    def get(self, user):
-
-        user_libraries = self.get_libraries(absolute_uid=user)
-        return {'libraries': user_libraries}, 200
+    def post(self, user, library):
+        print(user, library)
+        return {}, 200

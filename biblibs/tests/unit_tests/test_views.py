@@ -21,11 +21,11 @@ import app
 from models import db, User, Library, Permissions
 from flask.ext.testing import TestCase
 from sqlalchemy.exc import IntegrityError
-from views import CreateLibraryView, GetLibraryView
+from views import UserView
 from tests.stubdata.stub_data import StubDataLibrary
 
 
-class TestLibraryViews(TestCase):
+class TestUserViews(TestCase):
     """
     Base class to test the Library creation views
     """
@@ -41,8 +41,7 @@ class TestLibraryViews(TestCase):
         """
 
         super(TestCase, self).__init__(*args, **kwargs)
-        self.create_library = CreateLibraryView()
-        self.get_library = GetLibraryView()
+        self.user_view = UserView()
 
     def create_app(self):
         """
@@ -81,9 +80,9 @@ class TestLibraryViews(TestCase):
         """
 
         # Create a user using the function
-        self.create_library.create_user(absolute_uid=self.stub_uid)
+        self.user_view.create_user(absolute_uid=self.stub_uid)
         # Create another use so that we know it returns a single record
-        self.create_library.create_user(absolute_uid=self.stub_uid+1)
+        self.user_view.create_user(absolute_uid=self.stub_uid+1)
 
         # Check if it really exists in the database
         result = User.query.filter(User.absolute_uid == self.stub_uid).all()
@@ -107,7 +106,7 @@ class TestLibraryViews(TestCase):
         # Now try to add a user with the same uid from the API, it should raise
         # an error
         with self.assertRaises(IntegrityError):
-            self.create_library.create_user(absolute_uid=self.stub_uid)
+            self.user_view.create_user(absolute_uid=self.stub_uid)
 
     def test_user_creation_if_exists(self):
         """
@@ -118,7 +117,7 @@ class TestLibraryViews(TestCase):
 
         # Check if the user exists, given we have not added any user in this
         # test, it should return nothing.
-        exists = self.create_library.user_exists(absolute_uid=self.stub_uid)
+        exists = self.user_view.user_exists(absolute_uid=self.stub_uid)
         self.assertFalse(exists)
 
         # Add the user with the given UID to the database
@@ -127,7 +126,7 @@ class TestLibraryViews(TestCase):
         db.session.commit()
 
         # Check that the user exists in the database
-        exists = self.create_library.user_exists(absolute_uid=self.stub_uid)
+        exists = self.user_view.user_exists(absolute_uid=self.stub_uid)
         self.assertTrue(exists)
 
     def test_user_can_create_a_library(self):
@@ -143,7 +142,7 @@ class TestLibraryViews(TestCase):
         db.session.commit()
 
         # Create the library for the user we created, with the library stub data
-        self.create_library.create_library(
+        self.user_view.create_library(
             service_uid=user.id,
             library_data=self.stub_library
         )
@@ -171,12 +170,12 @@ class TestLibraryViews(TestCase):
         # Make a library that ensures we get one back
         number_of_libs = 2
         for i in range(number_of_libs):
-            self.create_library.create_library(
+            self.user_view.create_library(
                 service_uid=user.id,
                 library_data=self.stub_library
             )
 
         # Get the library created
-        libraries = self.get_library.get_libraries(self.stub_uid)
+        libraries = self.user_view.get_libraries(self.stub_uid)
 
         self.assertEqual(len(libraries), number_of_libs)

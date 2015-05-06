@@ -3,7 +3,7 @@ Application
 """
 
 from flask import Flask
-from views import CreateLibraryView, GetLibraryView
+from views import UserView, LibraryView
 from flask.ext.restful import Api
 from flask.ext.discoverer import Discoverer
 from models import db
@@ -50,8 +50,13 @@ def create_app(config_type='PRODUCTION'):
     api = Api(app)
 
     # Add the end resource end points
-    api.add_resource(CreateLibraryView, '/create/<int:user>')
-    api.add_resource(GetLibraryView, '/retrieve/<int:user>')
+    api.add_resource(UserView,
+                     '/users/<int:user>/libraries/',
+                     methods=['GET', 'POST'])
+
+    api.add_resource(LibraryView,
+                     '/users/<int:user>/libraries/<int:library>',
+                     methods=['POST'])
 
     # Initiate the database from the SQL Alchemy model
     db.init_app(app)
