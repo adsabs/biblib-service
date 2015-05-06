@@ -7,6 +7,7 @@ from views import CreateLibraryView, GetLibraryView
 from flask.ext.restful import Api
 from flask.ext.discoverer import Discoverer
 from models import db
+from utils import setup_logging_handler
 
 __author__ = 'J. Elliott'
 __maintainer__ = 'J. Elliott'
@@ -43,6 +44,10 @@ def create_app():
 
     # Initiate the database from the SQL Alchemy model
     db.init_app(app)
+
+    # Add logging
+    handler = setup_logging_handler(level='DEBUG')
+    app.logger.addHandler(handler)
 
     discoverer = Discoverer(app)
     return app

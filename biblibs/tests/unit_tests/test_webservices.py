@@ -20,6 +20,7 @@ sys.path.append(PROJECT_HOME)
 
 import app
 import unittest
+import json
 from flask.ext.testing import TestCase
 from flask import url_for
 from models import db
@@ -66,8 +67,15 @@ class TestWebservices(TestCase):
         """
 
         # Make the library
+        stub_library = dict(
+            name="Library1",
+            read=True,
+            write=True,
+            public=True
+        )
+
         url = url_for('createlibraryview', user=1234)
-        r = self.client.post(url)
+        r = self.client.post(url, data=json.dumps(stub_library))
         self.assertEqual(r.status_code, 200)
         self.assertIn('user', r.json)
 
@@ -75,8 +83,8 @@ class TestWebservices(TestCase):
         url = url_for('getlibraryview', user=1234)
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
-        self.assertIn('Library1', r.json['libraries'])
-
+        for library in r.json['libraries']:
+            self.assertIn('Library1', library['name'])
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

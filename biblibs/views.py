@@ -11,10 +11,12 @@ __status__ = 'Production'
 __credit__ = ['V. Sudilovsky']
 __license__ = 'MIT'
 
+from flask import request, current_app
 from flask.ext.restful import Resource
 from flask.ext.discoverer import advertise
 from models import db, User, Library, Permissions
 from sqlalchemy.exc import IntegrityError
+from utils import get_post_data
 
 
 class CreateLibraryView(Resource):
@@ -46,7 +48,9 @@ class CreateLibraryView(Resource):
             db.session.commit()
 
         except IntegrityError as error:
-            # Log here
+            current_app.logger.error('IntegritError. User: {0:d} was not added.'
+                                     'Full traceback: {1}'
+                                     .format(user, error))
             raise
 
     def user_exists(self, absolute_uid):
@@ -70,6 +74,9 @@ class CreateLibraryView(Resource):
         _read = library_data['read']
         _write = library_data['write']
         _public = library_data['public']
+
+        current_app.logger.info('Creating library for user_service: {0:d}'
+                                .format(service_uid))
         try:
 
             # Make the library in the library table
@@ -92,14 +99,31 @@ class CreateLibraryView(Resource):
             db.session.add_all([library, permission, user])
             db.session.commit()
 
-        except IntegrityError as error:
+            current_app.logger.info('Library: "{0}" created, user_service: {1:d}'
+                                    .format(library.name, user.id))
 
+        except IntegrityError as error:
             # Roll back the changes
             db.session.rollback()
+            current_app.logger.error('IntegitryError, database has been rolled'
+                                     'back. Caused by user_service: {0:d}. Full'
+                                     'error: {1}'
+                                     .format(user.id, error))
             # Log here
             raise
         except Exception:
             db.session.rollback()
+            raise
+
+    def absolute_uid_to_service_uid(self, absolute_uid):
+        """
+        Convert the API UID to the BibLib service ID
+
+        :param absolute_uid: API UID
+        :return: BibLib service ID
+        """
+        user = User.query.filter(User.absolute_uid == absolute_uid).one()
+        return user.id
 
     # Methods
     def post(self, user):
@@ -110,8 +134,22 @@ class CreateLibraryView(Resource):
         :return: the response for if the library was successfully created
         """
 
+        # Check if the user exists, if not, generate a user in the database
+        current_app.logger.info('Checking if the user exists')
         if not self.user_exists(absolute_uid=user):
+            current_app.logger.info('User: {0:d}, does not exist.'.format(user))
+
             self.create_user(absolute_uid=user)
+            current_app.logger.info('User: {0:d}, created.'.format(user))
+
+        # Switch to the service UID and not the API UID
+        service_uid = self.absolute_uid_to_service_uid(absolute_uid=user)
+        current_app.logger.info('user_API: {0:d} is now user_service: {1:d}'
+                                .format(user, service_uid))
+
+        # Create the library
+        data = get_post_data(request)
+        self.create_library(service_uid=service_uid, library_data=data)
 
         return {'user': user}, 200
 
@@ -128,7 +166,12 @@ class GetLibraryView(Resource):
         user_libraries = \
             Library.query.filter(User.absolute_uid == absolute_uid).all()
 
-        return user_libraries
+        output_libraries = []
+        for library in user_libraries:
+            payload = dict(name=library.name)
+            output_libraries.append(payload)
+
+        return output_libraries
 
     def get(self, user):
 

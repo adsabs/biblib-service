@@ -22,6 +22,7 @@ PROJECT_HOME = os.path.abspath(
 sys.path.append(PROJECT_HOME)
 
 import app
+import json
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
@@ -70,8 +71,16 @@ class TestJobEpic(TestCase):
         #   XXX 2. Gives it a description.
         #   XXX 3. Makes it public to view.
 
-        url = url_for('gut.createlibrary', user=1234)
-        response = self.client.post(url)
+        # Make the library
+        stub_library = dict(
+            name="Library1",
+            read=True,
+            write=True,
+            public=True
+        )
+
+        url = url_for('createlibraryview', user=1234)
+        response = self.client.post(url, data=json.dumps(stub_library))
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue('user' in response.json)

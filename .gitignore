@@ -6,3 +6,4 @@ local_config.py
 *.ps
 *.pdf
 *.png
+logs/
