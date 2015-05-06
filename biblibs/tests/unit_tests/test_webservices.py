@@ -38,7 +38,7 @@ class TestWebservices(TestCase):
 
         :return: application instance
         """
-        app_ = app.create_app()
+        app_ = app.create_app(config_type='TEST')
         return app_
 
     def setUp(self):

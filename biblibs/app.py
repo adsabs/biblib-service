@@ -19,7 +19,7 @@ __credit__ = ['V. Sudilovsky']
 __license__ = 'MIT'
 
 
-def create_app():
+def create_app(config_type='PRODUCTION'):
     """
     Create the application and return it to the user
 
@@ -29,11 +29,22 @@ def create_app():
     app = Flask(__name__, static_folder=None)
 
     app.url_map.strict_slashes = False
-    app.config.from_pyfile('config.py')
-    try:
-        app.config.from_pyfile('local_config.py')
-    except IOError:
-        pass
+
+    config_dictionary = dict(
+        TEST='test_config.py',
+        LOCAL='local_config.py',
+        PRODUCTION='config.py'
+    )
+
+    app.config.from_pyfile(config_dictionary['PRODUCTION'])
+
+    if config_type in config_dictionary.keys():
+        try:
+            app.config.from_pyfile(config_dictionary[config_type])
+        except IOError:
+            app.logger.warning('Could not find specified config file: {0}'
+                               .format(config_dictionary[config_type]))
+            raise
 
     # Initiate the blueprint
     api = Api(app)

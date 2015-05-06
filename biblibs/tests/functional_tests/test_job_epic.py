@@ -39,7 +39,7 @@ class TestJobEpic(TestCase):
 
         :return: application instance
         """
-        return app.create_app()
+        return app.create_app(config_type='TEST')
 
     def setUp(self):
         """
