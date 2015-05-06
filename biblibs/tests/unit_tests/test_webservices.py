@@ -24,6 +24,7 @@ import json
 from flask.ext.testing import TestCase
 from flask import url_for
 from models import db
+from tests.stubdata.stub_data import StubDataLibrary
 
 
 class TestWebservices(TestCase):
@@ -48,6 +49,7 @@ class TestWebservices(TestCase):
         """
 
         db.create_all()
+        self.stub_library, self.stub_user_id = StubDataLibrary().make_stub()
 
     def tearDown(self):
         """
@@ -67,24 +69,18 @@ class TestWebservices(TestCase):
         """
 
         # Make the library
-        stub_library = dict(
-            name="Library1",
-            read=True,
-            write=True,
-            public=True
-        )
-
-        url = url_for('createlibraryview', user=1234)
-        r = self.client.post(url, data=json.dumps(stub_library))
+        url = url_for('createlibraryview', user=self.stub_user_id)
+        r = self.client.post(url, data=json.dumps(self.stub_library))
         self.assertEqual(r.status_code, 200)
         self.assertIn('user', r.json)
 
         # Check the library exists in the database
-        url = url_for('getlibraryview', user=1234)
+        url = url_for('getlibraryview', user=self.stub_user_id)
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
         for library in r.json['libraries']:
-            self.assertIn('Library1', library['name'])
+            self.assertIn(self.stub_library['name'], library['name'])
+            self.assertIn(self.stub_library['description'], library['description'])
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

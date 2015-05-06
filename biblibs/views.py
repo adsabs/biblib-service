@@ -49,8 +49,8 @@ class CreateLibraryView(Resource):
 
         except IntegrityError as error:
             current_app.logger.error('IntegritError. User: {0:d} was not added.'
-                                     'Full traceback: {1}'
-                                     .format(user, error))
+                                     ' Full traceback: {1}'
+                                     .format(absolute_uid, error))
             raise
 
     def user_exists(self, absolute_uid):
@@ -71,6 +71,7 @@ class CreateLibraryView(Resource):
     def create_library(self, service_uid, library_data):
 
         _name = library_data['name']
+        _description = library_data['description']
         _read = library_data['read']
         _write = library_data['write']
         _public = library_data['public']
@@ -80,7 +81,9 @@ class CreateLibraryView(Resource):
         try:
 
             # Make the library in the library table
-            library = Library(name=_name, public=_public)
+            library = Library(name=_name,
+                              description=_description,
+                              public=_public)
             user = User.query.filter(User.id == service_uid).one()
 
             # Make the permissions
@@ -168,7 +171,10 @@ class GetLibraryView(Resource):
 
         output_libraries = []
         for library in user_libraries:
-            payload = dict(name=library.name)
+            payload = dict(
+                name=library.name,
+                description=library.description,
+            )
             output_libraries.append(payload)
 
         return output_libraries

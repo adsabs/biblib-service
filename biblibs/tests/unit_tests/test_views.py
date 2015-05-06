@@ -22,6 +22,7 @@ from models import db, User, Library, Permissions
 from flask.ext.testing import TestCase
 from sqlalchemy.exc import IntegrityError
 from views import CreateLibraryView, GetLibraryView
+from tests.stubdata.stub_data import StubDataLibrary
 
 
 class TestLibraryViews(TestCase):
@@ -43,8 +44,6 @@ class TestLibraryViews(TestCase):
         self.create_library = CreateLibraryView()
         self.get_library = GetLibraryView()
 
-        self.stub_uid = 1234
-
     def create_app(self):
         """
         Create the wsgi application for the flask test extension
@@ -62,6 +61,7 @@ class TestLibraryViews(TestCase):
         """
 
         db.create_all()
+        self.stub_library, self.stub_uid = StubDataLibrary().make_stub()
 
     def tearDown(self):
         """
@@ -137,14 +137,6 @@ class TestLibraryViews(TestCase):
         :return:
         """
 
-        # Make stub data for the library we want to create
-        stub_library = {
-            'name': 'MyLibrary1',
-            'public': True,
-            'read': True,
-            'write': True
-        }
-
         # Make the user we want the library to be associated with
         user = User(absolute_uid=self.stub_uid)
         db.session.add(user)
@@ -153,7 +145,7 @@ class TestLibraryViews(TestCase):
         # Create the library for the user we created, with the library stub data
         self.create_library.create_library(
             service_uid=user.id,
-            library_data=stub_library
+            library_data=self.stub_library
         )
 
         # Check that the library was created with the correct permissions
@@ -170,13 +162,6 @@ class TestLibraryViews(TestCase):
 
         :return: no return
         """
-        # Make stub data for the library we want to create
-        stub_library = {
-            'name': 'MyLibrary1',
-            'public': True,
-            'read': True,
-            'write': True
-        }
 
         # To make a library we need an actual user
         user = User(absolute_uid=self.stub_uid)
@@ -188,7 +173,7 @@ class TestLibraryViews(TestCase):
         for i in range(number_of_libs):
             self.create_library.create_library(
                 service_uid=user.id,
-                library_data=stub_library
+                library_data=self.stub_library
             )
 
         # Get the library created

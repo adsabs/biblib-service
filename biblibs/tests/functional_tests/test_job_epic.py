@@ -26,6 +26,7 @@ import json
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
+from tests.stubdata.stub_data import StubDataLibrary
 
 
 class TestJobEpic(TestCase):
@@ -47,6 +48,7 @@ class TestJobEpic(TestCase):
         :return: no return
         """
         db.create_all()
+        self.stub_library, self.stub_uid = StubDataLibrary().make_stub()
 
     def tearDown(self):
         """
@@ -67,24 +69,17 @@ class TestJobEpic(TestCase):
         """
 
         # Mary creates a private library and
-        #   XXX 1. Gives it a name.
-        #   XXX 2. Gives it a description.
-        #   XXX 3. Makes it public to view.
+        #   1. Gives it a name.
+        #   2. Gives it a description.
+        #   3. Makes it public to view.
 
         # Make the library
-        stub_library = dict(
-            name="Library1",
-            read=True,
-            write=True,
-            public=True
-        )
-
-        url = url_for('createlibraryview', user=1234)
-        response = self.client.post(url, data=json.dumps(stub_library))
+        url = url_for('createlibraryview', user=self.stub_uid)
+        response = self.client.post(url, data=json.dumps(self.stub_library))
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue('user' in response.json)
-        self.assertTrue(response.json['user'] == 1234)
+        self.assertTrue(response.json['user'] == self.stub_uid)
 
         # Mary searches for an article and then adds it to her private library.
 
