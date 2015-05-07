@@ -8,9 +8,9 @@ addons:
 before_script:
  - psql -c 'create database testdb;' -U vagrant
 script:
- - coverage run -p --source=. tests/unit_tests/test_views.py
- - coverage run -p --source=. tests/unit_tests/test_webservices.py
- - coverage run -p --source=. tests/functional_tests/tess_job_epic.py
+ - coverage run -p --source=. biblib/tests/unit_tests/test_views.py
+ - coverage run -p --source=. biblib/tests/unit_tests/test_webservices.py
+ - coverage run -p --source=. biblib/tests/functional_tests/tess_job_epic.py
 after_success:
  - coverage combine
  - coveralls
