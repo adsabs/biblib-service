@@ -12,3 +12,4 @@ psycopg2
 testing.postgresql
 nose
 coveralls
+ConcurrentLogHandler
