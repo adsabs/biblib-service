@@ -6,7 +6,7 @@ install:
 addons:
  - postgresql: "9.3"
 before_script:
- - psql -c 'create database testdb;' -U vagrant
+ - psql -c 'create database testdb;' -U postgres
 script:
  - coverage run -p --source=. biblib/tests/unit_tests/test_views.py
  - coverage run -p --source=. biblib/tests/unit_tests/test_webservices.py
