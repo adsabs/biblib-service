@@ -47,8 +47,8 @@ class UserView(Resource):
             db.session.commit()
 
         except IntegrityError as error:
-            current_app.logger.error('IntegritError. User: {0:d} was not added.'
-                                     ' Full traceback: {1}'
+            current_app.logger.error('IntegritError. User: {0:d} was not'
+                                     'added. Full traceback: {1}'
                                      .format(absolute_uid, error))
             raise
 
@@ -101,7 +101,7 @@ class UserView(Resource):
             db.session.add_all([library, permission, user])
             db.session.commit()
 
-            current_app.logger.info('Library: "{0}" created, user_service: {1:d}'
+            current_app.logger.info('Library: "{0}" made, user_service: {1:d}'
                                     .format(library.name, user.id))
 
             return library
@@ -110,8 +110,8 @@ class UserView(Resource):
             # Roll back the changes
             db.session.rollback()
             current_app.logger.error('IntegitryError, database has been rolled'
-                                     'back. Caused by user_service: {0:d}. Full'
-                                     'error: {1}'
+                                     'back. Caused by user_service: {0:d}.'
+                                     'Full error: {1}'
                                      .format(user.id, error))
             # Log here
             raise
@@ -174,7 +174,8 @@ class UserView(Resource):
         # Check if the user exists, if not, generate a user in the database
         current_app.logger.info('Checking if the user exists')
         if not self.user_exists(absolute_uid=user):
-            current_app.logger.info('User: {0:d}, does not exist.'.format(user))
+            current_app.logger.info('User: {0:d}, does not exist.'
+                                    .format(user))
 
             self.create_user(absolute_uid=user)
             current_app.logger.info('User: {0:d}, created.'.format(user))

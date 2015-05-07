@@ -104,8 +104,8 @@ class Permissions(db.Model):
     """
     Permissions table
 
-    Logically connects the library and user table. Whereby, a Library belongs to
-    a user, and the user can give permissions to other users to view their
+    Logically connects the library and user table. Whereby, a Library belongs
+    to a user, and the user can give permissions to other users to view their
     libraries.
     User (1) to Permissions (Many)
     Library (1) to Permissions (Many)
@@ -119,5 +119,6 @@ class Permissions(db.Model):
     library_id = db.Column(db.Integer, db.ForeignKey('library.id'))
 
     def __repr__(self):
-        return '<UserGroup, user_id: {0}, library_id: {1}, read: {2}, write: {3}'\
+        return '<Permissions, user_id: {0}, library_id: {1}, read: {2}, '\
+               'write: {3}'\
             .format(self.user_id, self.library_id, self.read, self.write)
