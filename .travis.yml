@@ -12,6 +12,6 @@ script:
  - coverage run -p --source=. biblib/tests/unit_tests/test_webservices.py
  - coverage run -p --source=. biblib/tests/functional_tests/test_job_epic.py
 after_success:
- - coverage report --omit 'biblib/tests/*'
  - coverage combine
+ - coverage report --omit 'biblib/tests/*','wsgi.py','*__init__.py','*config*'
  - coveralls
