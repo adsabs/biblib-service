@@ -10,7 +10,7 @@ before_script:
 script:
  - coverage run -p --source=. biblib/tests/unit_tests/test_views.py
  - coverage run -p --source=. biblib/tests/unit_tests/test_webservices.py
- - coverage run -p --source=. biblib/tests/functional_tests/tess_job_epic.py
+ - coverage run -p --source=. biblib/tests/functional_tests/tests_job_epic.py
 after_success:
  - coverage combine
  - coveralls

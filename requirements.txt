@@ -11,4 +11,4 @@ SQLAlchemy
 psycopg2
 testing.postgresql
 nose
-sadisplay
+coveralls
