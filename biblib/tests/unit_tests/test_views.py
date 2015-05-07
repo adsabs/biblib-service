@@ -21,13 +21,13 @@ import app
 from models import db, User, Library, Permissions
 from flask.ext.testing import TestCase
 from sqlalchemy.exc import IntegrityError
-from views import UserView
-from tests.stubdata.stub_data import StubDataLibrary
+from views import UserView, LibraryView
+from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
 
 
 class TestUserViews(TestCase):
     """
-    Base class to test the Library creation views
+    Base class to test the User & Library creation views
     """
 
     def __init__(self, *args, **kwargs):
@@ -179,3 +179,141 @@ class TestUserViews(TestCase):
         libraries = self.user_view.get_libraries(self.stub_uid)
 
         self.assertEqual(len(libraries), number_of_libs)
+
+
+class TestLibraryViews(TestCase):
+    """
+    Base class to test the Library view for GET/POST/DELETE (PUT for tags?)
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor of the class
+
+        :param args: to pass on to the super class
+        :param kwargs: to pass on to the super class
+
+        :return: no return
+        """
+
+        super(TestCase, self).__init__(*args, **kwargs)
+        self.user_view = UserView()
+        self.library_view = LibraryView()
+
+    def create_app(self):
+        """
+        Create the wsgi application for the flask test extension
+
+        :return: application instance
+        """
+
+        return app.create_app(config_type='TEST')
+
+    def setUp(self):
+        """
+        Set up the database for use
+
+        :return: no return
+        """
+
+        db.create_all()
+        self.stub_library, self.stub_uid = StubDataLibrary().make_stub()
+        self.stub_document = StubDataDocument().make_stub()
+
+    def tearDown(self):
+        """
+        Remove/delete the database and the relevant connections
+
+        :return: no return
+        """
+
+        db.session.remove()
+        db.drop_all()
+
+    def test_user_can_add_to_library(self):
+        """
+        Tests that adding a bibcode to a library works correctly
+
+        :return:
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True)
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        library_id = library.id
+        user_id = user.id
+
+        # Get stub data for the document
+
+        # Add a document to the library
+        self.library_view.add_document_to_library(
+            library_id=library_id,
+            document_data=self.stub_document
+        )
+
+        # Check that the document is in the library
+        library = Library.query.filter(Library.id == library_id).all()
+        for _lib in library:
+            self.assertIn(self.stub_document['bibcode'], _lib.bibcode)
+
+        self.stub_document['bibcode'] = self.stub_document['bibcode'] + 'NEW'
+        # Add a different document to the library
+        self.library_view.add_document_to_library(
+            library_id=library_id,
+            document_data=self.stub_document
+        )
+
+        # Check that the document is in the library
+        library = Library.query.filter(Library.id == library_id).all()
+        for _lib in library:
+            self.assertIn(self.stub_document['bibcode'], _lib.bibcode)
+
+    def test_user_can_get_documents_from_library(self):
+        """
+        Tests that can retrieve all the bibcodes from a library
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        # Retrieve the bibcodes using the web services
+        bibcodes = self.library_view.get_documents_from_library(
+            library_id=library.id
+        )

@@ -54,7 +54,7 @@ class TestJobEpic(TestCase):
     def tearDown(self):
         """
         Remove/delete the database and the relevant connections
-
+!
         :return: no return
         """
         db.session.remove()
@@ -83,11 +83,14 @@ class TestJobEpic(TestCase):
         self.assertTrue(response.json['name'] == self.stub_library['name'])
 
         # Mary searches for an article and then adds it to her private library.
+
         # First she picks which library to add it to.
         url = url_for('userview', user=self.stub_uid)
         response = self.client.get(url)
         library_id = response.json['libraries'][0]['id']
 
+        # Then she submits the document (in this case a bibcode) to add to the
+        # library
         url = url_for('libraryview', user=self.stub_uid, library=library_id)
         response = self.client.post(url, data=json.dumps(self.stub_document))
         self.assertEqual(response.status_code, 200, response)

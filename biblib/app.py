@@ -22,6 +22,8 @@ __license__ = 'MIT'
 def create_app(config_type='PRODUCTION'):
     """
     Create the application and return it to the user
+    :param config_type: specifies which configuration file to load. Options are
+    TEST, LOCAL, and PRODUCTION.
 
     :return: application
     """
@@ -56,7 +58,7 @@ def create_app(config_type='PRODUCTION'):
 
     api.add_resource(LibraryView,
                      '/users/<int:user>/libraries/<int:library>',
-                     methods=['POST'])
+                     methods=['GET', 'POST'])
 
     # Initiate the database from the SQL Alchemy model
     db.init_app(app)

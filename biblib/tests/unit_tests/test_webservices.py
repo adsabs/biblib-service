@@ -24,7 +24,7 @@ import json
 from flask.ext.testing import TestCase
 from flask import url_for
 from models import db
-from tests.stubdata.stub_data import StubDataLibrary
+from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
 
 
 class TestWebservices(TestCase):
@@ -50,6 +50,7 @@ class TestWebservices(TestCase):
 
         db.create_all()
         self.stub_library, self.stub_user_id = StubDataLibrary().make_stub()
+        self.stub_document = StubDataDocument().make_stub()
 
     def tearDown(self):
         """
@@ -63,28 +64,55 @@ class TestWebservices(TestCase):
 
     def test_create_library_resource(self):
         """
-        Test the /create route
+        Test the /users/<> route
 
         :return: no return
         """
 
         # Make the library
         url = url_for('userview', user=self.stub_user_id)
-        r = self.client.post(url, data=json.dumps(self.stub_library))
-        self.assertEqual(r.status_code, 200)
+        response = self.client.post(url, data=json.dumps(self.stub_library))
+        self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
-            self.assertIn(key, r.json)
+            self.assertIn(key, response.json)
 
         # Check the library exists in the database
         url = url_for('userview', user=self.stub_user_id)
-        r = self.client.get(url)
-        self.assertEqual(r.status_code, 200)
-        for library in r.json['libraries']:
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        for library in response.json['libraries']:
             self.assertIn(self.stub_library['name'], library['name'])
             self.assertIn(
                 self.stub_library['description'],
                 library['description']
             )
+
+    def test_add_document_to_library(self):
+        """
+        Test the /users/<>/libraries/<> endpoint
+
+        :return: no return
+        """
+
+        # Make the library
+        url = url_for('userview', user=self.stub_user_id)
+        response = self.client.post(url, data=json.dumps(self.stub_library))
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Add to the library
+        url = url_for('libraryview', user=self.stub_user_id, library=library_id)
+        response = self.client.post(url, data=json.dumps(self.stub_document))
+
+        # Check the library was created and documents exist
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.stub_document['bibcode'], response.json['documents'])
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

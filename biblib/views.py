@@ -152,6 +152,13 @@ class UserView(Resource):
 
     # Methods
     def get(self, user):
+        """
+        HTTP GET request that returns all the libraries that belong to a given
+        user
+
+        :param user: user ID as given by the API
+        :return: list of the users libraries with the relevant information
+        """
         # XXX: Check that user is not anon
         user_libraries = self.get_libraries(absolute_uid=user)
         return {'libraries': user_libraries}, 200
@@ -159,7 +166,7 @@ class UserView(Resource):
     def post(self, user):
         """
         HTTP POST request that creates a library for a given user
-        :param user: user ID as given from the API
+        :param user: user ID as given by the API
 
         :return: the response for if the library was successfully created
         """
@@ -194,8 +201,69 @@ class LibraryView(Resource):
 
     XXX: need to ignore the anon user, they should not be able to do anything
     XXX: document already exists
+    XXX: adding tags using PUT for RESTful endpoint?
 
     """
+
+    def add_document_to_library(self, library_id, document_data):
+        """
+        Adds a document to a user's library
+        :param library_id: the library id to update
+        :param document_data: the meta data of the document
+
+        :return: no return
+        """
+
+        current_app.logger.info('Adding a document: {0} to library_id: {1:d}'
+                                .format(document_data, library_id))
+        # Find the specified library
+        library = Library.query.filter(Library.id == library_id).one()
+        if not library.bibcode:
+            current_app.logger.debug('Zero length array: {0}'
+                                     .format(library.bibcode))
+            library.bibcode = [document_data['bibcode']]
+        else:
+            current_app.logger.debug('Non-Zero length array: {0}'
+                                     .format(library.bibcode))
+            library.bibcode.append(document_data['bibcode'])
+
+        db.session.add(library)
+        db.session.commit()
+
+        current_app.logger.info(library.bibcode)
+
+    def get_documents_from_library(self, library_id):
+        """
+        Retrieve all the documents that are within the library specified
+        :param library_id: the unique ID of the library
+
+        :return: bibcodes
+        """
+
+        library = Library.query.filter(Library.id == library_id).one()
+        return library.bibcode
+
+    def get(self, user, library):
+        """
+        HTTP GET request that returns all the documents inside a given
+        user's library
+
+        :param user: user ID as given by the API
+        :param library: library ID
+
+        :return: list of the users libraries with the relevant information
+        """
+        documents = self.get_documents_from_library(library_id=library)
+        return {'documents': documents}, 200
+
     def post(self, user, library):
-        print(user, library)
+        """
+        HTTP POST request that adds a document to a library for a given user
+        :param user: user ID as given by the API
+        :param library: library ID
+
+        :return: the response for if the library was successfully created
+        """
+        data = get_post_data(request)
+        self.add_document_to_library(library_id=library, document_data=data)
         return {}, 200

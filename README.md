@@ -1,6 +1,9 @@
-[![Build Status](https://travis-ci.org/jonnybazookatone/gut-service.svg?branch=master)](https://travis-ci.org/jonnybazookatone/gut-service)
+[![Build Status](https://travis-ci.org/jonnybazookatone/biblib-service.svg?branch=master)](https://travis-ci.org/jonnybazookatone/biblib-service)
+[![Coverage Status](https://coveralls.io/repos/jonnybazookatone/biblib-service/badge.svg)](https://coveralls.io/r/jonnybazookatone/biblib-service)
 
-# gut-service
+# biblib-service
+
+Astrophysic Data System's library service 
 
 ## development
 

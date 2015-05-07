@@ -4,6 +4,7 @@ flask-restful
 Flask-Testing
 flask-sqlalchemy
 flask-discoverer
+Flask-Migrate
 requests
 httpretty
 SQLAlchemy

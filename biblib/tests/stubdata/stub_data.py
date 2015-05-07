@@ -34,7 +34,10 @@ class StubDataDocument(object):
         :return: document in string format
         """
 
-        return '2015MNRAS...111...1'
+        bibcode = '2015MNRAS...111...1'
+        bibcode_payload = {'bibcode': bibcode}
+
+        return bibcode_payload
 
     def make_stub(self):
         """
