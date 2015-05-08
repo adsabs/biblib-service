@@ -92,11 +92,19 @@ class TestJobEpic(TestCase):
         # Then she submits the document (in this case a bibcode) to add to the
         # library
         url = url_for('libraryview', user=self.stub_uid, library=library_id)
+        self.stub_document['action'] = 'add'
         response = self.client.post(url, data=json.dumps(self.stub_document))
         self.assertEqual(response.status_code, 200, response)
 
         # Mary realises she added one that is not hers and goes back to her list
         # and deletes it from her library.
+        url = url_for('libraryview', user=self.stub_uid, library=library_id)
+        self.stub_document['action'] = 'remove'
+        response = self.client.post(url, data=json.dumps(self.stub_document))
+        self.assertEqual(response.status_code, 200, response)
+
+        response = response = self.client.get(url)
+        self.assertTrue(len(response.json['documents']) == 0, response.json)
 
         # Happy with her library, she copies the link to the library and e-mails
         # it to the prospective employer.

@@ -31,13 +31,24 @@ class MutableList(Mutable, list):
     """
     def append(self, value):
         """
-        Define an append
+        Define an append action
         :param value: value to be appended
 
         :return: no return
         """
 
         list.append(self, value)
+        self.changed()
+
+    def remove(self, value):
+        """
+        Define a remove action
+        :param value: value to be removed
+
+        :return: no return
+        """
+
+        list.remove(self, value)
         self.changed()
 
     @classmethod

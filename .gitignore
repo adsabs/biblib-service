@@ -7,3 +7,4 @@ local_config.py
 *.pdf
 *.png
 logs/
+*.coverage

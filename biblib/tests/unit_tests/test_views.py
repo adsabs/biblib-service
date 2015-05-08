@@ -287,7 +287,7 @@ class TestLibraryViews(TestCase):
 
     def test_user_can_get_documents_from_library(self):
         """
-        Tests that can retrieve all the bibcodes from a library
+        Test that can retrieve all the bibcodes from a library
 
         :return: no return
         """
@@ -316,4 +316,46 @@ class TestLibraryViews(TestCase):
         # Retrieve the bibcodes using the web services
         bibcodes = self.library_view.get_documents_from_library(
             library_id=library.id
+        )
+
+    def test_user_can_remove_document_from_library(self):
+        """
+        Test that can remove a document from the library
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        # Remove the bibcode from the library
+        self.library_view.remove_documents_from_library(
+            library_id=library.id,
+            document_data=self.stub_document
+        )
+
+        # Check it worked
+        library = Library.query.filter(Library.id == library.id).one()
+
+        self.assertTrue(
+            len(library.bibcode) == 0,
+            'There should be no bibcodes: {0}'.format(library.bibcode)
         )

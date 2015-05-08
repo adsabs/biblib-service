@@ -228,10 +228,26 @@ class LibraryView(Resource):
                                      .format(library.bibcode))
             library.bibcode.append(document_data['bibcode'])
 
-        db.session.add(library)
         db.session.commit()
 
         current_app.logger.info(library.bibcode)
+
+    def remove_documents_from_library(self, library_id, document_data):
+        """
+        Remove a given document from a specific library
+
+        :param library_id: the unique ID of the library
+        :param document_data: the meta data of the document
+
+        :return: no return
+        """
+        current_app.logger.info('Removing a document: {0} from library_id: '
+                                '{1:d}'.format(document_data, library_id))
+        library = Library.query.filter(Library.id == library_id).one()
+        library.bibcode.remove(document_data['bibcode'])
+        db.session.commit()
+        current_app.logger.info('Removed document successfully: {0}'
+                                .format(library.bibcode))
 
     def get_documents_from_library(self, library_id):
         """
@@ -266,5 +282,20 @@ class LibraryView(Resource):
         :return: the response for if the library was successfully created
         """
         data = get_post_data(request)
-        self.add_document_to_library(library_id=library, document_data=data)
-        return {}, 200
+
+        if data['action'] == 'add':
+            current_app.logger.info('User requested to add a document')
+            self.add_document_to_library(library_id=library, document_data=data)
+            return {}, 200
+
+        elif data['action'] == 'remove':
+            current_app.logger.info('User requested to remove a document')
+            self.remove_documents_from_library(
+                library_id=library,
+                document_data=data
+            )
+            return {}, 200
+
+        else:
+            current_app.logger.info('User requested a non-standard action')
+            return {}, 400
