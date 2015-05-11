@@ -30,9 +30,10 @@ class StubDataDocument(object):
         self.name = 'Stub Data for User'
         self.documents = []
 
-    def get_document(self):
+    def get_document(self, **kwargs):
         """
         Generate a fake document, e.g., a bibcode
+        :param kwargs: list of kwargs that will go into the output dictionary
 
         :return: document in string format
         """
@@ -43,16 +44,20 @@ class StubDataDocument(object):
                                                   id=_id)
         bibcode_payload = {'bibcode': bibcode}
 
+        for key in kwargs:
+            bibcode_payload[key] = kwargs[key]
+
         return bibcode_payload
 
-    def make_stub(self):
+    def make_stub(self, **kwargs):
         """
         Makes relevant stub data
+        :param kwargs: key word parameters to go in the outgoing document
 
         :return: stub data for a document
         """
 
-        self.documents.append(self.get_document())
+        self.documents.append(self.get_document(**kwargs))
 
         return self.documents[-1]
 
@@ -74,7 +79,7 @@ class StubDataUser(object):
 
     def get_user(self):
 
-        api_id = 1234
+        api_id = int(random.random()*1000)
         return api_id
 
 
