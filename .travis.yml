@@ -11,5 +11,4 @@ script:
  - bash biblib/tests/run_tests.sh
 after_success:
  - coverage combine
- - coverage report --omit 'biblib/tests/*','wsgi.py','*__init__.py','*config*'
  - coveralls
