@@ -8,3 +8,4 @@ local_config.py
 *.png
 logs/
 *.coverage
+*.ignore
