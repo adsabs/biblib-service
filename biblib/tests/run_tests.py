@@ -15,8 +15,15 @@ import unittest
 import sys
 
 if __name__ == '__main__':
-    suite = unittest.TestLoader().discover('functional_tests')
-    results = unittest.TextTestRunner(verbosity=3).run(suite)
+    
+    exit_failure = False
 
-    if results.errors or results.failures:
+    for suite_name in ['functional_tests', 'unit_tests']:
+        suite = unittest.TestLoader().discover(suite_name)
+        results = unittest.TextTestRunner(verbosity=3).run(suite)
+        
+        if results.errors or results.failures:
+            exit_failure = True
+
+    if exit_failure:
         sys.exit(1)

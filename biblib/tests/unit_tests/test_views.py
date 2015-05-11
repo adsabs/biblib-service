@@ -21,6 +21,7 @@ import app
 from models import db, User, Library, Permissions
 from flask.ext.testing import TestCase
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import NoResultFound
 from views import UserView, LibraryView
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
 
@@ -170,15 +171,43 @@ class TestUserViews(TestCase):
         # Make a library that ensures we get one back
         number_of_libs = 2
         for i in range(number_of_libs):
+
+            stub_library, tmp = StubDataLibrary().make_stub()
+
             self.user_view.create_library(
                 service_uid=user.id,
-                library_data=self.stub_library
+                library_data=stub_library
             )
 
         # Get the library created
         libraries = self.user_view.get_libraries(self.stub_uid)
 
         self.assertEqual(len(libraries), number_of_libs)
+
+    def test_user_cannot_add_two_libraries_with_the_same_name(self):
+        """
+        Test that a user cannot add a new library with the same name
+
+        :return: no return
+        """
+
+        # To make a library we need an actual user
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Make the first library
+        self.user_view.create_library(
+            service_uid=user.id,
+            library_data=self.stub_library
+        )
+
+        # Make the second library
+        with self.assertRaises(IntegrityError):
+            self.user_view.create_library(
+                service_uid=user.id,
+                library_data=self.stub_library
+            )
 
 
 class TestLibraryViews(TestCase):
@@ -359,3 +388,41 @@ class TestLibraryViews(TestCase):
             len(library.bibcode) == 0,
             'There should be no bibcodes: {0}'.format(library.bibcode)
         )
+
+    def test_user_can_delete_a_library(self):
+        """
+        Tests that the user can correctly remove a library from its account
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        library = Library.query.filter(Library.id == library.id).one()
+        self.assertIsInstance(library, Library)
+
+        self.library_view.delete_library(library_id=library.id)
+
+        with self.assertRaises(NoResultFound):
+            library = Library.query.filter(Library.id == library.id).one()

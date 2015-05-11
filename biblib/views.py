@@ -16,7 +16,19 @@ from flask.ext.restful import Resource
 from flask.ext.discoverer import advertise
 from models import db, User, Library, Permissions
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import NoResultFound
 from utils import get_post_data
+
+DUPLICATE_LIBRARY_NAME_ERROR = {'body': 'Library name given already '
+                                        'exists and must be unique.',
+                                'number': 409}
+
+MISSING_LIBRARY_ERROR = {'body': 'Library specified does not exist.',
+                         'number': 410}
+
+
+MISSING_DOCUMENT_ERROR = {'body': 'Document specified does not exist.',
+                          'number': 410}
 
 
 class UserView(Resource):
@@ -179,6 +191,8 @@ class UserView(Resource):
 
             self.create_user(absolute_uid=user)
             current_app.logger.info('User: {0:d}, created.'.format(user))
+        else:
+            current_app.logger.info('User already exists.')
 
         # Switch to the service UID and not the API UID
         service_uid = self.absolute_uid_to_service_uid(absolute_uid=user)
@@ -187,8 +201,12 @@ class UserView(Resource):
 
         # Create the library
         data = get_post_data(request)
-        library = \
-            self.create_library(service_uid=service_uid, library_data=data)
+        try:
+            library = \
+                self.create_library(service_uid=service_uid, library_data=data)
+        except IntegrityError as error:
+            return {'error': DUPLICATE_LIBRARY_NAME_ERROR['body']}, \
+                DUPLICATE_LIBRARY_NAME_ERROR['number']
 
         return {'name': library.name,
                 'id': library.id,
@@ -260,6 +278,18 @@ class LibraryView(Resource):
         library = Library.query.filter(Library.id == library_id).one()
         return library.bibcode
 
+    def delete_library(self, library_id):
+        """
+        Delete the entire library from the database
+        :param library_id: the unique ID of the library
+
+        :return: no return
+        """
+
+        library = Library.query.filter(Library.id == library_id).one()
+        db.session.delete(library)
+        db.session.commit()
+
     def get(self, user, library):
         """
         HTTP GET request that returns all the documents inside a given
@@ -270,8 +300,12 @@ class LibraryView(Resource):
 
         :return: list of the users libraries with the relevant information
         """
-        documents = self.get_documents_from_library(library_id=library)
-        return {'documents': documents}, 200
+        try:
+            documents = self.get_documents_from_library(library_id=library)
+            return {'documents': documents}, 200
+        except:
+            return {'error': MISSING_LIBRARY_ERROR['body']}, \
+                MISSING_LIBRARY_ERROR['number']
 
     def post(self, user, library):
         """
@@ -285,7 +319,8 @@ class LibraryView(Resource):
 
         if data['action'] == 'add':
             current_app.logger.info('User requested to add a document')
-            self.add_document_to_library(library_id=library, document_data=data)
+            self.add_document_to_library(library_id=library,
+                                         document_data=data)
             return {}, 200
 
         elif data['action'] == 'remove':
@@ -299,3 +334,28 @@ class LibraryView(Resource):
         else:
             current_app.logger.info('User requested a non-standard action')
             return {}, 400
+
+    def delete(self, user, library):
+        """
+        HTTP DELETE request that deletes a library defined by the number passed
+
+        :param user: user ID as given by the API
+        :param library: library ID
+
+        :return: the response for it the library was deleted
+        """
+
+        try:
+            current_app.logger.info('user_API: {0:d} '
+                                    'requesting to delete library: {0:d}'
+                                    .format(library))
+
+            self.delete_library(library_id=library)
+            current_app.logger.info('Deleted library.')
+
+        except NoResultFound as error:
+            current_app.logger.info('Failed to delete: {0}'.format(error))
+            return {'error': MISSING_LIBRARY_ERROR['body']}, \
+                MISSING_LIBRARY_ERROR['number']
+
+        return {}, 200

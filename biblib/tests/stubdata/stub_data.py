@@ -11,6 +11,8 @@ __status__ = 'Production'
 __credit__ = ['V. Sudilovsky']
 __license__ = 'MIT'
 
+import random
+
 
 class StubDataDocument(object):
     """
@@ -26,6 +28,7 @@ class StubDataDocument(object):
         """
 
         self.name = 'Stub Data for User'
+        self.documents = []
 
     def get_document(self):
         """
@@ -34,7 +37,10 @@ class StubDataDocument(object):
         :return: document in string format
         """
 
-        bibcode = '2015MNRAS...111...1'
+        year = '200{0}'.format(int(random.random()*9.0))
+        _id = (random.random()*99)+100
+        bibcode = '{year}MNRAS...{id}...J'.format(year=year,
+                                                  id=_id)
         bibcode_payload = {'bibcode': bibcode}
 
         return bibcode_payload
@@ -45,7 +51,10 @@ class StubDataDocument(object):
 
         :return: stub data for a document
         """
-        return self.get_document()
+
+        self.documents.append(self.get_document())
+
+        return self.documents[-1]
 
 
 class StubDataUser(object):
@@ -85,6 +94,7 @@ class StubDataLibrary(object):
         self.name = 'Stub Data for Libraries'
         self.stub_user = None
         self.stub_library = None
+        self.libraries = []
 
     def get_library(self):
         """
@@ -93,8 +103,21 @@ class StubDataLibrary(object):
         :return: dictionary of library stub data
         """
 
+        list_of_words = ['My', 'Library', 'first', 'second',
+                         'science', 'astronomy', 'word']
+
+        def random_word():
+            """Return a random word"""
+            return list_of_words[int((random.random()*len(list_of_words)))-1]
+
+        jumble = " ".join([random_word() for i in range(3)])
+
+        current_names = [j['name'] for j in zip(*self.libraries)]
+        while jumble in current_names:
+            jumble += random_word()
+
         stub_library = dict(
-            name='Library1',
+            name=jumble,
             description='My first library',
             read=True,
             write=True,
@@ -113,4 +136,6 @@ class StubDataLibrary(object):
         self.stub_library = self.get_library()
         self.stub_user = StubDataUser().get_user()
 
-        return self.stub_library, self.stub_user
+        self.libraries.append([self.get_library(), StubDataUser().get_user()])
+
+        return self.libraries[-1]

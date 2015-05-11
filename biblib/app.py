@@ -58,7 +58,7 @@ def create_app(config_type='PRODUCTION'):
 
     api.add_resource(LibraryView,
                      '/users/<int:user>/libraries/<int:library>',
-                     methods=['GET', 'POST'])
+                     methods=['GET', 'POST', 'DELETE'])
 
     # Initiate the database from the SQL Alchemy model
     db.init_app(app)
