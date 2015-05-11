@@ -23,6 +23,7 @@ sys.path.append(PROJECT_HOME)
 
 import app
 import json
+import unittest
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
@@ -111,3 +112,6 @@ class TestJobEpic(TestCase):
 
         # She then checks the link herself as she is paranoid it may not work,
         # but it works fine.
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)

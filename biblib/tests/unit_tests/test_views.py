@@ -18,6 +18,7 @@ PROJECT_HOME = os.path.abspath(
 sys.path.append(PROJECT_HOME)
 
 import app
+import unittest
 from models import db, User, Library, Permissions
 from flask.ext.testing import TestCase
 from sqlalchemy.exc import IntegrityError
@@ -426,3 +427,6 @@ class TestLibraryViews(TestCase):
 
         with self.assertRaises(NoResultFound):
             library = Library.query.filter(Library.id == library.id).one()
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)

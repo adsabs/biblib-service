@@ -23,6 +23,7 @@ sys.path.append(PROJECT_HOME)
 
 import app
 import json
+import unittest
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
@@ -124,3 +125,6 @@ class TestDeletionEpic(TestCase):
         url = url_for('userview', user=stub_uid)
         response = self.client.get(url)
         self.assertTrue(len(response.json['libraries']) == 0)
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)
