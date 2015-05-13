@@ -57,9 +57,10 @@ class StubDataDocument(object):
         :return: stub data for a document
         """
 
-        self.documents.append(self.get_document(**kwargs))
+        new_document = self.get_document(**kwargs)
+        self.documents.append(new_document)
 
-        return self.documents[-1]
+        return new_document
 
 
 class StubDataUser(object):

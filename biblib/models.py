@@ -94,7 +94,7 @@ class Library(db.Model):
     """
     __tablename__ = 'library'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True)
+    name = db.Column(db.String(50))
     description = db.Column(db.String(50))
     public = db.Column(db.Boolean)
     bibcode = db.Column(MutableList.as_mutable(ARRAY(db.String(50))))

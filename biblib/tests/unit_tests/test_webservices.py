@@ -173,7 +173,7 @@ class TestWebservices(TestCase):
 
     def test_can_remove_a_library(self):
         """
-        Tests the /users/<>/library<> end point with DELETE to remove a
+        Tests the /users/<>/library/<> end point with DELETE to remove a
         library from a user's libraries
 
         :return: no return
@@ -216,6 +216,13 @@ class TestWebservices(TestCase):
         self.assertEqual(response.json['error'],
                          MISSING_LIBRARY_ERROR['body'])
 
+    def test_user_without_permission_cannot_access_library(self):
+        """
+        Tests the /users/<>/library/<> end point to ensure that a user cannot
+        access the library unless they have permissions
+
+        :return: no return
+        """
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
