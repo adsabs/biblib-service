@@ -17,7 +17,7 @@ from flask.ext.discoverer import advertise
 from models import db, User, Library, Permissions
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from utils import get_post_data
+from utils import get_post_data, BackendIntegrityError
 
 DUPLICATE_LIBRARY_NAME_ERROR = {'body': 'Library name given already '
                                         'exists and must be unique.',
@@ -89,6 +89,14 @@ class UserView(Resource):
 
         current_app.logger.info('Creating library for user_service: {0:d}'
                                 .format(service_uid))
+
+        library_names = \
+            [i.library.name for i in
+             Permissions.query.filter(Permissions.user_id == service_uid).all()]
+
+        if _name in library_names:
+            raise BackendIntegrityError('Library name already exists')
+
         try:
 
             # Make the library in the library table
@@ -204,7 +212,7 @@ class UserView(Resource):
         try:
             library = \
                 self.create_library(service_uid=service_uid, library_data=data)
-        except IntegrityError as error:
+        except BackendIntegrityError as error:
             return {'error': DUPLICATE_LIBRARY_NAME_ERROR['body']}, \
                 DUPLICATE_LIBRARY_NAME_ERROR['number']
 
