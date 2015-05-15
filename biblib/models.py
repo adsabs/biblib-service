@@ -14,8 +14,10 @@ __status__ = 'Production'
 __license__ = 'MIT'
 
 from flask.ext.sqlalchemy import SQLAlchemy
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.ext.mutable import Mutable
+from sqlalchemy_utils import UUIDType
+import uuid
 
 db = SQLAlchemy()
 
@@ -93,7 +95,7 @@ class Library(db.Model):
     much like a bibtex file.
     """
     __tablename__ = 'library'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUIDType(), primary_key=True)
     name = db.Column(db.String(50))
     description = db.Column(db.String(50))
     public = db.Column(db.Boolean)
@@ -101,7 +103,7 @@ class Library(db.Model):
     permissions = db.relationship('Permissions', backref='library')
 
     def __repr__(self):
-        return '<Library, library_id: {0:d} name: {1}, ' \
+        return '<Library, library_id: {0} name: {1}, ' \
                'description: {2}, public: {3},' \
                'bibcode: {4}>'\
             .format(self.id,
@@ -128,7 +130,7 @@ class Permissions(db.Model):
     owner = db.Column(db.Boolean)
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    library_id = db.Column(db.Integer, db.ForeignKey('library.id'))
+    library_id = db.Column(UUIDType(binary=False), db.ForeignKey('library.id'))
 
     def __repr__(self):
         return '<Permissions, user_id: {0}, library_id: {1}, read: {2}, '\

@@ -18,6 +18,7 @@ from models import db, User, Library, Permissions
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from utils import get_post_data, BackendIntegrityError
+import uuid
 
 DUPLICATE_LIBRARY_NAME_ERROR = {'body': 'Library name given already '
                                         'exists and must be unique.',
@@ -108,6 +109,7 @@ class UserView(Resource):
             library = Library(name=_name,
                               description=_description,
                               public=_public)
+            library.id = uuid.uuid4()
             user = User.query.filter(User.id == service_uid).one()
 
             # Make the permissions
