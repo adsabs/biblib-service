@@ -86,13 +86,18 @@ class UserView(Resource):
         _read = library_data['read']
         _write = library_data['write']
         _public = library_data['public']
+        _owner = True
 
         current_app.logger.info('Creating library for user_service: {0:d}'
                                 .format(service_uid))
 
+	# We want to ensure that the users have unique library names. However,
+        # it should be possible that they have access to other libraries from
+        # other people, that have the same name
         library_names = \
             [i.library.name for i in
-             Permissions.query.filter(Permissions.user_id == service_uid).all()]
+             Permissions.query.filter(Permissions.user_id == service_uid,
+                                      Permissions.owner == True).all()]
 
         if _name in library_names:
             raise BackendIntegrityError('Library name already exists')
@@ -108,7 +113,8 @@ class UserView(Resource):
             # Make the permissions
             permission = Permissions(
                 read=_read,
-                write=_write
+                write=_write,
+                owner=_owner,
             )
 
             # Use the ORM to link the permissions to the library and user,

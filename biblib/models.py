@@ -125,6 +125,7 @@ class Permissions(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     read = db.Column(db.Boolean)
     write = db.Column(db.Boolean)
+    owner = db.Column(db.Boolean)
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     library_id = db.Column(db.Integer, db.ForeignKey('library.id'))
