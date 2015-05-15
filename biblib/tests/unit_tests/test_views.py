@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from views import UserView, LibraryView
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
+from utils import BackendIntegrityError
 
 
 class TestUserViews(TestCase):
@@ -204,7 +205,7 @@ class TestUserViews(TestCase):
         )
 
         # Make the second library
-        with self.assertRaises(IntegrityError):
+        with self.assertRaises(BackendIntegrityError):
             self.user_view.create_library(
                 service_uid=user.id,
                 library_data=self.stub_library

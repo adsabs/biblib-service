@@ -77,3 +77,13 @@ def get_post_data(request):
         return request.get_json(force=True)
     except:
         return request.values
+
+
+class BackendIntegrityError(Exception):
+    def __init__(self, message):
+
+        # Call the base class constructor with the parameters it needs
+        super(BackendIntegrityError, self).__init__(message)
+
+        # Now for your custom code...
+        self.errors = 'The library name already exists for this user'
