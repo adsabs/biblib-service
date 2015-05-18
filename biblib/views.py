@@ -60,7 +60,7 @@ class UserView(Resource):
             db.session.commit()
 
         except IntegrityError as error:
-            current_app.logger.error('IntegritError. User: {0:d} was not'
+            current_app.logger.error('IntegrityError. User: {0:d} was not'
                                      'added. Full traceback: {1}'
                                      .format(absolute_uid, error))
             raise
@@ -109,7 +109,6 @@ class UserView(Resource):
             library = Library(name=_name,
                               description=_description,
                               public=_public)
-            library.id = uuid.uuid4()
             user = User.query.filter(User.id == service_uid).one()
 
             # Make the permissions
@@ -171,7 +170,7 @@ class UserView(Resource):
         for library in user_libraries:
             payload = {
                 'name': library.name,
-                'id': library.id,
+                'id': '{0}'.format(library.id),
                 'description': library.description,
             }
             output_libraries.append(payload)
@@ -225,7 +224,7 @@ class UserView(Resource):
                 DUPLICATE_LIBRARY_NAME_ERROR['number']
 
         return {'name': library.name,
-                'id': library.id,
+                'id': '{0}'.format(library.id),
                 'description': library.description}, 200
 
 
@@ -249,7 +248,7 @@ class LibraryView(Resource):
         :return: no return
         """
 
-        current_app.logger.info('Adding a document: {0} to library_id: {1:d}'
+        current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
                                 .format(document_data, library_id))
         # Find the specified library
         library = Library.query.filter(Library.id == library_id).one()
@@ -275,8 +274,8 @@ class LibraryView(Resource):
 
         :return: no return
         """
-        current_app.logger.info('Removing a document: {0} from library_id: '
-                                '{1:d}'.format(document_data, library_id))
+        current_app.logger.info('Removing a document: {0} from library_uuid: '
+                                '{1}'.format(document_data, library_id))
         library = Library.query.filter(Library.id == library_id).one()
         library.bibcode.remove(document_data['bibcode'])
         db.session.commit()
@@ -363,8 +362,8 @@ class LibraryView(Resource):
 
         try:
             current_app.logger.info('user_API: {0:d} '
-                                    'requesting to delete library: {0:d}'
-                                    .format(library))
+                                    'requesting to delete library: {0}'
+                                    .format(user, library))
 
             self.delete_library(library_id=library)
             current_app.logger.info('Deleted library.')

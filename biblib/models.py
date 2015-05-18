@@ -13,13 +13,56 @@ __email__ = 'ads@cfa.harvard.edu'
 __status__ = 'Production'
 __license__ = 'MIT'
 
+import uuid
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.ext.mutable import Mutable
-from sqlalchemy_utils import UUIDType
-import uuid
+from sqlalchemy.types import TypeDecorator, CHAR
+
 
 db = SQLAlchemy()
+
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID type.
+
+    Uses Postgresql's UUID type, otherwise uses
+    CHAR(32), storing as stringified hex values.
+
+    Taken from http://docs.sqlalchemy.org/en/latest/core/custom_types.html
+    ?highlight=guid#backend-agnostic-guid-type
+
+    Does not work if you simply do the following:
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    as Flask cannot serialise UUIDs correctly.
+
+    """
+    impl = CHAR
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(UUID())
+        else:
+            return dialect.type_descriptor(CHAR(32))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return str(value)
+        else:
+            if not isinstance(value, uuid.UUID):
+                return '{0:.32x}'.format(uuid.UUID(value))
+            else:
+                # hexstring
+                return '{0:.32x}'.format(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        else:
+            return uuid.UUID(value)
 
 
 class MutableList(Mutable, list):
@@ -95,7 +138,7 @@ class Library(db.Model):
     much like a bibtex file.
     """
     __tablename__ = 'library'
-    id = db.Column(UUIDType(), primary_key=True)
+    id = db.Column(GUID, primary_key=True, default=uuid.uuid4)
     name = db.Column(db.String(50))
     description = db.Column(db.String(50))
     public = db.Column(db.Boolean)
@@ -130,7 +173,7 @@ class Permissions(db.Model):
     owner = db.Column(db.Boolean)
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    library_id = db.Column(UUIDType(binary=False), db.ForeignKey('library.id'))
+    library_id = db.Column(GUID, db.ForeignKey('library.id'))
 
     def __repr__(self):
         return '<Permissions, user_id: {0}, library_id: {1}, read: {2}, '\
