@@ -53,11 +53,11 @@ def create_app(config_type='PRODUCTION'):
 
     # Add the end resource end points
     api.add_resource(UserView,
-                     '/users/<int:user>/libraries/',
+                     '/libraries',
                      methods=['GET', 'POST'])
 
     api.add_resource(LibraryView,
-                     '/users/<int:user>/libraries/<string:library>',
+                     '/libraries/<string:library>',
                      methods=['GET', 'POST', 'DELETE'])
 
     # Initiate the database from the SQL Alchemy model

@@ -24,6 +24,7 @@ sys.path.append(PROJECT_HOME)
 import app
 import json
 import unittest
+from views import USER_ID_KEYWORD
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
@@ -73,21 +74,34 @@ class TestDeletionEpic(TestCase):
         #  3. decides she wants to delete the next one too
         # She then checks that they were deleted
 
-        # Makes the two libraries
-        # First
+        # Load stub data 1
         stub_library_1, stub_uid = StubDataLibrary().make_stub()
-        url = url_for('userview', user=stub_uid)
-        response = self.client.post(url, data=json.dumps(stub_library_1))
+        # Make the header
+        # that will come from the ADSWS
+        headers = {USER_ID_KEYWORD: stub_uid}
+
+        # Makes the two libraries
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(stub_library_1),
+            headers=headers
+        )
         library_name_1 = response.json['name']
 
         self.assertEqual(response.status_code, 200, response)
         self.assertTrue('name' in response.json)
         self.assertTrue(library_name_1 == stub_library_1['name'])
 
-        # Second
+        # Second stub data
         stub_library_2, tmp = StubDataLibrary().make_stub()
-        url = url_for('userview', user=stub_uid)
-        response = self.client.post(url, data=json.dumps(stub_library_2))
+
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(stub_library_2),
+            headers=headers
+        )
         library_name_2 = response.json['name']
 
         self.assertEqual(response.status_code, 200, response)
@@ -101,29 +115,44 @@ class TestDeletionEpic(TestCase):
                             .format(library_name_1, library_name_2))
 
         # Deletes the first library
-        url = url_for('userview', user=stub_uid)
-        response = self.client.get(url)
+        url = url_for('userview')
+        response = self.client.get(
+            url,
+            headers=headers
+        )
         library_id_1 = response.json['libraries'][0]['id']
         library_id_2 = response.json['libraries'][1]['id']
 
         # Deletes the second library
-        url = url_for('libraryview', user=stub_uid, library=library_id_2)
-        response = self.client.delete(url)
+        url = url_for('libraryview', library=library_id_2)
+        response = self.client.delete(
+            url,
+            headers=headers
+        )
         self.assertEqual(response.status_code, 200)
 
         # Looks to check there are is only one libraries
-        url = url_for('userview', user=stub_uid)
-        response = self.client.get(url)
+        url = url_for('userview')
+        response = self.client.get(
+            url,
+            headers=headers
+        )
         self.assertTrue(len(response.json['libraries']) == 1)
 
         # Deletes the first library
-        url = url_for('libraryview', user=stub_uid, library=library_id_1)
-        response = self.client.delete(url)
+        url = url_for('libraryview', library=library_id_1)
+        response = self.client.delete(
+            url,
+            headers=headers
+        )
         self.assertEqual(response.status_code, 200)
 
         # Looks to check there are is only one libraries
-        url = url_for('userview', user=stub_uid)
-        response = self.client.get(url)
+        url = url_for('userview')
+        response = self.client.get(
+            url,
+            headers=headers
+        )
         self.assertTrue(len(response.json['libraries']) == 0)
 
 if __name__ == '__main__':

@@ -31,6 +31,11 @@ MISSING_LIBRARY_ERROR = {'body': 'Library specified does not exist.',
 MISSING_DOCUMENT_ERROR = {'body': 'Document specified does not exist.',
                           'number': 410}
 
+MISSING_USERNAME_ERROR = {'body': 'You did not supply enough user details',
+                          'number': 400}
+
+USER_ID_KEYWORD = 'X-Adsws-Uid'
+
 
 class UserView(Resource):
     """
@@ -92,7 +97,7 @@ class UserView(Resource):
         current_app.logger.info('Creating library for user_service: {0:d}'
                                 .format(service_uid))
 
-	# We want to ensure that the users have unique library names. However,
+        # We want to ensure that the users have unique library names. However,
         # it should be possible that they have access to other libraries from
         # other people, that have the same name
         library_names = \
@@ -101,7 +106,9 @@ class UserView(Resource):
                                       Permissions.owner == True).all()]
 
         if _name in library_names:
-            raise BackendIntegrityError('Library name already exists')
+            current_app.logger.error('Name supplied for the library already '
+                                     'exists: "{0}"'.format(_name))
+            raise BackendIntegrityError('Library name already exists.')
 
         try:
 
@@ -178,7 +185,7 @@ class UserView(Resource):
         return output_libraries
 
     # Methods
-    def get(self, user):
+    def get(self):
         """
         HTTP GET request that returns all the libraries that belong to a given
         user
@@ -187,16 +194,32 @@ class UserView(Resource):
         :return: list of the users libraries with the relevant information
         """
         # XXX: Check that user is not anon
+        # Check that they pass a user id
+        try:
+            user = int(request.headers[USER_ID_KEYWORD])
+        except KeyError:
+            current_app.logger.error('No username passed')
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
+
         user_libraries = self.get_libraries(absolute_uid=user)
         return {'libraries': user_libraries}, 200
 
-    def post(self, user):
+    def post(self):
         """
         HTTP POST request that creates a library for a given user
         :param user: user ID as given by the API
 
         :return: the response for if the library was successfully created
         """
+
+        # Check that they pass a user id
+        try:
+            user = int(request.headers[USER_ID_KEYWORD])
+        except KeyError:
+            current_app.logger.error('No username passed')
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
 
         # Check if the user exists, if not, generate a user in the database
         current_app.logger.info('Checking if the user exists')
@@ -234,7 +257,7 @@ class LibraryView(Resource):
     removing content
 
     XXX: need to ignore the anon user, they should not be able to do anything
-    XXX: document already exists
+    XXX: document already exists (only add a bibcode once)
     XXX: adding tags using PUT for RESTful endpoint?
 
     """
@@ -305,7 +328,7 @@ class LibraryView(Resource):
         db.session.delete(library)
         db.session.commit()
 
-    def get(self, user, library):
+    def get(self, library):
         """
         HTTP GET request that returns all the documents inside a given
         user's library
@@ -314,7 +337,14 @@ class LibraryView(Resource):
         :param library: library ID
 
         :return: list of the users libraries with the relevant information
+        XXX: Needs authentification still
         """
+        try:
+            user = int(request.headers[USER_ID_KEYWORD])
+        except KeyError:
+            current_app.logger.error('No username passed')
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
         try:
             documents = self.get_documents_from_library(library_id=library)
             return {'documents': documents}, 200
@@ -322,16 +352,24 @@ class LibraryView(Resource):
             return {'error': MISSING_LIBRARY_ERROR['body']}, \
                 MISSING_LIBRARY_ERROR['number']
 
-    def post(self, user, library):
+    def post(self, library):
         """
         HTTP POST request that adds a document to a library for a given user
         :param user: user ID as given by the API
         :param library: library ID
 
         :return: the response for if the library was successfully created
-        """
-        data = get_post_data(request)
 
+        XXX: Needs authentification still
+        """
+        try:
+            user = int(request.headers[USER_ID_KEYWORD])
+        except KeyError:
+            current_app.logger.error('No username passed')
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
+
+        data = get_post_data(request)
         if data['action'] == 'add':
             current_app.logger.info('User requested to add a document')
             self.add_document_to_library(library_id=library,
@@ -350,7 +388,7 @@ class LibraryView(Resource):
             current_app.logger.info('User requested a non-standard action')
             return {}, 400
 
-    def delete(self, user, library):
+    def delete(self, library):
         """
         HTTP DELETE request that deletes a library defined by the number passed
 
@@ -359,6 +397,12 @@ class LibraryView(Resource):
 
         :return: the response for it the library was deleted
         """
+        try:
+            user = int(request.headers[USER_ID_KEYWORD])
+        except KeyError:
+            current_app.logger.error('No username passed')
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
 
         try:
             current_app.logger.info('user_API: {0:d} '
