@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/adsabs/biblib-service.svg?branch=master)](https://travis-ci.org/adsabs/biblib-service)
-[![Coverage Status](https://coveralls.io/repos/adsabs/biblib-service/badge.svg)](https://coveralls.io/r/adsabs/biblib-service)
+[![Coverage Status](https://coveralls.io/repos/adsabs/biblib-service/badge.svg?branch=master)](https://coveralls.io/r/adsabs/biblib-service?branch=master)
 
 # biblib-service
 
