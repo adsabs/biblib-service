@@ -24,7 +24,7 @@ sys.path.append(PROJECT_HOME)
 import app
 import json
 import unittest
-from views import USER_ID_KEYWORD
+from views import USER_ID_KEYWORD, NO_PERMISSION_ERROR
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
@@ -131,20 +131,56 @@ class TestDeletionEpic(TestCase):
             url,
             headers=headers_mary
         )
-        # self.assertEqual(response.status_code, 403)
-        # self.assertNotIn('documents', response.json.keys())
-        # self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertNotIn('documents', response.json.keys())
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
         # Ask API for the user_id, if it does not exist, we send an e-mail?
 
         # Dave then gives Mary the permissions to read his library
+        headers = {'user': uid_dave}
+        email_mary = 'mary@email.com'
+        permission_data = {
+            'user': email_mary,
+            'permission': ['viewer'],
+            'action': 'add'
+        }
 
         # need a permissions endpoint
-        # /users/<id>/libraries/<id>/permissions/<id>
+        # /permissions/<uuid_library>
+        url = url_for('permissionview', library=library_id_dave, method='post')
+        headers = {'user': uid_dave}
+        response = self.client.post(
+            url,
+            data=permission_data,
+            headers=headers
+        )
 
-        # Mary writes back to say she can see his libraries and is happy
+        self.assertEqual(response.status_code, 200)
 
-        # need a permissions check inside
+        # Mary writes back to say she can see his libraries and is happy but
+        # wants to add content herself
+        url = url_for('libraryview', library=library_id_dave)
+        response = self.client.get(
+            url,
+            headers=headers_mary
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(len(response.json['documents']) == number_of_documents)
+
+        # Mary accidentally tries to delete the permissions of Dave, but nothing
+        # happens
+
+        # Dave is unhappy with Mary's changes, so he removes her permissions
+        # to write
+
+        # Mary realises she can no longer add content
+
+        # Dave then removes her ability to read anything
+
+        # Mary realises she can no longer read content
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

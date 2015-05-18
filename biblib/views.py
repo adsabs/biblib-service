@@ -18,7 +18,6 @@ from models import db, User, Library, Permissions
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from utils import get_post_data, BackendIntegrityError
-import uuid
 
 DUPLICATE_LIBRARY_NAME_ERROR = {'body': 'Library name given already '
                                         'exists and must be unique.',
@@ -33,6 +32,9 @@ MISSING_DOCUMENT_ERROR = {'body': 'Document specified does not exist.',
 
 MISSING_USERNAME_ERROR = {'body': 'You did not supply enough user details',
                           'number': 400}
+
+NO_PERMISSION_ERROR = {'body': 'You do not have the correct permissions.',
+                       'number': 403}
 
 USER_ID_KEYWORD = 'X-Adsws-Uid'
 
@@ -86,6 +88,14 @@ class UserView(Resource):
             return False
 
     def create_library(self, service_uid, library_data):
+        """
+        Creates a library for a user
+
+        :param service_uid: the user ID within this microservice
+        :param library_data: content needed to create a library
+
+        :return: no return
+        """
 
         _name = library_data['name']
         _description = library_data['description']
@@ -208,7 +218,6 @@ class UserView(Resource):
     def post(self):
         """
         HTTP POST request that creates a library for a given user
-        :param user: user ID as given by the API
 
         :return: the response for if the library was successfully created
         """
@@ -261,6 +270,31 @@ class LibraryView(Resource):
     XXX: adding tags using PUT for RESTful endpoint?
 
     """
+
+    def user_exists(self, absolute_uid):
+        """
+        Checks if a use exists before it would attempt to create one
+
+        :param absolute_uid: UID from the API
+        :return: boolean for if the user exists
+        """
+
+        user_count = User.query.filter(User.absolute_uid == absolute_uid).all()
+        user_count = len(user_count)
+        if user_count == 1:
+            return True
+        elif user_count == 0:
+            return False
+
+    def absolute_uid_to_service_uid(self, absolute_uid):
+        """
+        Convert the API UID to the BibLib service ID
+
+        :param absolute_uid: API UID
+        :return: BibLib service ID
+        """
+        user = User.query.filter(User.absolute_uid == absolute_uid).one()
+        return user.id
 
     def add_document_to_library(self, library_id, document_data):
         """
@@ -328,12 +362,31 @@ class LibraryView(Resource):
         db.session.delete(library)
         db.session.commit()
 
+    def access_allowed(self, service_uid, library_id, access_type):
+        """
+        Determines if the given user has permissions to look at the content
+        of a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+        try:
+            permissions = Permissions.query.filter(
+                Permissions.library_id == library_id,
+                Permissions.user_id == service_uid
+            ).one()
+            return getattr(permissions, access_type)
+        except NoResultFound as error:
+            current_app.logger.error('No permissions for this user and library.'
+                                     ' [{0}]'.format(error))
+            return False
+
     def get(self, library):
         """
         HTTP GET request that returns all the documents inside a given
         user's library
-
-        :param user: user ID as given by the API
         :param library: library ID
 
         :return: list of the users libraries with the relevant information
@@ -345,7 +398,36 @@ class LibraryView(Resource):
             current_app.logger.error('No username passed')
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
+
+        current_app.logger.info('User: {0} requested library: {1}'
+                                .format(user, library))
+
+        # If the library is public, allow access
+
+        # If the user does not exist then there are no associated permissions
+        # If the user exists, they will have permissions
+        if self.user_exists(absolute_uid=user):
+            service_uid = self.absolute_uid_to_service_uid(absolute_uid=user)
+        else:
+            current_app.logger.error('User:{0} does not exist in the database. '
+                                     'Therefore, will not have extra privileges'
+                                     'to view the library: {1}'
+                                     .format(user, library))
+
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                   NO_PERMISSION_ERROR['number']
+
+        # If they do not have access, exit
+        if not self.access_allowed(service_uid=service_uid,
+                               library_id=library,
+                               access_type='read'):
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                   NO_PERMISSION_ERROR['number']
+
+        # If they have access, let them obtain the requested content
         try:
+            current_app.logger.info('User: {0} request library: {1}. ALLOWED'
+                                    .format(user, library))
             documents = self.get_documents_from_library(library_id=library)
             return {'documents': documents}, 200
         except:
@@ -355,7 +437,6 @@ class LibraryView(Resource):
     def post(self, library):
         """
         HTTP POST request that adds a document to a library for a given user
-        :param user: user ID as given by the API
         :param library: library ID
 
         :return: the response for if the library was successfully created
@@ -391,8 +472,6 @@ class LibraryView(Resource):
     def delete(self, library):
         """
         HTTP DELETE request that deletes a library defined by the number passed
-
-        :param user: user ID as given by the API
         :param library: library ID
 
         :return: the response for it the library was deleted
@@ -417,4 +496,30 @@ class LibraryView(Resource):
             return {'error': MISSING_LIBRARY_ERROR['body']}, \
                 MISSING_LIBRARY_ERROR['number']
 
+        return {}, 200
+
+
+class PermissionView(Resource):
+    """
+    End point to manipulate the permissions between a user and a library
+
+
+    XXX: Users that do not have an account, cannot be added to permissions
+    XXX: add read, write, admin
+    XXX: remove read, write, admin
+    XXX: only an admin/owner can add permissions to someone
+    XXX: update permissions stub data (and stub data in general)
+    """
+
+    decorators = [advertise('scopes', 'rate_limit')]
+    scopes = ['scope1', 'scope2']
+    rate_limit = [1000, 60*60*24]
+
+    def post(self, library):
+        """
+        HTTP POST request that modifies the permissions of a library
+        :param library: library ID
+
+        :return: the response for if the library was successfully created
+        """
         return {}, 200

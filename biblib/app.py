@@ -3,7 +3,7 @@ Application
 """
 
 from flask import Flask
-from views import UserView, LibraryView
+from views import UserView, LibraryView, PermissionView
 from flask.ext.restful import Api
 from flask.ext.discoverer import Discoverer
 from models import db
@@ -59,6 +59,10 @@ def create_app(config_type='PRODUCTION'):
     api.add_resource(LibraryView,
                      '/libraries/<string:library>',
                      methods=['GET', 'POST', 'DELETE'])
+
+    api.add_resource(PermissionView,
+                     '/permissions/<string:library>',
+                     methods=['POST'])
 
     # Initiate the database from the SQL Alchemy model
     db.init_app(app)

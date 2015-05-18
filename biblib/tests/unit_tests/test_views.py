@@ -429,5 +429,44 @@ class TestLibraryViews(TestCase):
         with self.assertRaises(NoResultFound):
             library = Library.query.filter(Library.id == library.id).one()
 
+    def test_user_without_permission_cannot_access_private_library(self):
+        """
+        Tests that the user requesting to see the contents of a library has
+        the correct permissions. In this case, they do not, and are refused to
+        see the library content.
+
+        :return: no return
+        """
+
+        # Make a fake user and library
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        # Make sure the second user is denied access
+        access = self.library_view.access_allowed(service_uid=user.id+1,
+                                                  library_id=library.id,
+                                                  access_type='read')
+
+        self.assertIsNotNone(access)
+        self.assertFalse(access)
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

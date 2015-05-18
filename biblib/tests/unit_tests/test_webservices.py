@@ -25,7 +25,7 @@ from flask.ext.testing import TestCase
 from flask import url_for
 from models import db
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
-    MISSING_USERNAME_ERROR
+    MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR
 from views import USER_ID_KEYWORD
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
 
@@ -366,14 +366,110 @@ class TestWebservices(TestCase):
         self.assertEqual(response.json['error'],
                          MISSING_LIBRARY_ERROR['body'])
 
-    def test_user_without_permission_cannot_access_library(self):
+    def test_user_without_permission_cannot_access_private_library(self):
         """
-        Tests the /users/<>/library/<> end point to ensure that a user cannot
+        Tests the /libraries/<> end point to ensure that a user cannot
         access the library unless they have permissions
 
         :return: no return
         """
-        pass
+
+        # Make a library for a given user, user 1
+        url = url_for('userview')
+        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers_1
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Request from user 2 to see the library should be refused if user 2
+        # does not have the permissions
+        # Check the library is empty
+        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
+        url = url_for('libraryview', library=library_id)
+
+        response = self.client.get(
+            url,
+            headers=headers_2
+        )
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
+
+    def test_can_add_read_permissions(self):
+        """
+        Tests that a user can add read permissions to another user for one of
+        their libraries.
+
+        :return: no return
+        """
+
+        # Initialise HTTPretty for the URL for the API
+
+        # Make a library for a given user, user 1
+        url = url_for('userview')
+        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
+        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers_1
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Make a library for user 2 so that we have an account
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers_2
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # Add the permissions for user 2
+        url = url_for('permissionview')
+        email = 'user@email.com'
+
+        data_permissions = {
+            'user': email,
+            'permission': 'read'
+        }
+
+        response = self.client.post(
+            url,
+            data=json.dumps(data_permissions),
+            headers=headers_1
+        )
+
+
+        # The user can now access the content of the library
+        url = url_for('libraryview', library=library_id)
+
+        response = self.client.get(
+            url,
+            headers=headers_2
+        )
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
+
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
