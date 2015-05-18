@@ -24,7 +24,9 @@ import json
 from flask.ext.testing import TestCase
 from flask import url_for
 from models import db
-from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR
+from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
+    MISSING_USERNAME_ERROR
+from views import USER_ID_KEYWORD
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
 
 
@@ -63,23 +65,93 @@ class TestWebservices(TestCase):
         db.session.remove()
         db.drop_all()
 
+    def test_when_no_user_information_passed_to_user_post(self):
+        """
+        Test the /libraries route
+        Tests that a KeyError is raised when the user ID is not passed
+
+        :return: no return
+        """
+
+        url = url_for('userview')
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, MISSING_USERNAME_ERROR['number'])
+        self.assertEqual(response.json['error'], MISSING_USERNAME_ERROR['body'])
+
+    def test_when_no_user_information_passed_to_user_get(self):
+        """
+        Test the /libraries route
+        Tests that a KeyError is raised when the user ID is not passed
+
+        :return: no return
+        """
+
+        url = url_for('userview')
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, MISSING_USERNAME_ERROR['number'])
+        self.assertEqual(response.json['error'], MISSING_USERNAME_ERROR['body'])
+
+    def test_when_no_user_information_passed_to_library_post(self):
+        """
+        Test the /libraries/<library_uuid> route
+        Tests that a KeyError is raised when the user ID is not passed
+
+        :return: no return
+        """
+
+        url = url_for('libraryview', library='test')
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, MISSING_USERNAME_ERROR['number'])
+        self.assertEqual(response.json['error'], MISSING_USERNAME_ERROR['body'])
+
+    def test_when_no_user_information_passed_to_library_get(self):
+        """
+        Test the /libraries route
+        Tests that a KeyError is raised when the user ID is not passed
+
+        :return: no return
+        """
+
+        url = url_for('libraryview', library='test')
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, MISSING_USERNAME_ERROR['number'])
+        self.assertEqual(response.json['error'], MISSING_USERNAME_ERROR['body'])
+
     def test_create_library_resource(self):
         """
-        Test the /users/<> route
+        Test the /libraries route
+        Creating the user and a library
 
         :return: no return
         """
 
         # Make the library
-        url = url_for('userview', user=self.stub_user_id)
-        response = self.client.post(url, data=json.dumps(self.stub_library))
+        url = url_for('userview')
+        payload = self.stub_library
+        headers = {USER_ID_KEYWORD: self.stub_user_id}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(payload),
+            headers=headers
+        )
+
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
 
         # Check the library exists in the database
         url = url_for('userview', user=self.stub_user_id)
-        response = self.client.get(url)
+
+        response = self.client.get(
+            url,
+            headers=headers
+        )
+
         self.assertEqual(response.status_code, 200)
         for library in response.json['libraries']:
             self.assertIn(self.stub_library['name'], library['name'])
@@ -90,14 +162,22 @@ class TestWebservices(TestCase):
 
     def test_add_document_to_library(self):
         """
-        Test the /users/<>/libraries/<> end point with POST to add a document
+        Test the /libraries/<> end point with POST to add a document
 
         :return: no return
         """
 
         # Make the library
-        url = url_for('userview', user=self.stub_user_id)
-        response = self.client.post(url, data=json.dumps(self.stub_library))
+        url = url_for('userview')
+        payload = self.stub_library
+        headers = {USER_ID_KEYWORD: self.stub_user_id}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(payload),
+            headers=headers
+        )
+
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
@@ -107,23 +187,40 @@ class TestWebservices(TestCase):
 
         # Add to the library
         self.stub_document['action'] = 'add'
-        url = url_for('libraryview', user=self.stub_user_id, library=library_id)
-        response = self.client.post(url, data=json.dumps(self.stub_document))
+        url = url_for('libraryview', library=library_id)
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_document),
+            headers=headers
+        )
 
         # Check the library was created and documents exist
-        response = self.client.get(url)
+        response = self.client.get(
+            url,
+            data=json.dumps(payload),
+            headers=headers
+        )
+
         self.assertEqual(response.status_code, 200)
         self.assertIn(self.stub_document['bibcode'], response.json['documents'])
 
     def test_remove_document_from_library(self):
         """
-        Test the /users/<>/libraries/<> end point with POST to remove a document
+        Test the /libraries/<> end point with POST to remove a document
 
         :return:
         """
         # Make the library
-        url = url_for('userview', user=self.stub_user_id)
-        response = self.client.post(url, data=json.dumps(self.stub_library))
+        url = url_for('userview')
+        headers = {USER_ID_KEYWORD: self.stub_user_id}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers
+        )
+
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
@@ -133,39 +230,69 @@ class TestWebservices(TestCase):
 
         # Add to the library
         self.stub_document['action'] = 'add'
-        url = url_for('libraryview', user=self.stub_user_id, library=library_id)
-        response = self.client.post(url, data=json.dumps(self.stub_document))
+        url = url_for('libraryview', library=library_id)
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_document),
+            headers=headers
+        )
+
         self.assertTrue(response.status, 200)
 
         # Delete the document
         self.stub_document['action'] = 'remove'
-        url = url_for('libraryview', user=self.stub_user_id, library=library_id)
-        response = self.client.post(url, data=json.dumps(self.stub_document))
+        url = url_for('libraryview', library=library_id)
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_document),
+            headers=headers
+        )
+
         self.assertTrue(response.status, 200)
 
         # Check the library is empty
-        url = url_for('libraryview', user=self.stub_user_id, library=library_id)
-        response = self.client.get(url)
+        url = url_for('libraryview', library=library_id)
+
+        response = self.client.get(
+            url,
+            headers=headers
+        )
+
         self.assertTrue(len(response.json['documents']) == 0)
 
     def test_cannot_add_library_with_duplicate_names(self):
         """
-        Test the /users/<> end point with POST to ensure two libraries cannot
+        Test the /liraries end point with POST to ensure two libraries cannot
         have the same name
 
         :return: no return
         """
 
         # Make first library
-        url = url_for('userview', user=self.stub_user_id)
-        response = self.client.post(url, data=json.dumps(self.stub_library))
+        url = url_for('userview')
+        headers = {USER_ID_KEYWORD: self.stub_user_id}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers
+        )
+
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
 
         # Make another one with the same name
-        url = url_for('userview', user=self.stub_user_id)
-        response = self.client.post(url, data=json.dumps(self.stub_library))
+        url = url_for('userview')
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers
+        )
+
         self.assertEqual(response.status_code,
                          DUPLICATE_LIBRARY_NAME_ERROR['number'])
         self.assertEqual(response.json['error'],
@@ -173,15 +300,22 @@ class TestWebservices(TestCase):
 
     def test_can_remove_a_library(self):
         """
-        Tests the /users/<>/library/<> end point with DELETE to remove a
+        Tests the /libraries/<> end point with DELETE to remove a
         library from a user's libraries
 
         :return: no return
         """
 
         # Make first library
-        url = url_for('userview', user=self.stub_user_id)
-        response = self.client.post(url, data=json.dumps(self.stub_library))
+        url = url_for('userview')
+        headers = {USER_ID_KEYWORD: self.stub_user_id}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers
+        )
+
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
@@ -190,17 +324,28 @@ class TestWebservices(TestCase):
 
         # Delete the library
         url = url_for('libraryview', user=self.stub_user_id, library=library_id)
-        response = self.client.delete(url)
+        response = self.client.delete(
+            url,
+            headers=headers
+        )
         self.assertEqual(response.status_code, 200)
 
         # Check its deleted
-        url = url_for('userview', user=self.stub_user_id)
-        response = self.client.get(url)
+        url = url_for('userview')
+
+        response = self.client.get(
+            url,
+            headers=headers
+        )
+
         self.assertTrue(len(response.json['libraries']) == 0,
                         response.json)
 
-        url = url_for('libraryview', user=self.stub_user_id, library=library_id)
-        response = self.client.get(url)
+        url = url_for('libraryview', library=library_id)
+        response = self.client.get(
+            url,
+            headers=headers
+        )
         self.assertEqual(response.status_code,
                          MISSING_LIBRARY_ERROR['number'],
                          'Received response error: {0}'
@@ -210,8 +355,13 @@ class TestWebservices(TestCase):
 
         # Try to delete even though it does not exist, this should return
         # some errors from the server
-        url = url_for('libraryview', user=self.stub_user_id, library=library_id)
-        response = self.client.delete(url)
+        url = url_for('libraryview', library=library_id)
+
+        response = self.client.delete(
+            url,
+            headers=headers
+        )
+
         self.assertEqual(response.status_code, MISSING_LIBRARY_ERROR['number'])
         self.assertEqual(response.json['error'],
                          MISSING_LIBRARY_ERROR['body'])
@@ -223,6 +373,7 @@ class TestWebservices(TestCase):
 
         :return: no return
         """
+        pass
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

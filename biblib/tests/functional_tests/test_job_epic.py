@@ -24,6 +24,7 @@ sys.path.append(PROJECT_HOME)
 import app
 import json
 import unittest
+from views import USER_ID_KEYWORD
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
@@ -75,9 +76,17 @@ class TestJobEpic(TestCase):
         #   2. Gives it a description.
         #   3. Makes it public to view.
 
+        # Make the header
+        # that will come from the ADSWS
+        headers = {USER_ID_KEYWORD: self.stub_uid}
+
         # Make the library
-        url = url_for('userview', user=self.stub_uid)
-        response = self.client.post(url, data=json.dumps(self.stub_library))
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers
+        )
 
         self.assertEqual(response.status_code, 200, response)
         self.assertTrue('name' in response.json)
@@ -86,25 +95,39 @@ class TestJobEpic(TestCase):
         # Mary searches for an article and then adds it to her private library.
 
         # First she picks which library to add it to.
-        url = url_for('userview', user=self.stub_uid)
-        response = self.client.get(url)
+        url = url_for('userview')
+        response = self.client.get(
+            url,
+            headers=headers
+        )
         library_id = response.json['libraries'][0]['id']
 
         # Then she submits the document (in this case a bibcode) to add to the
         # library
-        url = url_for('libraryview', user=self.stub_uid, library=library_id)
+        url = url_for('libraryview', library=library_id)
         self.stub_document['action'] = 'add'
-        response = self.client.post(url, data=json.dumps(self.stub_document))
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_document),
+            headers=headers
+        )
         self.assertEqual(response.status_code, 200, response)
 
         # Mary realises she added one that is not hers and goes back to her list
         # and deletes it from her library.
-        url = url_for('libraryview', user=self.stub_uid, library=library_id)
+        url = url_for('libraryview', library=library_id)
         self.stub_document['action'] = 'remove'
-        response = self.client.post(url, data=json.dumps(self.stub_document))
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_document),
+            headers=headers
+        )
         self.assertEqual(response.status_code, 200, response)
 
-        response = response = self.client.get(url)
+        response = response = self.client.get(
+            url,
+            headers=headers
+        )
         self.assertTrue(len(response.json['documents']) == 0, response.json)
 
         # Happy with her library, she copies the link to the library and e-mails

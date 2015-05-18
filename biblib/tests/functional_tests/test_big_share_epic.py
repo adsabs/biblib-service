@@ -24,6 +24,7 @@ sys.path.append(PROJECT_HOME)
 import app
 import json
 import unittest
+from views import USER_ID_KEYWORD
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
@@ -71,16 +72,29 @@ class TestDeletionEpic(TestCase):
         #  1. Lets say 20 bibcodes
 
         # We make a library just to get a user account for mary
-        stub_library, mary_uid = StubDataLibrary().make_stub()
-        url = url_for('userview', user=mary_uid)
-        response = self.client.post(url, data=json.dumps(stub_library))
+        stub_library, uid_mary = StubDataLibrary().make_stub()
+        headers_mary = {USER_ID_KEYWORD: uid_mary}
+
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(stub_library),
+            headers=headers_mary
+        )
         self.assertEqual(response.status_code, 200, response)
         library_id_mary = response.json['id']
 
         # Dave makes his library
         library_dave, uid_dave = StubDataLibrary().make_stub()
-        url = url_for('userview', user=uid_dave)
-        response = self.client.post(url, data=json.dumps(stub_library))
+        headers_dave = {USER_ID_KEYWORD: uid_dave}
+        url = url_for('userview')
+
+        response = self.client.post(
+            url,
+            data=json.dumps(stub_library),
+            headers=headers_dave
+        )
+
         self.assertEqual(response.status_code, 200, response)
         library_id_dave = response.json['id']
 
@@ -91,20 +105,32 @@ class TestDeletionEpic(TestCase):
         number_of_documents = 20
         for i in range(number_of_documents):
             # Add document
-            url = url_for('libraryview', user=uid_dave, library=library_id_dave)
+            url = url_for('libraryview', library=library_id_dave)
             stub_document = StubDataDocument().make_stub(action='add')
-            response = self.client.post(url, data=json.dumps(stub_document))
+
+            response = self.client.post(
+                url,
+                data=json.dumps(stub_document),
+                headers=headers_dave
+            )
+
             self.assertEqual(response.status_code, 200, response)
 
-        url = url_for('libraryview', user=uid_dave, library=library_id_dave)
-        response = self.client.get(url)
+        url = url_for('libraryview', library=library_id_dave)
+        response = self.client.get(
+            url,
+            headers=headers_dave
+        )
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
         # Dave has made his library private, and his library friend Mary says
         # she cannot access the library.
         # Dave selects her e-mail address
-        url = url_for('libraryview', user=mary_uid, library=library_id_dave)
-        response = self.client.get(url)
+        url = url_for('libraryview', library=library_id_dave)
+        response = self.client.get(
+            url,
+            headers=headers_mary
+        )
         # self.assertEqual(response.status_code, 403)
         # self.assertNotIn('documents', response.json.keys())
         # self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])

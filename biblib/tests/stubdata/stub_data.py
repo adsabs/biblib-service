@@ -142,6 +142,6 @@ class StubDataLibrary(object):
         self.stub_library = self.get_library()
         self.stub_user = StubDataUser().get_user()
 
-        self.libraries.append([self.get_library(), StubDataUser().get_user()])
+        self.libraries.append([self.stub_library, self.stub_user])
 
         return self.libraries[-1]
