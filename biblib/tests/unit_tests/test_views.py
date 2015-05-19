@@ -23,7 +23,7 @@ from models import db, User, Library, Permissions
 from flask.ext.testing import TestCase
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from views import UserView, LibraryView
+from views import UserView, LibraryView, PermissionView
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
 from utils import BackendIntegrityError
 
@@ -428,6 +428,137 @@ class TestLibraryViews(TestCase):
 
         with self.assertRaises(NoResultFound):
             library = Library.query.filter(Library.id == library.id).one()
+
+    def test_user_without_permission_cannot_access_private_library(self):
+        """
+        Tests that the user requesting to see the contents of a library has
+        the correct permissions. In this case, they do not, and are refused to
+        see the library content.
+
+        :return: no return
+        """
+
+        # Make a fake user and library
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        # Make sure the second user is denied access
+        access = self.library_view.access_allowed(service_uid=user.id+1,
+                                                  library_id=library.id,
+                                                  access_type='read')
+
+        self.assertIsNotNone(access)
+        self.assertFalse(access)
+
+
+class TestPermissionViews(TestCase):
+    """
+    Base class to test the creation, modification, deletion of user
+    permissions via the Permissions view.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor of the class
+
+        :param args: to pass on to the super class
+        :param kwargs: to pass on to the super class
+
+        :return: no return
+        """
+
+        super(TestCase, self).__init__(*args, **kwargs)
+        self.permission_view = PermissionView()
+
+    def create_app(self):
+        """
+        Create the wsgi application for the flask test extension
+
+        :return: application instance
+        """
+
+        return app.create_app(config_type='TEST')
+
+    def setUp(self):
+        """
+        Set up the database for use
+
+        :return: no return
+        """
+
+        db.create_all()
+        self.stub_library, self.stub_uid = StubDataLibrary().make_stub()
+        self.stub_document = StubDataDocument().make_stub()
+
+
+    def tearDown(self):
+        """
+        Remove/delete the database and the relevant connections
+
+        :return: no return
+        """
+
+        db.session.remove()
+        db.drop_all()
+
+    def test_can_add_read_permission_to_user(self):
+        """
+        Tests the backend logic for adding read permissions to a user
+
+        :return: no return
+        """
+
+        # Make a fake user and library
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        db.session.add_all([user, library])
+        db.session.commit()
+
+        self.permission_view.add_permission(service_uid=user.id,
+                                            library_id=library.id,
+                                            permission='read',
+                                            value=True)
+
+        try:
+            permission = Permissions.query.filter(
+                Permissions.user_id == user.id,
+                Permissions.library_id == library.id
+            ).one()
+        except Exception as error:
+            self.fail('No permissions were created, most likely the code has '
+                      'not been implemented. [{0}]'.format(error))
+
+        self.assertTrue(permission.read)
+        self.assertFalse(permission.write)
+        self.assertFalse(permission.owner)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

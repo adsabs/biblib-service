@@ -18,7 +18,7 @@ SAMPLE_APPLICATION_PARAM = {
     'reason': 'this will allow easier integration if this app is incorporated'
               ' as a python module',
 }
-SAMPLE_APPLICATION_ADSWS_API_URL = 'https://api.adsabs.harvard.edu'
+USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
 
 # Database for microservice
 try:
@@ -34,7 +34,7 @@ except KeyError:
 # These lines are necessary only if the app needs to be a client of the
 # adsws-api
 from client import Client
-SAMPLE_APPLICATION_ADSWS_API_TOKEN = 'this is a secret api token!'
-SAMPLE_APPLICATION_CLIENT = Client(
-    {'TOKEN': SAMPLE_APPLICATION_ADSWS_API_TOKEN}
+BIBLIB_CLIENT_ADSWS_API_TOKEN = 'this is a secret api token!'
+BIBLIB_CLIENT = Client(
+    {'TOKEN': BIBLIB_CLIENT_ADSWS_API_TOKEN}
 )
