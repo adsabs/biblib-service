@@ -39,6 +39,59 @@ NO_PERMISSION_ERROR = {'body': 'You do not have the correct permissions.',
 USER_ID_KEYWORD = 'X-Adsws-Uid'
 
 
+class BaseView(Resource):
+    """
+    A base view class to keep a single version of common functions used between
+    all of the views.
+    """
+
+    def helper_get_user_id(self):
+        """
+        Helper function: get the user id from the header, otherwise raise
+        a key error exception
+
+        :return: unique API user ID
+        """
+        try:
+            user = request.headers[USER_ID_KEYWORD]
+            if user.isdigit():
+                user = int(user)
+        except KeyError:
+            current_app.logger.error('No username passed')
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
+
+    def helper_absolute_uid_to_service_uid(self, absolute_uid):
+        """
+        Convert the API UID to the BibLib service ID
+
+        :param absolute_uid: API UID
+        :return: BibLib service ID
+        """
+        user = User.query.filter(User.absolute_uid == absolute_uid).one()
+        return user.id
+
+    def helper_email_to_service_uid(self, permission_data):
+        # XXX: The user does not exist (404 returned)
+        # XXX: The api timesout on response
+        # XXX: general errors from the API (400)
+        try:
+            service = '{api}/{email}'.format(
+                api=current_app.config['USER_EMAIL_ADSWS_API_URL'],
+                email=permission_data['email']
+            )
+            response = current_app.config['BIBLIB_CLIENT'].session.get(
+                service
+            )
+        except KeyError as error:
+            current_app.logger.error('No user email provided.')
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
+
+        if response.status_code == 200:
+            return int(response.json()['uid'])
+
+
 class UserView(Resource):
     """
     End point to create a library for a given user
@@ -499,12 +552,13 @@ class LibraryView(Resource):
         return {}, 200
 
 
-class PermissionView(Resource):
+class PermissionView(BaseView):
     """
     End point to manipulate the permissions between a user and a library
 
 
     XXX: Users that do not have an account, cannot be added to permissions
+    XXX:   - send invitation?
     XXX: add read, write, admin
     XXX: remove read, write, admin
     XXX: only an admin/owner can add permissions to someone
@@ -515,11 +569,82 @@ class PermissionView(Resource):
     scopes = ['scope1', 'scope2']
     rate_limit = [1000, 60*60*24]
 
+    def add_permission(self, service_uid, library_id, permission, value):
+        """
+        Adds a permission for a user to a specific library
+        :param service_uid: the user ID within this microservice
+        :param library_id: the library id to update
+        :param permission: the permission to be added
+        :param value: boolean that accompanies the permission
+
+        :return: no return
+        """
+
+        try:
+            # If the user has permissions for this already
+            new_permission = Permissions.query.filter(
+                Permissions.user_id == service_uid,
+                Permissions.library_id == library_id
+            ).one()
+
+            setattr(new_permission, permission, value)
+            db.session.add(new_permission)
+
+        except NoResultFound:
+            # If no permissions set yet for user and library
+            user = User.query.filter(User.id == service_uid).one()
+            library = Library.query.filter(Library.id == library_id).one()
+
+            new_permission = Permissions(
+                read=False,
+                write=False,
+                owner=False,
+            )
+
+            setattr(new_permission, permission, value)
+
+            user.permissions.append(new_permission)
+            library.permissions.append(new_permission)
+            db.session.add_all([user, library, new_permission])
+
+        db.session.commit()
+
     def post(self, library):
         """
         HTTP POST request that modifies the permissions of a library
         :param library: library ID
 
         :return: the response for if the library was successfully created
+
+        XXX: Need a helper function to check the user gave the right input
         """
+
+        user = 'TBA'
+
+        permission_data = get_post_data(request)
+        current_app.logger.info('Requested permission changes for user {0}:'
+                                ' {1} for library {2}, by user: {3}'
+                                .format(permission_data['email'],
+                                        permission_data,
+                                        library,
+                                        user)
+                                )
+
+        secondary_user = self.helper_email_to_service_uid(permission_data)
+        current_app.logger.info('User: {0} corresponds to: {1}'
+                                .format(permission_data['email'],
+                                        secondary_user))
+
+        secondary_service_uid = \
+            self.helper_absolute_uid_to_service_uid(
+                absolute_uid=secondary_user)
+        current_app.logger.info('User: {0} is internally: {1}'
+                                .format(secondary_user, secondary_service_uid))
+
+        current_app.logger.info('Modifying permissions STARTING....')
+        self.add_permission(service_uid=secondary_service_uid,
+                            library_id=library,
+                            permission=permission_data['permission'],
+                            value=permission_data['value'])
+        current_app.logger.info('...SUCCESS.')
         return {}, 200

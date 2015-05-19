@@ -19,8 +19,9 @@ PROJECT_HOME = os.path.abspath(
 sys.path.append(PROJECT_HOME)
 
 import app
-import unittest
 import json
+import unittest
+from httpretty import HTTPretty
 from flask.ext.testing import TestCase
 from flask import url_for
 from models import db
@@ -28,6 +29,67 @@ from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR
 from views import USER_ID_KEYWORD
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
+
+
+class MockADSWSAPI(object):
+    """
+    Mock of the ADSWS API
+    """
+    def __init__(self, api_endpoint, user_uid=1):
+        """
+        Constructor
+        :param api_endpoint: name of the API end point
+        :param user_uid: unique API user ID to be returned
+        :return: no return
+        """
+
+        self.api_endpoint = api_endpoint
+        self.user_uid = user_uid
+
+        def request_callback(request, uri, headers):
+            """
+            :param request: HTTP request
+            :param uri: URI/URL to send the request
+            :param headers: header of the HTTP request
+            :return:
+            """
+            resp = json.dumps(
+                {
+                    'api-response': 'success',
+                    'uid': self.user_uid,
+                    'token': request.headers.get(
+                        'Authorization', 'No Authorization header passed!'
+                    )
+                }
+            )
+            return 200, headers, resp
+
+        HTTPretty.register_uri(
+            HTTPretty.GET,
+            self.api_endpoint,
+            body=request_callback,
+            content_type="application/json"
+        )
+
+    def __enter__(self):
+        """
+        Defines the behaviour for __enter__
+        :return: no return
+        """
+
+        HTTPretty.enable()
+
+    def __exit__(self, etype, value, traceback):
+        """
+        Defines the behaviour for __exit__
+        :param etype: exit type
+        :param value: exit value
+        :param traceback: the traceback for the exit
+        :return: no return
+        """
+
+        HTTPretty.reset()
+        HTTPretty.disable()
 
 
 class TestWebservices(TestCase):
@@ -443,20 +505,29 @@ class TestWebservices(TestCase):
             self.assertIn(key, response.json)
 
         # Add the permissions for user 2
-        url = url_for('permissionview')
+        url = url_for('permissionview', library=library_id)
         email = 'user@email.com'
 
         data_permissions = {
-            'user': email,
-            'permission': 'read'
+            'email': email,
+            'permission': 'read',
+            'value': True
         }
 
-        response = self.client.post(
-            url,
-            data=json.dumps(data_permissions),
-            headers=headers_1
+        # This requires communication with the API
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
         )
+        with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id+1):
 
+            response = self.client.post(
+                url,
+                data=json.dumps(data_permissions),
+                headers=headers_1
+            )
+
+        self.assertEqual(response.status_code, 200)
 
         # The user can now access the content of the library
         url = url_for('libraryview', library=library_id)
@@ -465,10 +536,8 @@ class TestWebservices(TestCase):
             url,
             headers=headers_2
         )
-
-        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
-        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
-
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue('documents' in response.json)
 
 
 if __name__ == '__main__':
