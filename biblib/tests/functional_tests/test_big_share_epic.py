@@ -29,6 +29,7 @@ from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
+from tests.base import MockADSWSAPI
 
 
 class TestDeletionEpic(TestCase):
@@ -141,21 +142,28 @@ class TestDeletionEpic(TestCase):
         # Dave then gives Mary the permissions to read his library
         headers = {'user': uid_dave}
         email_mary = 'mary@email.com'
-        permission_data = {
-            'user': email_mary,
-            'permission': ['viewer'],
-            'action': 'add'
+        data_permissions = {
+            'email': email_mary,
+            'permission': 'read',
+            'value': 'true'
         }
 
         # need a permissions endpoint
         # /permissions/<uuid_library>
         url = url_for('permissionview', library=library_id_dave, method='post')
         headers = {'user': uid_dave}
-        response = self.client.post(
-            url,
-            data=permission_data,
-            headers=headers
+
+        # This requires communication with the API
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
         )
+        with MockADSWSAPI(test_endpoint, user_uid=uid_mary):
+            response = self.client.post(
+                url,
+                data=data_permissions,
+                headers=headers
+            )
 
         self.assertEqual(response.status_code, 200)
 
