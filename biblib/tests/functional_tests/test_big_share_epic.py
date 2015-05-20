@@ -150,7 +150,7 @@ class TestDeletionEpic(TestCase):
 
         # need a permissions endpoint
         # /permissions/<uuid_library>
-        url = url_for('permissionview', library=library_id_dave, method='post')
+        url = url_for('permissionview', library=library_id_dave)
         headers = {'user': uid_dave}
 
         # This requires communication with the API
@@ -178,13 +178,41 @@ class TestDeletionEpic(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
-        # Mary accidentally tries to delete the permissions of Dave, but nothing
-        # happens
+        # Mary accidentally tries to delete the permissions of Dave, but
+        # nothing happens
+        url = url_for('permissionview', library=library_id_dave)
+        with MockADSWSAPI(test_endpoint, user_uid=uid_mary):
+            response = self.client.post(
+                url,
+                data=data_permissions,
+                headers=headers
+            )
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
         # Dave is unhappy with Mary's changes, so he removes her permissions
         # to write
+        data_permissions['value'] = False
+        url = url_for('permissionview', library=library_id_dave)
+        with MockADSWSAPI(test_endpoint, user_uid=uid_mary):
+            response = self.client.post(
+                url,
+                data=data_permissions,
+                headers=headers
+            )
+        self.assertEqual(response.status_code, 200)
 
         # Mary realises she can no longer add content
+        url = url_for('libraryview', library=library_id_dave)
+        response = self.client.get(
+            url,
+            headers=headers_mary
+        )
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertNotIn('documents', response.json.keys())
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
         # Dave then removes her ability to read anything
 

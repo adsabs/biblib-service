@@ -559,6 +559,165 @@ class TestPermissionViews(TestCase):
         self.assertFalse(permission.write)
         self.assertFalse(permission.owner)
 
+    def test_a_user_without_permissions_cannot_modify_permissions(self):
+
+        # Make a fake user and library
+        # Ensure a user exists
+        user_1 = User(absolute_uid=self.stub_uid)
+        user_2 = User(absolute_uid=self.stub_uid+1)
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        permission = Permissions()
+        user_1.permissions.append(permission)
+        library.permissions.append(permission)
+
+        db.session.add_all([user_1, user_2, library])
+        db.session.commit()
+
+        result = self.permission_view.has_permission(
+            service_uid_editor=user_2.id,
+            service_uid_modify=user_1.id,
+            library_id=library.id
+        )
+
+        self.assertFalse(result)
+
+    def test_a_user_with_owner_permissions_can_edit_permissions(self):
+
+        # Make a fake user and library
+        # Ensure a user exists
+        user_1 = User(absolute_uid=self.stub_uid)
+        user_2 = User(absolute_uid=self.stub_uid+1)
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        permission = Permissions()
+        permission.owner = True
+        user_2.permissions.append(permission)
+        library.permissions.append(permission)
+
+        db.session.add_all([user_1, user_2, library])
+        db.session.commit()
+
+        result = self.permission_view.has_permission(
+            service_uid_editor=user_2.id,
+            service_uid_modify=user_1.id,
+            library_id=library.id
+        )
+
+        self.assertTrue(result)
+
+    def test_a_user_with_editing_permissions_can_edit_permissions(self):
+
+        # Make a fake user and library
+        # Ensure a user exists
+        user_1 = User(absolute_uid=self.stub_uid)
+        user_2 = User(absolute_uid=self.stub_uid+1)
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        permission_1 = Permissions()
+        permission_1.admin = True
+        permission_2 = Permissions()
+        permission_2.admin = True
+
+        user_1.permissions.append(permission_1)
+        library.permissions.append(permission_1)
+
+        user_2.permissions.append(permission_2)
+        library.permissions.append(permission_2)
+
+        db.session.add_all([user_1, user_2, library])
+        db.session.commit()
+
+        result = self.permission_view.has_permission(
+            service_uid_editor=user_2.id,
+            service_uid_modify=user_1.id,
+            library_id=library.id
+        )
+
+        self.assertTrue(result)
+
+    def test_a_user_with_editing_permissions_cannot_edit_owner(self):
+        # Make a fake user and library
+        # Ensure a user exists
+        user_1 = User(absolute_uid=self.stub_uid)
+        user_2 = User(absolute_uid=self.stub_uid+1)
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        permission_1 = Permissions()
+        permission_1.owner = True
+        permission_2 = Permissions()
+        permission_2.admin = True
+
+        user_1.permissions.append(permission_1)
+        library.permissions.append(permission_1)
+
+        user_2.permissions.append(permission_2)
+        library.permissions.append(permission_2)
+
+        db.session.add_all([user_1, user_2, library])
+        db.session.commit()
+
+        result = self.permission_view.has_permission(
+            service_uid_editor=user_2.id,
+            service_uid_modify=user_1.id,
+            library_id=library.id
+        )
+
+        self.assertFalse(result)
+
+    def test_a_user_with_permissions_cannot_edit_anyone(self):
+        # Make a fake user and library
+        # Ensure a user exists
+        user_1 = User(absolute_uid=self.stub_uid)
+        user_2 = User(absolute_uid=self.stub_uid+1)
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        permission_1 = Permissions()
+        permission_1.admin = True
+        permission_2 = Permissions()
+        permission_2.read = True
+
+        user_1.permissions.append(permission_1)
+        library.permissions.append(permission_1)
+
+        user_2.permissions.append(permission_2)
+        library.permissions.append(permission_2)
+
+        db.session.add_all([user_1, user_2, library])
+        db.session.commit()
+
+        result = self.permission_view.has_permission(
+            service_uid_editor=user_2.id,
+            service_uid_modify=user_1.id,
+            library_id=library.id
+        )
+
+        self.assertFalse(result)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

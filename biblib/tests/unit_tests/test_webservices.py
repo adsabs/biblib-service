@@ -480,5 +480,66 @@ class TestWebservices(TestCase):
         self.assertTrue('documents' in response.json)
 
 
+    def test_cannot_change_permission_without_permission(self):
+        """
+        Test that a user without permissions cannot alter the permissions
+        of a library.
+        :return:
+        """
+        # Make a library for a given user, user 1
+        url = url_for('userview')
+        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
+        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers_1
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Make a library for user 2 so that we have an account
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers_2
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # User 2 with no permissions tries to modify user 1
+        url = url_for('permissionview', library=library_id)
+        email = 'user@email.com'
+
+        data_permissions = {
+            'email': email,
+            'permission': 'read',
+            'value': True
+        }
+
+        # This requires communication with the API
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
+        )
+        with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id):
+
+            response = self.client.post(
+                url,
+                data=json.dumps(data_permissions),
+                headers=headers_1
+            )
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

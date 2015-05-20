@@ -565,11 +565,71 @@ class PermissionView(BaseView):
     XXX: only an admin/owner can add permissions to someone
     XXX: update permissions stub data (and stub data in general)
     XXX: pass user and permissions as lists
+    XXX: change read/write to user types that get sent with true/false (or add
+    /remove)
     """
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = ['scope1', 'scope2']
     rate_limit = [1000, 60*60*24]
+
+    def has_permission(self, service_uid_editor, service_uid_modify, library_id):
+        """
+        Check if the user wanting to change the library has the correct
+        permissions to do so, and the user to be changed is not the owner.
+        :param service_uid_editor: the user ID of the editor
+        :param service_uid_modify: the user ID of the user to be edited
+        :param library_id: the library id
+
+        :return: boolean
+        """
+
+        current_app.logger.info('Checking if user: {0}, can edit the '
+                                'permissions of user: {1}'
+                                .format(
+                                    service_uid_editor,
+                                    service_uid_modify
+                                ))
+
+        # Check if the editor has permissions
+        try:
+            editor_permissions = Permissions.query.filter(
+                Permissions.user_id == service_uid_editor,
+                Permissions.library_id == library_id
+            ).one()
+        except NoResultFound:
+            current_app.logger.error(
+                'User: {0} has no permissions for this library'
+            )
+            return False
+
+        if editor_permissions.owner:
+            current_app.logger.info('User: {0} is owner, so is allowed to '
+                                    'change permissions'
+                                    .format(service_uid_editor))
+            return True
+
+        # Check if the user to be modified has permissions
+        try:
+            modify_permissions = Permissions.query.filter(
+                Permissions.user_id == service_uid_modify,
+                Permissions.library_id == library_id
+            ).one()
+        except NoResultFound:
+            modify_permissions = False
+
+        # if the editor is admin, and the modifier has no permissions
+        if editor_permissions.admin:
+
+            # user to be modified has no permissions
+            if not modify_permissions:
+                return True
+
+            # user to be modified is not owner
+            if not modify_permissions.owner:
+                return True
+        else:
+            return False
 
     def add_permission(self, service_uid, library_id, permission, value):
         """

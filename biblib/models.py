@@ -168,9 +168,10 @@ class Permissions(db.Model):
     """
     __tablename__ = 'permissions'
     id = db.Column(db.Integer, primary_key=True)
-    read = db.Column(db.Boolean)
-    write = db.Column(db.Boolean)
-    owner = db.Column(db.Boolean)
+    read = db.Column(db.Boolean, default=False)
+    write = db.Column(db.Boolean, default=False)
+    admin = db.Column(db.Boolean, default=False)
+    owner = db.Column(db.Boolean, default=False)
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     library_id = db.Column(GUID, db.ForeignKey('library.id'))
