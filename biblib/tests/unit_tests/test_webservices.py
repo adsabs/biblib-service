@@ -29,67 +29,7 @@ from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR
 from views import USER_ID_KEYWORD
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
-
-
-class MockADSWSAPI(object):
-    """
-    Mock of the ADSWS API
-    """
-    def __init__(self, api_endpoint, user_uid=1):
-        """
-        Constructor
-        :param api_endpoint: name of the API end point
-        :param user_uid: unique API user ID to be returned
-        :return: no return
-        """
-
-        self.api_endpoint = api_endpoint
-        self.user_uid = user_uid
-
-        def request_callback(request, uri, headers):
-            """
-            :param request: HTTP request
-            :param uri: URI/URL to send the request
-            :param headers: header of the HTTP request
-            :return:
-            """
-            resp = json.dumps(
-                {
-                    'api-response': 'success',
-                    'uid': self.user_uid,
-                    'token': request.headers.get(
-                        'Authorization', 'No Authorization header passed!'
-                    )
-                }
-            )
-            return 200, headers, resp
-
-        HTTPretty.register_uri(
-            HTTPretty.GET,
-            self.api_endpoint,
-            body=request_callback,
-            content_type="application/json"
-        )
-
-    def __enter__(self):
-        """
-        Defines the behaviour for __enter__
-        :return: no return
-        """
-
-        HTTPretty.enable()
-
-    def __exit__(self, etype, value, traceback):
-        """
-        Defines the behaviour for __exit__
-        :param etype: exit type
-        :param value: exit value
-        :param traceback: the traceback for the exit
-        :return: no return
-        """
-
-        HTTPretty.reset()
-        HTTPretty.disable()
+from tests.base import MockADSWSAPI
 
 
 class TestWebservices(TestCase):
@@ -409,11 +349,11 @@ class TestWebservices(TestCase):
             headers=headers
         )
         self.assertEqual(response.status_code,
-                         MISSING_LIBRARY_ERROR['number'],
+                         NO_PERMISSION_ERROR['number'],
                          'Received response error: {0}'
                          .format(response.status_code))
         self.assertEqual(response.json['error'],
-                         MISSING_LIBRARY_ERROR['body'])
+                         NO_PERMISSION_ERROR['body'])
 
         # Try to delete even though it does not exist, this should return
         # some errors from the server

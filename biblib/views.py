@@ -33,7 +33,8 @@ MISSING_DOCUMENT_ERROR = {'body': 'Document specified does not exist.',
 MISSING_USERNAME_ERROR = {'body': 'You did not supply enough user details',
                           'number': 400}
 
-NO_PERMISSION_ERROR = {'body': 'You do not have the correct permissions.',
+NO_PERMISSION_ERROR = {'body': 'You do not have the correct permissions or'
+                               'this library does not exist.',
                        'number': 403}
 
 USER_ID_KEYWORD = 'X-Adsws-Uid'
@@ -472,8 +473,8 @@ class LibraryView(Resource):
 
         # If they do not have access, exit
         if not self.access_allowed(service_uid=service_uid,
-                               library_id=library,
-                               access_type='read'):
+                                   library_id=library,
+                                   access_type='read'):
             return {'error': NO_PERMISSION_ERROR['body']}, \
                    NO_PERMISSION_ERROR['number']
 
@@ -563,6 +564,7 @@ class PermissionView(BaseView):
     XXX: remove read, write, admin
     XXX: only an admin/owner can add permissions to someone
     XXX: update permissions stub data (and stub data in general)
+    XXX: pass user and permissions as lists
     """
 
     decorators = [advertise('scopes', 'rate_limit')]
