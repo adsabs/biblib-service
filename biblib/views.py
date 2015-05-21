@@ -250,8 +250,18 @@ class UserView(BaseView):
 
         :param user: user ID as given by the API
         :return: list of the users libraries with the relevant information
+
+        Header:
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post body:
+        ----------
+        No post content accepted.
+
+        XXX: Check that user is not anon
         """
-        # XXX: Check that user is not anon
+
         # Check that they pass a user id
         try:
             user = int(request.headers[USER_ID_KEYWORD])
@@ -268,6 +278,20 @@ class UserView(BaseView):
         HTTP POST request that creates a library for a given user
 
         :return: the response for if the library was successfully created
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+
+        Post body:
+        ----------
+        KEYWORD, VALUE
+        name:        <string>    name of the library (must be unique for that
+                                 user)
+        description: <string>    description of the library
+        public:      <boolean>   is the library public to view
         """
 
         # Check that they pass a user id
@@ -422,6 +446,7 @@ class LibraryView(BaseView):
                                      ' [{0}]'.format(error))
             return False
 
+    # Methods
     def get(self, library):
         """
         HTTP GET request that returns all the documents inside a given
@@ -429,6 +454,17 @@ class LibraryView(BaseView):
         :param library: library ID
 
         :return: list of the users libraries with the relevant information
+
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post body:
+        ----------
+        No post content accepted.
+
         XXX: Needs authentification still
         """
         try:
@@ -484,6 +520,23 @@ class LibraryView(BaseView):
 
         :return: the response for if the library was successfully created
 
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post body:
+        ----------
+        KEYWORD, VALUE
+
+        bibcode:  <string>        Bibcode to be added
+        action:   add, remove     add - adds a bibcode, remove - removes a
+                                  bibcode
+
+        Notes:
+        Currently, bibcodes are just strings. If lists are required, then open
+        an issue on the repository.
+
         XXX: Needs authentification still
         """
         try:
@@ -518,7 +571,17 @@ class LibraryView(BaseView):
         :param library: library ID
 
         :return: the response for it the library was deleted
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post-body:
+        ----------
+        No post content accepted.
         """
+
         try:
             user = int(request.headers[USER_ID_KEYWORD])
         except KeyError:
@@ -664,6 +727,7 @@ class PermissionView(BaseView):
 
         db.session.commit()
 
+    # Methods
     def post(self, library):
         """
         HTTP POST request that modifies the permissions of a library
@@ -672,6 +736,34 @@ class PermissionView(BaseView):
         :return: the response for if the library was successfully created
 
         XXX: Need a helper function to check the user gave the right input
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post data:
+        ----------
+        KEYWORD, VALUE
+        email:   <e-mail@address>, specifies which user's permissions to be
+                                   modified
+        permission:  read, write,  specifies which permission to change
+                     admin
+        value:   boolean,          whether the user has this permission
+
+        Notes:
+        Currently, the posts are per user, per permission. If it wanted that
+        lists can be passed, then open an issue. In my mind, it made more
+        sense that you can retrieve the correct errors in a request/response
+        cycle, rather than complicating the response with a mixture of success
+        and failures.
+
+        For example, if an admin tries to modify the access for a random person
+        without permissions, and the owner, the admin is not allowed to modify
+        the owner. This would be both a success 200, and a forbidden, 404, so
+        I do not think that makes sense. However, if there are strong arguments
+        for a list input and the backend handling it, then open an issue on the
+        repository.
         """
 
         # Get the user requesting this from the header

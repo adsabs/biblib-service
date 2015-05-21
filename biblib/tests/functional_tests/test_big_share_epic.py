@@ -226,6 +226,7 @@ class TestDeletionEpic(TestCase):
 
         # Mary realises she can no longer add content
         url = url_for('libraryview', library=library_id_dave)
+
         response = self.client.get(
             url,
             headers=headers_mary
