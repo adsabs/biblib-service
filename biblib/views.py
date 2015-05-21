@@ -57,6 +57,7 @@ class BaseView(Resource):
             user = request.headers[USER_ID_KEYWORD]
             if user.isdigit():
                 user = int(user)
+            return user
         except KeyError:
             current_app.logger.error('No username passed')
             return {'error': MISSING_USERNAME_ERROR['body']}, \
@@ -70,6 +71,9 @@ class BaseView(Resource):
         :return: BibLib service ID
         """
         user = User.query.filter(User.absolute_uid == absolute_uid).one()
+        current_app.logger.info('User found: {0} -> {1}'
+                                .format(absolute_uid, user.id))
+
         return user.id
 
     def helper_email_to_service_uid(self, permission_data):
@@ -93,7 +97,7 @@ class BaseView(Resource):
             return int(response.json()['uid'])
 
 
-class UserView(Resource):
+class UserView(BaseView):
     """
     End point to create a library for a given user
 
@@ -217,16 +221,6 @@ class UserView(Resource):
             db.session.rollback()
             raise
 
-    def absolute_uid_to_service_uid(self, absolute_uid):
-        """
-        Convert the API UID to the BibLib service ID
-
-        :param absolute_uid: API UID
-        :return: BibLib service ID
-        """
-        user = User.query.filter(User.absolute_uid == absolute_uid).one()
-        return user.id
-
     def get_libraries(self, absolute_uid):
         """
         Get all the libraries a user has
@@ -296,7 +290,7 @@ class UserView(Resource):
             current_app.logger.info('User already exists.')
 
         # Switch to the service UID and not the API UID
-        service_uid = self.absolute_uid_to_service_uid(absolute_uid=user)
+        service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
         current_app.logger.info('user_API: {0:d} is now user_service: {1:d}'
                                 .format(user, service_uid))
 
@@ -314,7 +308,7 @@ class UserView(Resource):
                 'description': library.description}, 200
 
 
-class LibraryView(Resource):
+class LibraryView(BaseView):
     """
     End point to interact with a specific library, by adding content and
     removing content
@@ -322,6 +316,7 @@ class LibraryView(Resource):
     XXX: need to ignore the anon user, they should not be able to do anything
     XXX: document already exists (only add a bibcode once)
     XXX: adding tags using PUT for RESTful endpoint?
+    XXX: public/private behaviour
 
     """
 
@@ -339,16 +334,6 @@ class LibraryView(Resource):
             return True
         elif user_count == 0:
             return False
-
-    def absolute_uid_to_service_uid(self, absolute_uid):
-        """
-        Convert the API UID to the BibLib service ID
-
-        :param absolute_uid: API UID
-        :return: BibLib service ID
-        """
-        user = User.query.filter(User.absolute_uid == absolute_uid).one()
-        return user.id
 
     def add_document_to_library(self, library_id, document_data):
         """
@@ -433,7 +418,7 @@ class LibraryView(Resource):
             ).one()
             return getattr(permissions, access_type)
         except NoResultFound as error:
-            current_app.logger.error('No permissions for this user and library.'
+            current_app.logger.error('No permission for this user and library.'
                                      ' [{0}]'.format(error))
             return False
 
@@ -461,22 +446,26 @@ class LibraryView(Resource):
         # If the user does not exist then there are no associated permissions
         # If the user exists, they will have permissions
         if self.user_exists(absolute_uid=user):
-            service_uid = self.absolute_uid_to_service_uid(absolute_uid=user)
+            service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
         else:
-            current_app.logger.error('User:{0} does not exist in the database. '
-                                     'Therefore, will not have extra privileges'
+            current_app.logger.error('User:{0} does not exist in the database.'
+                                     'Therefore will not have extra privileges'
                                      'to view the library: {1}'
                                      .format(user, library))
 
             return {'error': NO_PERMISSION_ERROR['body']}, \
-                   NO_PERMISSION_ERROR['number']
+                NO_PERMISSION_ERROR['number']
 
         # If they do not have access, exit
         if not self.access_allowed(service_uid=service_uid,
                                    library_id=library,
                                    access_type='read'):
+            current_app.logger.error(
+                'User: {0} does not have access to library: {1}'
+                .format(service_uid, library)
+            )
             return {'error': NO_PERMISSION_ERROR['body']}, \
-                   NO_PERMISSION_ERROR['number']
+                NO_PERMISSION_ERROR['number']
 
         # If they have access, let them obtain the requested content
         try:
@@ -573,7 +562,10 @@ class PermissionView(BaseView):
     scopes = ['scope1', 'scope2']
     rate_limit = [1000, 60*60*24]
 
-    def has_permission(self, service_uid_editor, service_uid_modify, library_id):
+    def has_permission(self,
+                       service_uid_editor,
+                       service_uid_modify,
+                       library_id):
         """
         Check if the user wanting to change the library has the correct
         permissions to do so, and the user to be changed is not the owner.
@@ -597,9 +589,10 @@ class PermissionView(BaseView):
                 Permissions.user_id == service_uid_editor,
                 Permissions.library_id == library_id
             ).one()
-        except NoResultFound:
+        except NoResultFound as error:
             current_app.logger.error(
-                'User: {0} has no permissions for this library'
+                'User: {0} has no permissions for this library: {1}'
+                .format(service_uid_editor, error)
             )
             return False
 
@@ -681,7 +674,10 @@ class PermissionView(BaseView):
         XXX: Need a helper function to check the user gave the right input
         """
 
-        user = 'TBA'
+        # Get the user requesting this from the header
+        user_editing = self.helper_get_user_id()
+        user_editing_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
 
         permission_data = get_post_data(request)
         current_app.logger.info('Requested permission changes for user {0}:'
@@ -689,7 +685,7 @@ class PermissionView(BaseView):
                                 .format(permission_data['email'],
                                         permission_data,
                                         library,
-                                        user)
+                                        user_editing_uid)
                                 )
 
         secondary_user = self.helper_email_to_service_uid(permission_data)
@@ -704,6 +700,18 @@ class PermissionView(BaseView):
                                 .format(secondary_user, secondary_service_uid))
 
         current_app.logger.info('Modifying permissions STARTING....')
+
+        if not self.has_permission(service_uid_editor=user_editing_uid,
+                                   service_uid_modify=secondary_service_uid,
+                                   library_id=library):
+
+            current_app.logger.error(
+                'User: {0} does not have permissions to edit: {1}'
+                .format(user_editing_uid, library)
+            )
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                NO_PERMISSION_ERROR['number']
+
         self.add_permission(service_uid=secondary_service_uid,
                             library_id=library,
                             permission=permission_data['permission'],

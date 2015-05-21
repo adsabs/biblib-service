@@ -688,8 +688,8 @@ class TestPermissionViews(TestCase):
     def test_a_user_with_permissions_cannot_edit_anyone(self):
         # Make a fake user and library
         # Ensure a user exists
-        user_1 = User(absolute_uid=self.stub_uid)
-        user_2 = User(absolute_uid=self.stub_uid+1)
+        user_admin = User(absolute_uid=self.stub_uid)
+        user_read_only = User(absolute_uid=self.stub_uid+1)
 
         # Ensure a library exists
         library = Library(name='MyLibrary',
@@ -697,27 +697,31 @@ class TestPermissionViews(TestCase):
                           public=True,
                           bibcode=[self.stub_document['bibcode']])
 
-        permission_1 = Permissions()
-        permission_1.admin = True
-        permission_2 = Permissions()
-        permission_2.read = True
+        permission_admin = Permissions()
+        permission_admin.admin = True
+        permission_read_only = Permissions()
+        permission_read_only.read = True
 
-        user_1.permissions.append(permission_1)
-        library.permissions.append(permission_1)
+        user_admin.permissions.append(permission_admin)
+        library.permissions.append(permission_admin)
 
-        user_2.permissions.append(permission_2)
-        library.permissions.append(permission_2)
+        user_read_only.permissions.append(permission_read_only)
+        library.permissions.append(permission_read_only)
 
-        db.session.add_all([user_1, user_2, library])
+        db.session.add_all([user_admin, user_read_only, library])
         db.session.commit()
 
         result = self.permission_view.has_permission(
-            service_uid_editor=user_2.id,
-            service_uid_modify=user_1.id,
+            service_uid_editor=user_read_only.id,
+            service_uid_modify=user_admin.id,
             library_id=library.id
         )
 
         self.assertFalse(result)
+
+    @unittest.skip('NotImplemented')
+    def test_owner_does_not_modify_owner(self):
+        self.fail()
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

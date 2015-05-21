@@ -140,7 +140,6 @@ class TestDeletionEpic(TestCase):
         # Ask API for the user_id, if it does not exist, we send an e-mail?
 
         # Dave then gives Mary the permissions to read his library
-        headers = {'user': uid_dave}
         email_mary = 'mary@email.com'
         data_permissions = {
             'email': email_mary,
@@ -151,7 +150,6 @@ class TestDeletionEpic(TestCase):
         # need a permissions endpoint
         # /permissions/<uuid_library>
         url = url_for('permissionview', library=library_id_dave)
-        headers = {'user': uid_dave}
 
         # This requires communication with the API
         test_endpoint = '{api}/{email}'.format(
@@ -162,9 +160,8 @@ class TestDeletionEpic(TestCase):
             response = self.client.post(
                 url,
                 data=data_permissions,
-                headers=headers
+                headers=headers_dave
             )
-
         self.assertEqual(response.status_code, 200)
 
         # Mary writes back to say she can see his libraries and is happy but
@@ -180,12 +177,24 @@ class TestDeletionEpic(TestCase):
 
         # Mary accidentally tries to delete the permissions of Dave, but
         # nothing happens
+        email_dave = 'dave@email.com'
+        data_permissions = {
+            'email': email_dave,
+            'permission': 'read',
+            'value': 'false'
+        }
         url = url_for('permissionview', library=library_id_dave)
-        with MockADSWSAPI(test_endpoint, user_uid=uid_mary):
+
+        # Fake response from API
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
+        )
+        with MockADSWSAPI(test_endpoint, user_uid=uid_dave):
             response = self.client.post(
                 url,
                 data=data_permissions,
-                headers=headers
+                headers=headers_mary
             )
 
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
@@ -193,13 +202,25 @@ class TestDeletionEpic(TestCase):
 
         # Dave is unhappy with Mary's changes, so he removes her permissions
         # to write
+        data_permissions = {
+            'email': email_mary,
+            'permission': 'read',
+            'value': 'false'
+        }
+        url = url_for('permissionview', library=library_id_dave)
+
+        # Fake response from API
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
+        )
         data_permissions['value'] = False
         url = url_for('permissionview', library=library_id_dave)
         with MockADSWSAPI(test_endpoint, user_uid=uid_mary):
             response = self.client.post(
                 url,
                 data=data_permissions,
-                headers=headers
+                headers=headers_dave
             )
         self.assertEqual(response.status_code, 200)
 

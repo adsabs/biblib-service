@@ -525,16 +525,21 @@ class TestWebservices(TestCase):
         }
 
         # This requires communication with the API
+        # User requesting: user 2 that has no permissions
+        # To modify: user 2 is trying to modify user 1, which is the owner of
+        # the library
         test_endpoint = '{api}/{email}'.format(
             api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
             email=data_permissions['email']
         )
+        # E-mail requested should correspond to the owner of the library,
+        # which in this case is user 1
         with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id):
 
             response = self.client.post(
                 url,
                 data=json.dumps(data_permissions),
-                headers=headers_1
+                headers=headers_2
             )
 
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
