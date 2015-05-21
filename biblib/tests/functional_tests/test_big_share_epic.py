@@ -140,7 +140,6 @@ class TestDeletionEpic(TestCase):
         # Ask API for the user_id, if it does not exist, we send an e-mail?
 
         # Dave then gives Mary the permissions to read his library
-        headers = {'user': uid_dave}
         email_mary = 'mary@email.com'
         data_permissions = {
             'email': email_mary,
@@ -150,8 +149,7 @@ class TestDeletionEpic(TestCase):
 
         # need a permissions endpoint
         # /permissions/<uuid_library>
-        url = url_for('permissionview', library=library_id_dave, method='post')
-        headers = {'user': uid_dave}
+        url = url_for('permissionview', library=library_id_dave)
 
         # This requires communication with the API
         test_endpoint = '{api}/{email}'.format(
@@ -162,9 +160,8 @@ class TestDeletionEpic(TestCase):
             response = self.client.post(
                 url,
                 data=data_permissions,
-                headers=headers
+                headers=headers_dave
             )
-
         self.assertEqual(response.status_code, 200)
 
         # Mary writes back to say she can see his libraries and is happy but
@@ -178,13 +175,66 @@ class TestDeletionEpic(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
-        # Mary accidentally tries to delete the permissions of Dave, but nothing
-        # happens
+        # Mary accidentally tries to delete the permissions of Dave, but
+        # nothing happens
+        email_dave = 'dave@email.com'
+        data_permissions = {
+            'email': email_dave,
+            'permission': 'read',
+            'value': 'false'
+        }
+        url = url_for('permissionview', library=library_id_dave)
+
+        # Fake response from API
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
+        )
+        with MockADSWSAPI(test_endpoint, user_uid=uid_dave):
+            response = self.client.post(
+                url,
+                data=data_permissions,
+                headers=headers_mary
+            )
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
         # Dave is unhappy with Mary's changes, so he removes her permissions
         # to write
+        data_permissions = {
+            'email': email_mary,
+            'permission': 'read',
+            'value': 'false'
+        }
+        url = url_for('permissionview', library=library_id_dave)
+
+        # Fake response from API
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
+        )
+        data_permissions['value'] = False
+        url = url_for('permissionview', library=library_id_dave)
+        with MockADSWSAPI(test_endpoint, user_uid=uid_mary):
+            response = self.client.post(
+                url,
+                data=data_permissions,
+                headers=headers_dave
+            )
+        self.assertEqual(response.status_code, 200)
 
         # Mary realises she can no longer add content
+        url = url_for('libraryview', library=library_id_dave)
+
+        response = self.client.get(
+            url,
+            headers=headers_mary
+        )
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertNotIn('documents', response.json.keys())
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
         # Dave then removes her ability to read anything
 

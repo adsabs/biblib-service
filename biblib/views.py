@@ -57,6 +57,7 @@ class BaseView(Resource):
             user = request.headers[USER_ID_KEYWORD]
             if user.isdigit():
                 user = int(user)
+            return user
         except KeyError:
             current_app.logger.error('No username passed')
             return {'error': MISSING_USERNAME_ERROR['body']}, \
@@ -70,6 +71,9 @@ class BaseView(Resource):
         :return: BibLib service ID
         """
         user = User.query.filter(User.absolute_uid == absolute_uid).one()
+        current_app.logger.info('User found: {0} -> {1}'
+                                .format(absolute_uid, user.id))
+
         return user.id
 
     def helper_email_to_service_uid(self, permission_data):
@@ -93,7 +97,7 @@ class BaseView(Resource):
             return int(response.json()['uid'])
 
 
-class UserView(Resource):
+class UserView(BaseView):
     """
     End point to create a library for a given user
 
@@ -217,16 +221,6 @@ class UserView(Resource):
             db.session.rollback()
             raise
 
-    def absolute_uid_to_service_uid(self, absolute_uid):
-        """
-        Convert the API UID to the BibLib service ID
-
-        :param absolute_uid: API UID
-        :return: BibLib service ID
-        """
-        user = User.query.filter(User.absolute_uid == absolute_uid).one()
-        return user.id
-
     def get_libraries(self, absolute_uid):
         """
         Get all the libraries a user has
@@ -256,8 +250,18 @@ class UserView(Resource):
 
         :param user: user ID as given by the API
         :return: list of the users libraries with the relevant information
+
+        Header:
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post body:
+        ----------
+        No post content accepted.
+
+        XXX: Check that user is not anon
         """
-        # XXX: Check that user is not anon
+
         # Check that they pass a user id
         try:
             user = int(request.headers[USER_ID_KEYWORD])
@@ -274,6 +278,20 @@ class UserView(Resource):
         HTTP POST request that creates a library for a given user
 
         :return: the response for if the library was successfully created
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+
+        Post body:
+        ----------
+        KEYWORD, VALUE
+        name:        <string>    name of the library (must be unique for that
+                                 user)
+        description: <string>    description of the library
+        public:      <boolean>   is the library public to view
         """
 
         # Check that they pass a user id
@@ -296,7 +314,7 @@ class UserView(Resource):
             current_app.logger.info('User already exists.')
 
         # Switch to the service UID and not the API UID
-        service_uid = self.absolute_uid_to_service_uid(absolute_uid=user)
+        service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
         current_app.logger.info('user_API: {0:d} is now user_service: {1:d}'
                                 .format(user, service_uid))
 
@@ -314,7 +332,7 @@ class UserView(Resource):
                 'description': library.description}, 200
 
 
-class LibraryView(Resource):
+class LibraryView(BaseView):
     """
     End point to interact with a specific library, by adding content and
     removing content
@@ -322,6 +340,7 @@ class LibraryView(Resource):
     XXX: need to ignore the anon user, they should not be able to do anything
     XXX: document already exists (only add a bibcode once)
     XXX: adding tags using PUT for RESTful endpoint?
+    XXX: public/private behaviour
 
     """
 
@@ -339,16 +358,6 @@ class LibraryView(Resource):
             return True
         elif user_count == 0:
             return False
-
-    def absolute_uid_to_service_uid(self, absolute_uid):
-        """
-        Convert the API UID to the BibLib service ID
-
-        :param absolute_uid: API UID
-        :return: BibLib service ID
-        """
-        user = User.query.filter(User.absolute_uid == absolute_uid).one()
-        return user.id
 
     def add_document_to_library(self, library_id, document_data):
         """
@@ -433,10 +442,11 @@ class LibraryView(Resource):
             ).one()
             return getattr(permissions, access_type)
         except NoResultFound as error:
-            current_app.logger.error('No permissions for this user and library.'
+            current_app.logger.error('No permission for this user and library.'
                                      ' [{0}]'.format(error))
             return False
 
+    # Methods
     def get(self, library):
         """
         HTTP GET request that returns all the documents inside a given
@@ -444,6 +454,17 @@ class LibraryView(Resource):
         :param library: library ID
 
         :return: list of the users libraries with the relevant information
+
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post body:
+        ----------
+        No post content accepted.
+
         XXX: Needs authentification still
         """
         try:
@@ -461,22 +482,26 @@ class LibraryView(Resource):
         # If the user does not exist then there are no associated permissions
         # If the user exists, they will have permissions
         if self.user_exists(absolute_uid=user):
-            service_uid = self.absolute_uid_to_service_uid(absolute_uid=user)
+            service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
         else:
-            current_app.logger.error('User:{0} does not exist in the database. '
-                                     'Therefore, will not have extra privileges'
+            current_app.logger.error('User:{0} does not exist in the database.'
+                                     'Therefore will not have extra privileges'
                                      'to view the library: {1}'
                                      .format(user, library))
 
             return {'error': NO_PERMISSION_ERROR['body']}, \
-                   NO_PERMISSION_ERROR['number']
+                NO_PERMISSION_ERROR['number']
 
         # If they do not have access, exit
         if not self.access_allowed(service_uid=service_uid,
                                    library_id=library,
                                    access_type='read'):
+            current_app.logger.error(
+                'User: {0} does not have access to library: {1}'
+                .format(service_uid, library)
+            )
             return {'error': NO_PERMISSION_ERROR['body']}, \
-                   NO_PERMISSION_ERROR['number']
+                NO_PERMISSION_ERROR['number']
 
         # If they have access, let them obtain the requested content
         try:
@@ -494,6 +519,23 @@ class LibraryView(Resource):
         :param library: library ID
 
         :return: the response for if the library was successfully created
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post body:
+        ----------
+        KEYWORD, VALUE
+
+        bibcode:  <string>        Bibcode to be added
+        action:   add, remove     add - adds a bibcode, remove - removes a
+                                  bibcode
+
+        Notes:
+        Currently, bibcodes are just strings. If lists are required, then open
+        an issue on the repository.
 
         XXX: Needs authentification still
         """
@@ -529,7 +571,17 @@ class LibraryView(Resource):
         :param library: library ID
 
         :return: the response for it the library was deleted
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post-body:
+        ----------
+        No post content accepted.
         """
+
         try:
             user = int(request.headers[USER_ID_KEYWORD])
         except KeyError:
@@ -565,11 +617,75 @@ class PermissionView(BaseView):
     XXX: only an admin/owner can add permissions to someone
     XXX: update permissions stub data (and stub data in general)
     XXX: pass user and permissions as lists
+    XXX: change read/write to user types that get sent with true/false (or add
+    /remove)
     """
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = ['scope1', 'scope2']
     rate_limit = [1000, 60*60*24]
+
+    def has_permission(self,
+                       service_uid_editor,
+                       service_uid_modify,
+                       library_id):
+        """
+        Check if the user wanting to change the library has the correct
+        permissions to do so, and the user to be changed is not the owner.
+        :param service_uid_editor: the user ID of the editor
+        :param service_uid_modify: the user ID of the user to be edited
+        :param library_id: the library id
+
+        :return: boolean
+        """
+
+        current_app.logger.info('Checking if user: {0}, can edit the '
+                                'permissions of user: {1}'
+                                .format(
+                                    service_uid_editor,
+                                    service_uid_modify
+                                ))
+
+        # Check if the editor has permissions
+        try:
+            editor_permissions = Permissions.query.filter(
+                Permissions.user_id == service_uid_editor,
+                Permissions.library_id == library_id
+            ).one()
+        except NoResultFound as error:
+            current_app.logger.error(
+                'User: {0} has no permissions for this library: {1}'
+                .format(service_uid_editor, error)
+            )
+            return False
+
+        if editor_permissions.owner:
+            current_app.logger.info('User: {0} is owner, so is allowed to '
+                                    'change permissions'
+                                    .format(service_uid_editor))
+            return True
+
+        # Check if the user to be modified has permissions
+        try:
+            modify_permissions = Permissions.query.filter(
+                Permissions.user_id == service_uid_modify,
+                Permissions.library_id == library_id
+            ).one()
+        except NoResultFound:
+            modify_permissions = False
+
+        # if the editor is admin, and the modifier has no permissions
+        if editor_permissions.admin:
+
+            # user to be modified has no permissions
+            if not modify_permissions:
+                return True
+
+            # user to be modified is not owner
+            if not modify_permissions.owner:
+                return True
+        else:
+            return False
 
     def add_permission(self, service_uid, library_id, permission, value):
         """
@@ -611,6 +727,7 @@ class PermissionView(BaseView):
 
         db.session.commit()
 
+    # Methods
     def post(self, library):
         """
         HTTP POST request that modifies the permissions of a library
@@ -619,9 +736,40 @@ class PermissionView(BaseView):
         :return: the response for if the library was successfully created
 
         XXX: Need a helper function to check the user gave the right input
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post data:
+        ----------
+        KEYWORD, VALUE
+        email:   <e-mail@address>, specifies which user's permissions to be
+                                   modified
+        permission:  read, write,  specifies which permission to change
+                     admin
+        value:   boolean,          whether the user has this permission
+
+        Notes:
+        Currently, the posts are per user, per permission. If it wanted that
+        lists can be passed, then open an issue. In my mind, it made more
+        sense that you can retrieve the correct errors in a request/response
+        cycle, rather than complicating the response with a mixture of success
+        and failures.
+
+        For example, if an admin tries to modify the access for a random person
+        without permissions, and the owner, the admin is not allowed to modify
+        the owner. This would be both a success 200, and a forbidden, 404, so
+        I do not think that makes sense. However, if there are strong arguments
+        for a list input and the backend handling it, then open an issue on the
+        repository.
         """
 
-        user = 'TBA'
+        # Get the user requesting this from the header
+        user_editing = self.helper_get_user_id()
+        user_editing_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
 
         permission_data = get_post_data(request)
         current_app.logger.info('Requested permission changes for user {0}:'
@@ -629,7 +777,7 @@ class PermissionView(BaseView):
                                 .format(permission_data['email'],
                                         permission_data,
                                         library,
-                                        user)
+                                        user_editing_uid)
                                 )
 
         secondary_user = self.helper_email_to_service_uid(permission_data)
@@ -644,6 +792,18 @@ class PermissionView(BaseView):
                                 .format(secondary_user, secondary_service_uid))
 
         current_app.logger.info('Modifying permissions STARTING....')
+
+        if not self.has_permission(service_uid_editor=user_editing_uid,
+                                   service_uid_modify=secondary_service_uid,
+                                   library_id=library):
+
+            current_app.logger.error(
+                'User: {0} does not have permissions to edit: {1}'
+                .format(user_editing_uid, library)
+            )
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                NO_PERMISSION_ERROR['number']
+
         self.add_permission(service_uid=secondary_service_uid,
                             library_id=library,
                             permission=permission_data['permission'],
