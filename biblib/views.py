@@ -639,6 +639,13 @@ class PermissionView(BaseView):
         :return: boolean
         """
 
+        if service_uid_editor == service_uid_modify:
+            current_app.logger.error('Editing user: {0} and user to edit: {1}'
+                                     ' are the same. This is not allowed.'
+                                     .format(service_uid_modify,
+                                             service_uid_editor))
+            return False
+
         current_app.logger.info('Checking if user: {0}, can edit the '
                                 'permissions of user: {1}'
                                 .format(

@@ -175,7 +175,7 @@ class TestDeletionEpic(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
-        # Mary accidentally tries to delete the permissions of Dave, but
+        # Mary tries to modify the permissions of Dave, but
         # nothing happens
         email_dave = 'dave@email.com'
         data_permissions = {
@@ -200,8 +200,8 @@ class TestDeletionEpic(TestCase):
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
-        # Dave is unhappy with Mary's changes, so he removes her permissions
-        # to write
+        # Dave is unhappy with Mary's attempt, so he removes her permissions
+        # to read
         data_permissions = {
             'email': email_mary,
             'permission': 'read',
@@ -224,7 +224,7 @@ class TestDeletionEpic(TestCase):
             )
         self.assertEqual(response.status_code, 200)
 
-        # Mary realises she can no longer add content
+        # Mary realises she can no longer read content
         url = url_for('libraryview', library=library_id_dave)
 
         response = self.client.get(
@@ -235,10 +235,6 @@ class TestDeletionEpic(TestCase):
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertNotIn('documents', response.json.keys())
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
-
-        # Dave then removes her ability to read anything
-
-        # Mary realises she can no longer read content
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
