@@ -461,10 +461,13 @@ class TestLibraryViews(TestCase):
         db.session.commit()
 
         # Make sure the second user is denied access
-        access = self.library_view.access_allowed(service_uid=user.id+1,
-                                                  library_id=library.id,
-                                                  access_type='read')
+        access = self.library_view.read_access(service_uid=user.id+1,
+                                               library_id=library.id)
+        self.assertIsNotNone(access)
+        self.assertFalse(access)
 
+        access = self.library_view.write_access(service_uid=user.id+1,
+                                                library_id=library.id)
         self.assertIsNotNone(access)
         self.assertFalse(access)
 
@@ -508,7 +511,6 @@ class TestPermissionViews(TestCase):
         db.create_all()
         self.stub_library, self.stub_uid = StubDataLibrary().make_stub()
         self.stub_document = StubDataDocument().make_stub()
-
 
     def tearDown(self):
         """

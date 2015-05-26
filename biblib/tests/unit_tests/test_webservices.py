@@ -479,7 +479,6 @@ class TestWebservices(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue('documents' in response.json)
 
-
     def test_cannot_change_permission_without_permission(self):
         """
         Test that a user without permissions cannot alter the permissions
@@ -545,6 +544,112 @@ class TestWebservices(TestCase):
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
+    unittest.skip('NotImplemented')
+
+    def test_owner_cannot_edit_owner(self):
+        """
+        Test that the owner of a library cannot modify their own permissions,
+        such as read, write, etc., otherwise it would allow orphan libraries
+
+        :return: no return
+        """
+        pass
+
+    def test_give_permissions_to_a_user_not_in_the_service_database(self):
+        """
+        This tests that a user that exists in the API but not the service
+        database, can have permissions changed.
+
+        :return: no return
+        """
+        # Make a library for a given user, user 1
+        url = url_for('userview')
+        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
+        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers_1
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Add the permissions for user 2
+        url = url_for('permissionview', library=library_id)
+        email = 'user@email.com'
+
+        for permission_type in ['read', 'write', 'admin']:
+            data_permissions = {
+                'email': email,
+                'permission': permission_type,
+                'value': True
+            }
+
+            # This requires communication with the API
+            test_endpoint = '{api}/{email}'.format(
+                api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+                email=data_permissions['email']
+            )
+            with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id+1):
+
+                response = self.client.post(
+                    url,
+                    data=json.dumps(data_permissions),
+                    headers=headers_1
+                )
+
+            self.assertEqual(response.status_code, 200)
+
+    def test_user_cannot_edit_library_without_permission(self):
+        """
+        Tests that only a user with correct edit permissions can edit the
+        content of a library.
+
+        :return:
+        """
+        # Make a library
+        url = url_for('userview')
+        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
+        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers_1
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+        # Get the library ID
+        library_id = response.json['id']
+
+        # See if a random user can edit content of the library
+        # Add to the library
+        self.stub_document['action'] = 'add'
+        url = url_for('libraryview', library=library_id)
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_document),
+            headers=headers_2
+        )
+
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+
+        # Check the owner can add/remove content
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_document),
+            headers=headers_1
+        )
+        self.assertEqual(response.status_code, 200)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
