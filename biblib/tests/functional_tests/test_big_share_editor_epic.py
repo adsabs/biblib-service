@@ -1,7 +1,7 @@
 """
 Functional test
 
-Deletion Epic
+Big Share Editor Epic
 
 Storyboard is defined within the comments of the program itself
 """
@@ -28,13 +28,14 @@ from views import USER_ID_KEYWORD, NO_PERMISSION_ERROR
 from models import db
 from flask.ext.testing import TestCase
 from flask import url_for
-from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
+from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument, \
+    StubDataUser
 from tests.base import MockADSWSAPI
 
 
 class TestDeletionEpic(TestCase):
     """
-    Base class used to test the Big Share Epic
+    Base class used to test the Big Share Editor Epic
     """
     def create_app(self):
         """
@@ -61,53 +62,43 @@ class TestDeletionEpic(TestCase):
         db.session.remove()
         db.drop_all()
 
-    def test_job_big_share(self):
+    def test_job_big_share_editor(self):
         """
-        Carries out the epic 'Big Share', where a user wants to share one of
-        their big libraries they have created
+        Carries out the epic 'Big Share Editor', where a user creates a library
+        and wants one other use to have editing permissions, i.e., add and
+        remove bibcodes from the library.
 
         :return: no return
         """
 
         # Librarian Dave makes a big library full of bibcodes
         #  1. Lets say 20 bibcodes
-
-        # We make a library just to get a user account for mary
-        stub_library, uid_mary = StubDataLibrary().make_stub()
+        # Dave makes his library
+        uid_mary = StubDataUser().get_user()
         headers_mary = {USER_ID_KEYWORD: uid_mary}
 
-        url = url_for('userview')
-        response = self.client.post(
-            url,
-            data=json.dumps(stub_library),
-            headers=headers_mary
-        )
-        self.assertEqual(response.status_code, 200, response)
-        library_id_mary = response.json['id']
-
-        # Dave makes his library
         library_dave, uid_dave = StubDataLibrary().make_stub()
         headers_dave = {USER_ID_KEYWORD: uid_dave}
         url = url_for('userview')
 
         response = self.client.post(
             url,
-            data=json.dumps(stub_library),
+            data=json.dumps(library_dave),
             headers=headers_dave
         )
 
         self.assertEqual(response.status_code, 200, response)
         library_id_dave = response.json['id']
 
-        # Let us just double check that their ids do not match
-        self.assertNotEqual(library_id_mary, library_id_dave)
-
         # Dave adds content to his library
+        libraries_added = []
         number_of_documents = 20
         for i in range(number_of_documents):
             # Add document
             url = url_for('libraryview', library=library_id_dave)
             stub_document = StubDataDocument().make_stub(action='add')
+
+            libraries_added.append(stub_document['bibcode'])
 
             response = self.client.post(
                 url,
@@ -124,27 +115,28 @@ class TestDeletionEpic(TestCase):
         )
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
-        # Dave has made his library private, and his library friend Mary says
-        # she cannot access the library.
-        # Dave selects her e-mail address
-        url = url_for('libraryview', library=library_id_dave)
-        response = self.client.get(
+        # Dave is too busy to do any work on the library and so asks his
+        # librarian friend Mary to do it. Dave does not realise she cannot
+        # add without permissions and Mary gets some error messages
+        stub_document['bibcode'] = 'failure'
+        response = self.client.post(
             url,
+            data=json.dumps(stub_document),
             headers=headers_mary
         )
 
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
-        self.assertNotIn('documents', response.json.keys())
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
-        # Ask API for the user_id, if it does not exist, we send an e-mail?
+        # Dave now adds her account to permissions. She already has an ADS
+        # account, and so Dave adds her with her e-mail address with read and
+        # write permissions (but not admin).
 
-        # Dave then gives Mary the permissions to read his library
         email_mary = 'mary@email.com'
         data_permissions = {
             'email': email_mary,
-            'permission': 'read',
-            'value': 'true'
+            'permission': 'write',
+            'value': True
         }
 
         # need a permissions endpoint
@@ -164,77 +156,76 @@ class TestDeletionEpic(TestCase):
             )
         self.assertEqual(response.status_code, 200)
 
-        # Mary writes back to say she can see his libraries and is happy but
-        # wants to add content herself
+        # Mary looks at the library
         url = url_for('libraryview', library=library_id_dave)
         response = self.client.get(
             url,
             headers=headers_mary
         )
-
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
-        # Mary tries to modify the permissions of Dave, but
-        # nothing happens
-        email_dave = 'dave@email.com'
-        data_permissions = {
-            'email': email_dave,
-            'permission': 'read',
-            'value': 'false'
-        }
-        url = url_for('permissionview', library=library_id_dave)
+        # Mary removes a few bibcodes and keeps a list of the ones she
+        # removed just in case
+        url = url_for('libraryview', library=library_id_dave)
 
-        # Fake response from API
-        test_endpoint = '{api}/{email}'.format(
-            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-            email=data_permissions['email']
-        )
-        with MockADSWSAPI(test_endpoint, user_uid=uid_dave):
+        libraries_removed = []
+        for i in range(number_of_documents/2):
+            # Remove documents
+
+            document = {
+                'bibcode': libraries_added[i],
+                'action': 'remove'
+            }
+            libraries_removed.append(libraries_added[i])
+            libraries_added.remove(libraries_added[i])
+
             response = self.client.post(
                 url,
-                data=data_permissions,
+                data=json.dumps(document),
                 headers=headers_mary
             )
 
-        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
-        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
+            self.assertEqual(response.status_code, 200, response)
 
-        # Dave is unhappy with Mary's attempt, so he removes her permissions
-        # to read
-        data_permissions = {
-            'email': email_mary,
-            'permission': 'read',
-            'value': 'false'
-        }
-        url = url_for('permissionview', library=library_id_dave)
-
-        # Fake response from API
-        test_endpoint = '{api}/{email}'.format(
-            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-            email=data_permissions['email']
-        )
-        data_permissions['value'] = False
-        url = url_for('permissionview', library=library_id_dave)
-        with MockADSWSAPI(test_endpoint, user_uid=uid_mary):
-            response = self.client.post(
-                url,
-                data=data_permissions,
-                headers=headers_dave
-            )
-        self.assertEqual(response.status_code, 200)
-
-        # Mary realises she can no longer read content
+        # She checks that they got removed
         url = url_for('libraryview', library=library_id_dave)
-
         response = self.client.get(
             url,
             headers=headers_mary
         )
+        self.assertTrue(
+            len(response.json['documents']) == number_of_documents/2
+        )
 
-        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
-        self.assertNotIn('documents', response.json.keys())
-        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
+        # Dave asks Mary to re-add the ones she removed because they were
+        # actually useful
+        for bibcode in libraries_removed:
+            # Add documents
+
+            document = {
+                'bibcode': bibcode,
+                'action': 'add'
+            }
+            libraries_added.append(bibcode)
+
+            response = self.client.post(
+                url,
+                data=json.dumps(document),
+                headers=headers_mary
+            )
+
+            self.assertEqual(response.status_code, 200, response)
+
+        # She checks that they got added
+        url = url_for('libraryview', library=library_id_dave)
+        response = self.client.get(
+            url,
+            headers=headers_mary
+        )
+        self.assertTrue(
+            len(response.json['documents']) == number_of_documents
+        )
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
