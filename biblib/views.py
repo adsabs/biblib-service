@@ -60,23 +60,71 @@ class BaseView(Resource):
             return user
         except KeyError:
             current_app.logger.error('No username passed')
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
+            raise
+
+    def helper_create_user(self, absolute_uid):
+        """
+        Creates a user in the database with a UID from the API
+        :param absolute_uid: UID from the API
+
+        :return: SQLAlchemy User instance
+        """
+
+        try:
+            user = User(absolute_uid=absolute_uid)
+            db.session.add(user)
+            db.session.commit()
+
+            current_app.logger.info('Successfully created user: {0} [API] as '
+                                    '{1} [Microservice]'
+                                    .format(absolute_uid, user.id))
+            return user
+
+        except IntegrityError as error:
+            current_app.logger.error('IntegrityError. User: {0:d} was not'
+                                     'added. Full traceback: {1}'
+                                     .format(absolute_uid, error))
+            raise
+
+    def helper_user_exists(self, absolute_uid):
+        """
+        Checks if a use exists before it would attempt to create one
+
+        :param absolute_uid: UID from the API
+        :return: boolean for if the user exists
+        """
+
+        user_count = User.query.filter(User.absolute_uid == absolute_uid).all()
+        user_count = len(user_count)
+        if user_count == 1:
+            current_app.logger.info('User exists in database: {0} [API]'
+                                    .format(absolute_uid))
+            return True
+        elif user_count == 0:
+            current_app.logger.warning('User does not exist in database: {0} '
+                                       '[API]'.format(absolute_uid))
+            return False
 
     def helper_absolute_uid_to_service_uid(self, absolute_uid):
         """
-        Convert the API UID to the BibLib service ID
+        Convert the API UID to the BibLib service ID.
+
+        If the user does not exist in the database, first create a user.
 
         :param absolute_uid: API UID
         :return: BibLib service ID
         """
-        user = User.query.filter(User.absolute_uid == absolute_uid).one()
+
+        if not self.helper_user_exists(absolute_uid=absolute_uid):
+            user = self.helper_create_user(absolute_uid=absolute_uid)
+        else:
+            user = User.query.filter(User.absolute_uid == absolute_uid).one()
         current_app.logger.info('User found: {0} -> {1}'
                                 .format(absolute_uid, user.id))
 
         return user.id
 
-    def helper_email_to_service_uid(self, permission_data):
+    def helper_email_to_api_uid(self, permission_data):
         # XXX: The user does not exist (404 returned)
         # XXX: The api timesout on response
         # XXX: general errors from the API (400)
@@ -432,19 +480,63 @@ class LibraryView(BaseView):
 
         :param service_uid: the user ID within this microservice
         :param library_id: the unique ID of the library
+        :param access_type: list of access types to check
 
         :return: boolean, access (True), no access (False)
         """
+
         try:
             permissions = Permissions.query.filter(
                 Permissions.library_id == library_id,
                 Permissions.user_id == service_uid
             ).one()
+
             return getattr(permissions, access_type)
+
         except NoResultFound as error:
-            current_app.logger.error('No permission for this user and library.'
-                                     ' [{0}]'.format(error))
+            current_app.logger.error('No permissions for '
+                                     'user: {0}, library: {1}, permission: {2}'
+                                     ' [{3}]'.format(service_uid, library_id,
+                                                     access_type, error))
             return False
+
+    def read_access(self, service_uid, library_id):
+        """
+        Defines which type of user has read permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+
+        read_allowed = ['read', 'write', 'admin', 'owner']
+        for access_type in read_allowed:
+            if self.access_allowed(service_uid=service_uid,
+                                   library_id=library_id,
+                                   access_type=access_type):
+                return True
+
+        return False
+
+    def write_access(self, service_uid, library_id):
+        """
+        Defines which type of user has write permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+
+        read_allowed = ['write', 'admin', 'owner']
+        for access_type in read_allowed:
+            if self.access_allowed(service_uid=service_uid,
+                                   library_id=library_id,
+                                   access_type=access_type):
+                return True
+
+        return False
 
     # Methods
     def get(self, library):
@@ -493,9 +585,8 @@ class LibraryView(BaseView):
                 NO_PERMISSION_ERROR['number']
 
         # If they do not have access, exit
-        if not self.access_allowed(service_uid=service_uid,
-                                   library_id=library,
-                                   access_type='read'):
+
+        if not self.read_access(service_uid=service_uid, library_id=library):
             current_app.logger.error(
                 'User: {0} does not have access to library: {1}'
                 .format(service_uid, library)
@@ -538,13 +629,24 @@ class LibraryView(BaseView):
         an issue on the repository.
 
         XXX: Needs authentification still
+        XXX: Want a tidier try/except/return pattern
         """
+
+        # Get the user requesting this from the header
         try:
-            user = int(request.headers[USER_ID_KEYWORD])
+            user_editing = self.helper_get_user_id()
         except KeyError:
-            current_app.logger.error('No username passed')
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
+
+        user_editing_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
+
+        # Check the permissions of the user
+        if not self.write_access(service_uid=user_editing_uid,
+                                 library_id=library):
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                   NO_PERMISSION_ERROR['number']
 
         data = get_post_data(request)
         if data['action'] == 'add':
@@ -612,13 +714,13 @@ class PermissionView(BaseView):
 
     XXX: Users that do not have an account, cannot be added to permissions
     XXX:   - send invitation?
+    XXX:   - if they exist in the API database but have not created a library
+             we still need to create a user entry in the database for them
     XXX: add read, write, admin
     XXX: remove read, write, admin
     XXX: only an admin/owner can add permissions to someone
     XXX: update permissions stub data (and stub data in general)
     XXX: pass user and permissions as lists
-    XXX: change read/write to user types that get sent with true/false (or add
-    /remove)
     """
 
     decorators = [advertise('scopes', 'rate_limit')]
@@ -704,7 +806,6 @@ class PermissionView(BaseView):
 
         :return: no return
         """
-
         try:
             # If the user has permissions for this already
             new_permission = Permissions.query.filter(
@@ -712,17 +813,37 @@ class PermissionView(BaseView):
                 Permissions.library_id == library_id
             ).one()
 
+            current_app.logger.info(
+                'User: {0} has permissions already for'
+                'library: {1}. Modifying: "{2}" from [{3}] '
+                'to [{4}]'
+                .format(service_uid,
+                        library_id,
+                        permission,
+                        getattr(new_permission, permission),
+                        value)
+            )
+
             setattr(new_permission, permission, value)
             db.session.add(new_permission)
 
         except NoResultFound:
             # If no permissions set yet for user and library
+            current_app.logger.info('No permissions yet set for user: {0} for '
+                                    'library: {1}. Using defaults for setup'
+                                    ' and allocating "{2}" to [{3}]'
+                                    .format(service_uid,
+                                            library_id,
+                                            permission,
+                                            value))
+
             user = User.query.filter(User.id == service_uid).one()
             library = Library.query.filter(Library.id == library_id).one()
 
             new_permission = Permissions(
                 read=False,
                 write=False,
+                admin=False,
                 owner=False,
             )
 
@@ -741,8 +862,6 @@ class PermissionView(BaseView):
         :param library: library ID
 
         :return: the response for if the library was successfully created
-
-        XXX: Need a helper function to check the user gave the right input
 
         Header:
         -------
@@ -771,10 +890,18 @@ class PermissionView(BaseView):
         I do not think that makes sense. However, if there are strong arguments
         for a list input and the backend handling it, then open an issue on the
         repository.
+
+        XXX: Need a helper function to check the user gave the right input
+        XXX: Need a check that there is the correct content passed
         """
 
         # Get the user requesting this from the header
-        user_editing = self.helper_get_user_id()
+        try:
+            user_editing = self.helper_get_user_id()
+        except KeyError:
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
+
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
 
@@ -787,7 +914,7 @@ class PermissionView(BaseView):
                                         user_editing_uid)
                                 )
 
-        secondary_user = self.helper_email_to_service_uid(permission_data)
+        secondary_user = self.helper_email_to_api_uid(permission_data)
         current_app.logger.info('User: {0} corresponds to: {1}'
                                 .format(permission_data['email'],
                                         secondary_user))
