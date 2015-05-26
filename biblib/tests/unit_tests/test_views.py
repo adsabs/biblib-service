@@ -487,6 +487,7 @@ class TestPermissionViews(TestCase):
 
         super(TestCase, self).__init__(*args, **kwargs)
         self.permission_view = PermissionView()
+        self.user_view = UserView()
 
     def create_app(self):
         """
@@ -719,9 +720,38 @@ class TestPermissionViews(TestCase):
 
         self.assertFalse(result)
 
-    @unittest.skip('NotImplemented')
     def test_owner_does_not_modify_owner(self):
-        self.fail()
+        # Make a fake user and library
+        # Ensure a user exists
+        user_owner = User(absolute_uid=self.stub_uid)
+        db.session.add(user_owner)
+        db.session.commit()
+
+        # Ensure a library exists
+        library_data = dict(name='MyLibrary',
+                            description='My library',
+                            public=True,
+                            read=False,
+                            write=False,
+                            bibcode=[self.stub_document['bibcode']])
+
+        library = self.user_view.create_library(service_uid=user_owner.id,
+                                                library_data=library_data)
+
+        # Check our user has owner permissions
+        permission = Permissions.query.filter(
+            Permissions.library_id == library.id,
+            Permissions.user_id == user_owner.id
+        ).one()
+        self.assertTrue(permission.owner)
+
+        # Check that the owner cannot mess with the owner's permissions
+        result = self.permission_view.has_permission(
+            service_uid_editor=user_owner.id,
+            service_uid_modify=user_owner.id,
+            library_id=library.id
+        )
+        self.assertFalse(result)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
