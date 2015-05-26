@@ -1,7 +1,7 @@
 """
 Functional test
 
-Deletion Epic
+Big Share Epic
 
 Storyboard is defined within the comments of the program itself
 """
