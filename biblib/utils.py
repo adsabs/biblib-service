@@ -87,3 +87,12 @@ class BackendIntegrityError(Exception):
 
         # Now for your custom code...
         self.errors = 'The library name already exists for this user'
+
+class PermissionDeniedError(Exception):
+    def __init__(self, message):
+
+        # Call the base class constructor with the parameters it needs
+        super(PermissionDeniedError, self).__init__(message)
+
+        # Now for your custom code...
+        self.errors = 'You do not have permission to do this'
