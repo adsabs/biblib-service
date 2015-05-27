@@ -577,8 +577,8 @@ class LibraryView(BaseView):
             service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
         else:
             current_app.logger.error('User:{0} does not exist in the database.'
-                                     'Therefore will not have extra privileges'
-                                     'to view the library: {1}'
+                                     ' Therefore will not have extra '
+                                     'privileges to view the library: {1}'
                                      .format(user, library))
 
             return {'error': NO_PERMISSION_ERROR['body']}, \
@@ -588,7 +588,7 @@ class LibraryView(BaseView):
 
         if not self.read_access(service_uid=service_uid, library_id=library):
             current_app.logger.error(
-                'User: {0} does not have access to library: {1}'
+                'User: {0} does not have access to library: {1}. DENIED'
                 .format(service_uid, library)
             )
             return {'error': NO_PERMISSION_ERROR['body']}, \
@@ -596,7 +596,8 @@ class LibraryView(BaseView):
 
         # If they have access, let them obtain the requested content
         try:
-            current_app.logger.info('User: {0} request library: {1}. ALLOWED'
+            current_app.logger.info('User: {0} has access to library: {1}. '
+                                    'ALLOWED'
                                     .format(user, library))
             documents = self.get_documents_from_library(library_id=library)
             return {'documents': documents}, 200
@@ -818,7 +819,7 @@ class PermissionView(BaseView):
             ).one()
 
             current_app.logger.info(
-                'User: {0} has permissions already for'
+                'User: {0} has permissions already for '
                 'library: {1}. Modifying: "{2}" from [{3}] '
                 'to [{4}]'
                 .format(service_uid,
@@ -901,6 +902,7 @@ class PermissionView(BaseView):
              exist in the API
         XXX: Need a get endpoint to find out what permissions people have as
              well
+        XXX: input values should be type checked as well in a systematic way
         """
 
         # Get the user requesting this from the header
