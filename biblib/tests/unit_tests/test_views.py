@@ -25,7 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from views import UserView, LibraryView, PermissionView
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
-from utils import BackendIntegrityError
+from utils import BackendIntegrityError, PermissionDeniedError
 
 
 class TestUserViews(TestCase):
@@ -563,6 +563,12 @@ class TestPermissionViews(TestCase):
         self.assertFalse(permission.owner)
 
     def test_a_user_without_permissions_cannot_modify_permissions(self):
+        """
+        Tests that a user that does not have admin permissions, cannot modify
+        the permissions of another user.
+
+        :return: no return
+        """
 
         # Make a fake user and library
         # Ensure a user exists
@@ -591,7 +597,12 @@ class TestPermissionViews(TestCase):
         self.assertFalse(result)
 
     def test_a_user_with_owner_permissions_can_edit_permissions(self):
+        """
+        Tests that the owner has the ability to edit permissions of users
+        within their library.
 
+        :return: no return
+        """
         # Make a fake user and library
         # Ensure a user exists
         user_1 = User(absolute_uid=self.stub_uid)
@@ -620,6 +631,12 @@ class TestPermissionViews(TestCase):
         self.assertTrue(result)
 
     def test_a_user_with_editing_permissions_can_edit_permissions(self):
+        """
+        Tests that a user that has been given admin privileges can edit other
+        users in the library.
+
+        :return: no return
+        """
 
         # Make a fake user and library
         # Ensure a user exists
@@ -655,6 +672,12 @@ class TestPermissionViews(TestCase):
         self.assertTrue(result)
 
     def test_a_user_with_editing_permissions_cannot_edit_owner(self):
+        """
+        Tests that a user with admin permissions cannot manipulate any of the
+        settings of the owners permissions.
+
+        :return: no return
+        """
         # Make a fake user and library
         # Ensure a user exists
         user_1 = User(absolute_uid=self.stub_uid)
@@ -689,6 +712,12 @@ class TestPermissionViews(TestCase):
         self.assertFalse(result)
 
     def test_a_user_with_permissions_cannot_edit_anyone(self):
+        """
+        Tests that a user with read permissions cannot do any permission
+        changes to other users.
+
+        :return: no return
+        """
         # Make a fake user and library
         # Ensure a user exists
         user_admin = User(absolute_uid=self.stub_uid)
@@ -754,6 +783,68 @@ class TestPermissionViews(TestCase):
             library_id=library.id
         )
         self.assertFalse(result)
+
+    def test_admin_cannot_modify_owner_value(self):
+        """
+        Test to ensure that the user with owner privileges cannot modify the
+        owner value of a library
+
+        :return: no return
+        """
+        # Make a fake user and library
+        # Ensure a user exists
+        user_owner = User(absolute_uid=self.stub_uid)
+        user_admin = User(absolute_uid=self.stub_uid+1)
+        user_random = User(absolute_uid=self.stub_uid+2)
+
+        db.session.add_all([user_owner, user_admin, user_random])
+        db.session.commit()
+
+        # Ensure a library exists
+        library_data = dict(name='MyLibrary',
+                            description='My library',
+                            public=True,
+                            read=False,
+                            write=False,
+                            bibcode=[self.stub_document['bibcode']])
+
+        library = self.user_view.create_library(service_uid=user_owner.id,
+                                                library_data=library_data)
+
+        # Check our user has owner permissions
+        permission = Permissions.query.filter(
+            Permissions.library_id == library.id,
+            Permissions.user_id == user_owner.id
+        ).one()
+        self.assertTrue(permission.owner)
+
+        # Give the second user, admin permissions
+        self.permission_view.add_permission(service_uid=user_admin.id,
+                                            library_id=library.id,
+                                            permission='admin',
+                                            value=True)
+
+        # Check our user has owner permissions
+        permission = Permissions.query.filter(
+            Permissions.library_id == library.id,
+            Permissions.user_id == user_admin.id
+        ).one()
+        self.assertTrue(permission.admin)
+        self.assertFalse(permission.owner)
+
+        # Check that the admin cannot modify the owner status of random user
+        with self.assertRaises(PermissionDeniedError):
+            self.permission_view.add_permission(service_uid=user_random.id,
+                                                library_id=library.id,
+                                                permission='owner',
+                                                value=True)
+
+        # Check our user has owner permissions
+        with self.assertRaises(NoResultFound):
+            Permissions.query.filter(
+                Permissions.library_id == library.id,
+                Permissions.user_id == user_random.id
+            ).one()
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

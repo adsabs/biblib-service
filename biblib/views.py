@@ -17,7 +17,7 @@ from flask.ext.discoverer import advertise
 from models import db, User, Library, Permissions
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from utils import get_post_data, BackendIntegrityError
+from utils import get_post_data, BackendIntegrityError, PermissionDeniedError
 
 DUPLICATE_LIBRARY_NAME_ERROR = {'body': 'Library name given already '
                                         'exists and must be unique.',
@@ -806,6 +806,10 @@ class PermissionView(BaseView):
 
         :return: no return
         """
+
+        if permission not in ['read', 'write', 'admin']:
+            raise PermissionDeniedError('Permission Error')
+
         try:
             # If the user has permissions for this already
             new_permission = Permissions.query.filter(
@@ -893,6 +897,10 @@ class PermissionView(BaseView):
 
         XXX: Need a helper function to check the user gave the right input
         XXX: Need a check that there is the correct content passed
+        XXX: Need to handle when there is no e-mail for the user as they do not
+             exist in the API
+        XXX: Need a get endpoint to find out what permissions people have as
+             well
         """
 
         # Get the user requesting this from the header
@@ -938,9 +946,18 @@ class PermissionView(BaseView):
             return {'error': NO_PERMISSION_ERROR['body']}, \
                 NO_PERMISSION_ERROR['number']
 
-        self.add_permission(service_uid=secondary_service_uid,
-                            library_id=library,
-                            permission=permission_data['permission'],
-                            value=permission_data['value'])
+        try:
+            self.add_permission(service_uid=secondary_service_uid,
+                                library_id=library,
+                                permission=permission_data['permission'],
+                                value=permission_data['value'])
+        except PermissionDeniedError:
+            current_app.logger.error('User: {0} does not have permissions to '
+                                     'modify the value of: {1}'
+                                     .format(user_editing_uid,
+                                             permission_data['permission']))
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                    NO_PERMISSION_ERROR['number']
+
         current_app.logger.info('...SUCCESS.')
         return {}, 200

@@ -544,8 +544,6 @@ class TestWebservices(TestCase):
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
-    unittest.skip('NotImplemented')
-
     def test_owner_cannot_edit_owner(self):
         """
         Test that the owner of a library cannot modify their own permissions,
@@ -553,7 +551,131 @@ class TestWebservices(TestCase):
 
         :return: no return
         """
-        pass
+
+        # Make a library for a given user, user 1
+        url = url_for('userview')
+        headers = {USER_ID_KEYWORD: self.stub_user_id}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Owner tries to modify owner permissions
+        url = url_for('permissionview', library=library_id)
+        email = 'user@email.com'
+
+        for permission_type in ['read', 'write', 'admin', 'owner']:
+            data_permissions = {
+                'email': email,
+                'permission': permission_type,
+                'value': True
+            }
+
+            test_endpoint = '{api}/{email}'.format(
+                api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+                email=data_permissions['email']
+            )
+            # E-mail requested should correspond to user
+            with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id):
+
+                response = self.client.post(
+                    url,
+                    data=json.dumps(data_permissions),
+                    headers=headers
+                )
+
+            self.assertEqual(response.status_code,
+                             NO_PERMISSION_ERROR['number'])
+            self.assertEqual(response.json['error'],
+                             NO_PERMISSION_ERROR['body'])
+
+    def test_admin_cannot_edit_any_owner_permission(self):
+        """
+        Test that an admin cannot edit the owner value of a library.
+
+        :return: no return
+        """
+
+        # Make a library for a given user, user 1
+        url = url_for('userview')
+        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
+        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
+        headers_3 = {USER_ID_KEYWORD: self.stub_user_id+2}
+
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers_1
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Give user 2 admin permissions
+        url = url_for('permissionview', library=library_id)
+        email = 'user2@email.com'
+
+        data_permissions = {
+            'email': email,
+            'permission': 'admin',
+            'value': True
+        }
+
+        # This requires communication with the API
+        # User requesting: user 1 owner of the library
+        # To modify: user 1 is trying to modify user 2
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
+        )
+        # E-mail requested should correspond to user 2
+        with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id+1):
+
+            response = self.client.post(
+                url,
+                data=json.dumps(data_permissions),
+                headers=headers_1
+            )
+
+        self.assertEqual(response.status_code, 200)
+
+        # Now user 2 tries to give user 3 owner permissions. Even though user 2
+        # has admin permissions, they should not be able to modify the owner.
+        url = url_for('permissionview', library=library_id)
+        email = 'user3@email.com'
+
+        data_permissions = {
+            'email': email,
+            'permission': 'owner',
+            'value': True
+        }
+
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
+        )
+        # E-mail requested should correspond to user 2
+        with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id+2):
+
+            response = self.client.post(
+                url,
+                data=json.dumps(data_permissions),
+                headers=headers_2
+            )
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
     def test_give_permissions_to_a_user_not_in_the_service_database(self):
         """
