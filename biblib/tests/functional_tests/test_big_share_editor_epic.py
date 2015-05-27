@@ -227,5 +227,45 @@ class TestDeletionEpic(TestCase):
             len(response.json['documents']) == number_of_documents
         )
 
+        # Sanity check
+        # Dave removes her permissions and Mary tries to modify the library
+        # content, but cnanot
+
+        email_mary = 'mary@email.com'
+        data_permissions = {
+            'email': email_mary,
+            'permission': 'write',
+            'value': False
+        }
+
+        # need a permissions endpoint
+        # /permissions/<uuid_library>
+        url = url_for('permissionview', library=library_id_dave)
+
+        # This requires communication with the API
+        test_endpoint = '{api}/{email}'.format(
+            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
+            email=data_permissions['email']
+        )
+        with MockADSWSAPI(test_endpoint, user_uid=uid_mary):
+            response = self.client.post(
+                url,
+                data=data_permissions,
+                headers=headers_dave
+            )
+        self.assertEqual(response.status_code, 200)
+
+        # Mary tries to add content
+        url = url_for('libraryview', library=library_id_dave)
+        stub_document['bibcode'] = 'failure'
+        response = self.client.post(
+            url,
+            data=json.dumps(stub_document),
+            headers=headers_mary
+        )
+
+        self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
+        self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
