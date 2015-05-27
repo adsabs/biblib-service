@@ -392,6 +392,10 @@ class LibraryView(BaseView):
 
     """
 
+    decorators = [advertise('scopes', 'rate_limit')]
+    scopes = ['scope1', 'scope2']
+    rate_limit = [1000, 60*60*24]
+
     def user_exists(self, absolute_uid):
         """
         Checks if a use exists before it would attempt to create one
@@ -459,7 +463,7 @@ class LibraryView(BaseView):
         """
 
         library = Library.query.filter(Library.id == library_id).one()
-        return library.bibcode
+        return library
 
     def delete_library(self, library_id):
         """
@@ -570,40 +574,48 @@ class LibraryView(BaseView):
                                 .format(user, library))
 
         # If the library is public, allow access
+        try:
+            library = self.get_documents_from_library(library_id=library)
+            documents = library.bibcode
+            if library.public:
+                current_app.logger.info('Library: {0} is public'
+                                        .format(library.id))
+                return {'documents': documents}, 200
+
+        except:
+            return {'error': MISSING_LIBRARY_ERROR['body']}, \
+                MISSING_LIBRARY_ERROR['number']
 
         # If the user does not exist then there are no associated permissions
         # If the user exists, they will have permissions
         if self.user_exists(absolute_uid=user):
-            service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
+            service_uid = \
+                self.helper_absolute_uid_to_service_uid(absolute_uid=user)
         else:
             current_app.logger.error('User:{0} does not exist in the database.'
                                      ' Therefore will not have extra '
                                      'privileges to view the library: {1}'
-                                     .format(user, library))
+                                     .format(user, library.id))
 
             return {'error': NO_PERMISSION_ERROR['body']}, \
                 NO_PERMISSION_ERROR['number']
 
         # If they do not have access, exit
 
-        if not self.read_access(service_uid=service_uid, library_id=library):
+        if not self.read_access(service_uid=service_uid, library_id=library.id):
             current_app.logger.error(
                 'User: {0} does not have access to library: {1}. DENIED'
-                .format(service_uid, library)
+                .format(service_uid, library.id)
             )
             return {'error': NO_PERMISSION_ERROR['body']}, \
                 NO_PERMISSION_ERROR['number']
 
         # If they have access, let them obtain the requested content
-        try:
-            current_app.logger.info('User: {0} has access to library: {1}. '
-                                    'ALLOWED'
-                                    .format(user, library))
-            documents = self.get_documents_from_library(library_id=library)
-            return {'documents': documents}, 200
-        except:
-            return {'error': MISSING_LIBRARY_ERROR['body']}, \
-                MISSING_LIBRARY_ERROR['number']
+        current_app.logger.info('User: {0} has access to library: {1}. '
+                                'ALLOWED'
+                                .format(user, library.id))
+
+        return {'documents': documents}, 200
 
     def post(self, library):
         """
