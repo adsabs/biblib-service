@@ -246,7 +246,7 @@ class TestDeletionEpic(TestCase):
             response = self.client.post(
                 url,
                 data=json.dumps(document),
-                headers=headers_student
+                headers=headers_mary
             )
 
             self.assertEqual(response.status_code, 200, response)
