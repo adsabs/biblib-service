@@ -20,10 +20,10 @@ from models import db
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR
 from views import USER_ID_KEYWORD
-import tests.stubdata
-from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
-from tests.base import MockADSWSAPI
 
+from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument, \
+    LibraryShop, UserShop
+from tests.base import MockADSWSAPI
 
 class TestWebservices(TestCase):
     """
@@ -47,6 +47,10 @@ class TestWebservices(TestCase):
         """
 
         db.create_all()
+
+        self.user = UserShop()
+        self.library = LibraryShop()
+
         self.stub_library, self.stub_user_id = StubDataLibrary().make_stub()
         self.stub_document = StubDataDocument().make_stub()
 
@@ -71,8 +75,10 @@ class TestWebservices(TestCase):
         url = url_for('userview')
         response = self.client.post(url)
 
-        self.assertEqual(response.status_code, MISSING_USERNAME_ERROR['number'])
-        self.assertEqual(response.json['error'], MISSING_USERNAME_ERROR['body'])
+        self.assertEqual(response.status_code,
+                         MISSING_USERNAME_ERROR['number'])
+        self.assertEqual(response.json['error'],
+                         MISSING_USERNAME_ERROR['body'])
 
     def test_when_no_user_information_passed_to_user_get(self):
         """
@@ -85,8 +91,10 @@ class TestWebservices(TestCase):
         url = url_for('userview')
         response = self.client.get(url)
 
-        self.assertEqual(response.status_code, MISSING_USERNAME_ERROR['number'])
-        self.assertEqual(response.json['error'], MISSING_USERNAME_ERROR['body'])
+        self.assertEqual(response.status_code,
+                         MISSING_USERNAME_ERROR['number'])
+        self.assertEqual(response.json['error'],
+                         MISSING_USERNAME_ERROR['body'])
 
     def test_when_no_user_information_passed_to_library_post(self):
         """
@@ -99,8 +107,10 @@ class TestWebservices(TestCase):
         url = url_for('documentview', library='test')
         response = self.client.post(url)
 
-        self.assertEqual(response.status_code, MISSING_USERNAME_ERROR['number'])
-        self.assertEqual(response.json['error'], MISSING_USERNAME_ERROR['body'])
+        self.assertEqual(response.status_code,
+                         MISSING_USERNAME_ERROR['number'])
+        self.assertEqual(response.json['error'],
+                         MISSING_USERNAME_ERROR['body'])
 
     def test_when_no_user_information_passed_to_library_get(self):
         """
@@ -113,8 +123,10 @@ class TestWebservices(TestCase):
         url = url_for('libraryview', library='test')
         response = self.client.get(url)
 
-        self.assertEqual(response.status_code, MISSING_USERNAME_ERROR['number'])
-        self.assertEqual(response.json['error'], MISSING_USERNAME_ERROR['body'])
+        self.assertEqual(response.status_code,
+                         MISSING_USERNAME_ERROR['number'])
+        self.assertEqual(response.json['error'],
+                         MISSING_USERNAME_ERROR['body'])
 
     def test_create_library_resource(self):
         """
@@ -124,15 +136,17 @@ class TestWebservices(TestCase):
         :return: no return
         """
 
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
         # Make the library
         url = url_for('userview')
-        payload = self.stub_library
-        headers = {USER_ID_KEYWORD: self.stub_user_id}
 
         response = self.client.post(
             url,
-            data=json.dumps(payload),
-            headers=headers
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
         )
 
         self.assertEqual(response.status_code, 200)
@@ -140,20 +154,19 @@ class TestWebservices(TestCase):
             self.assertIn(key, response.json)
 
         # Check the library exists in the database
-        url = url_for('userview', user=self.stub_user_id)
+        url = url_for('userview', user=stub_user.absolute_uid)
 
         response = self.client.get(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
 
         self.assertEqual(response.status_code, 200)
+
         for library in response.json['libraries']:
-            self.assertIn(self.stub_library['name'], library['name'])
-            self.assertIn(
-                self.stub_library['description'],
-                library['description']
-            )
+            self.assertEqual(stub_library.name, library['name'])
+            self.assertEqual(stub_library.description,
+                             library['description'])
 
     def test_add_document_to_library(self):
         """
@@ -162,15 +175,16 @@ class TestWebservices(TestCase):
         :return: no return
         """
 
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
         # Make the library
         url = url_for('userview')
-        payload = self.stub_library
-        headers = {USER_ID_KEYWORD: self.stub_user_id}
-
         response = self.client.post(
             url,
-            data=json.dumps(payload),
-            headers=headers
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
         )
 
         self.assertEqual(response.status_code, 200)
@@ -181,25 +195,22 @@ class TestWebservices(TestCase):
         library_id = response.json['id']
 
         # Add to the library
-        self.stub_document['action'] = 'add'
         url = url_for('documentview', library=library_id)
-
-        response = self.client.post(
+        self.client.post(
             url,
-            data=json.dumps(self.stub_document),
-            headers=headers
+            data=stub_library.document_view_post_data_json('add'),
+            headers=stub_user.headers
         )
 
         # Check the library was created and documents exist
         url = url_for('libraryview', library=library_id)
         response = self.client.get(
             url,
-            data=json.dumps(payload),
-            headers=headers
+            headers=stub_user.headers
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(self.stub_document['bibcode'], response.json['documents'])
+        self.assertEqual(response.status_code, 200, response)
+        self.assertIn(stub_library.bibcode, response.json['documents'])
 
     def test_remove_document_from_library(self):
         """
@@ -207,14 +218,17 @@ class TestWebservices(TestCase):
 
         :return:
         """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
         # Make the library
         url = url_for('userview')
-        headers = {USER_ID_KEYWORD: self.stub_user_id}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
         )
 
         self.assertEqual(response.status_code, 200)
@@ -225,37 +239,29 @@ class TestWebservices(TestCase):
         library_id = response.json['id']
 
         # Add to the library
-        self.stub_document['action'] = 'add'
         url = url_for('documentview', library=library_id)
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_document),
-            headers=headers
+            data=stub_library.document_view_post_data_json('add'),
+            headers=stub_user.headers
         )
-
         self.assertTrue(response.status, 200)
 
         # Delete the document
-        self.stub_document['action'] = 'remove'
         url = url_for('documentview', library=library_id)
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_document),
-            headers=headers
+            data=stub_library.document_view_post_data_json('remove'),
+            headers=stub_user.headers
         )
-
         self.assertTrue(response.status, 200)
 
         # Check the library is empty
         url = url_for('libraryview', library=library_id)
-
         response = self.client.get(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
-
         self.assertTrue(len(response.json['documents']) == 0)
 
     def test_cannot_add_library_with_duplicate_names(self):
@@ -266,29 +272,29 @@ class TestWebservices(TestCase):
         :return: no return
         """
 
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
         # Make first library
         url = url_for('userview')
-        headers = {USER_ID_KEYWORD: self.stub_user_id}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
         )
-
         self.assertEqual(response.status_code, 200)
+
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
 
         # Make another one with the same name
         url = url_for('userview')
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
         )
-
         self.assertEqual(response.status_code,
                          DUPLICATE_LIBRARY_NAME_ERROR['number'])
         self.assertEqual(response.json['error'],
@@ -296,20 +302,22 @@ class TestWebservices(TestCase):
 
     def test_can_remove_a_library(self):
         """
-        Tests the /libraries/<> end point with DELETE to remove a
+        Tests the /documents/<> end point with DELETE to remove a
         library from a user's libraries
 
         :return: no return
         """
 
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
         # Make first library
         url = url_for('userview')
-        headers = {USER_ID_KEYWORD: self.stub_user_id}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
         )
 
         self.assertEqual(response.status_code, 200)
@@ -319,28 +327,29 @@ class TestWebservices(TestCase):
         library_id = response.json['id']
 
         # Delete the library
-        url = url_for('documentview', user=self.stub_user_id, library=library_id)
+        url = url_for('documentview',
+                      user=stub_user.absolute_uid,
+                      library=library_id)
         response = self.client.delete(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
         self.assertEqual(response.status_code, 200)
 
         # Check its deleted
         url = url_for('userview')
-
         response = self.client.get(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
-
         self.assertTrue(len(response.json['libraries']) == 0,
                         response.json)
 
+        # Check there is no document content
         url = url_for('libraryview', library=library_id)
         response = self.client.get(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
         self.assertEqual(response.status_code,
                          MISSING_LIBRARY_ERROR['number'],
@@ -355,7 +364,7 @@ class TestWebservices(TestCase):
 
         response = self.client.delete(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
 
         self.assertEqual(response.status_code, MISSING_LIBRARY_ERROR['number'])
@@ -370,16 +379,18 @@ class TestWebservices(TestCase):
         :return: no return
         """
 
+        # Stub data
+        stub_user_1 = UserShop()
+        stub_user_2 = UserShop()
+        stub_library = LibraryShop()
+
         # Make a library for a given user, user 1
         url = url_for('userview')
-        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers_1
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user_1.headers,
         )
-
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
@@ -389,14 +400,11 @@ class TestWebservices(TestCase):
         # Request from user 2 to see the library should be refused if user 2
         # does not have the permissions
         # Check the library is empty
-        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
         url = url_for('libraryview', library=library_id)
-
         response = self.client.get(
             url,
-            headers=headers_2
+            headers=stub_user_2.headers
         )
-
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
@@ -408,19 +416,19 @@ class TestWebservices(TestCase):
         :return: no return
         """
 
-        # Initialise HTTPretty for the URL for the API
+        # Stub data
+        stub_user_1 = UserShop()
+        stub_user_2 = UserShop()
+        stub_library = LibraryShop()
 
+        # Initialise HTTPretty for the URL for the API
         # Make a library for a given user, user 1
         url = url_for('userview')
-        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
-        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers_1
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user_1.headers
         )
-
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
@@ -430,45 +438,34 @@ class TestWebservices(TestCase):
         # Make a library for user 2 so that we have an account
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers_2
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user_2.headers
         )
-
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
 
         # Add the permissions for user 2
         url = url_for('permissionview', library=library_id)
-        email = 'user@email.com'
-
-        data_permissions = {
-            'email': email,
-            'permission': 'read',
-            'value': True
-        }
 
         # This requires communication with the API
         test_endpoint = '{api}/{email}'.format(
             api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-            email=data_permissions['email']
+            email=stub_user_2.email
         )
-        with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id+1):
-
+        with MockADSWSAPI(test_endpoint, user_uid=stub_user_2.absolute_uid):
             response = self.client.post(
                 url,
-                data=json.dumps(data_permissions),
-                headers=headers_1
+                data=stub_user_2.permission_view_post_data_json('read', True),
+                headers=stub_user_1.headers
             )
-
         self.assertEqual(response.status_code, 200)
 
         # The user can now access the content of the library
         url = url_for('libraryview', library=library_id)
-
         response = self.client.get(
             url,
-            headers=headers_2
+            headers=stub_user_2.headers
         )
         self.assertEqual(response.status_code, 200)
         self.assertTrue('documents' in response.json)
@@ -479,17 +476,19 @@ class TestWebservices(TestCase):
         of a library.
         :return:
         """
+
+        # Stub data
+        stub_user_1 = UserShop()
+        stub_user_2 = UserShop()
+        stub_library = LibraryShop()
+
         # Make a library for a given user, user 1
         url = url_for('userview')
-        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
-        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers_1
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user_1.headers
         )
-
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
@@ -499,40 +498,30 @@ class TestWebservices(TestCase):
         # Make a library for user 2 so that we have an account
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers_2
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user_2.headers
         )
-
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
 
         # User 2 with no permissions tries to modify user 1
         url = url_for('permissionview', library=library_id)
-        email = 'user@email.com'
-
-        data_permissions = {
-            'email': email,
-            'permission': 'read',
-            'value': True
-        }
-
         # This requires communication with the API
         # User requesting: user 2 that has no permissions
         # To modify: user 2 is trying to modify user 1, which is the owner of
         # the library
         test_endpoint = '{api}/{email}'.format(
             api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-            email=data_permissions['email']
+            email=stub_user_1.email
         )
         # E-mail requested should correspond to the owner of the library,
         # which in this case is user 1
-        with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id):
-
+        with MockADSWSAPI(test_endpoint, user_uid=stub_user_1.absolute_uid):
             response = self.client.post(
                 url,
-                data=json.dumps(data_permissions),
-                headers=headers_2
+                data=stub_user_2.permission_view_post_data_json('read', True),
+                headers=stub_user_2.headers
             )
 
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])

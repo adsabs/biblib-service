@@ -3,6 +3,145 @@ Contains stub data that is to be used within the tests to avoid DRY
 """
 
 import random
+import json
+import factory
+from faker import Faker
+from models import User, Library
+from views import USER_ID_KEYWORD
+
+faker = Faker()
+
+def fake_biblist(nb_codes):
+
+    bibcodes = []
+    for i in range(nb_codes):
+        year = faker.year()
+        author = faker.random_letter().upper()
+        provider = 3*author
+        bibcode = '{year}.....{provider}......{author}'\
+            .format(year=year,
+                    provider=provider,
+                    author=author)
+        bibcodes.append(bibcode)
+
+    return bibcodes[0]
+
+class UserFactory(factory.Factory):
+    class Meta:
+        model = User
+
+    id = factory.Sequence(lambda n: n)
+    absolute_uid = factory.LazyAttribute(lambda x: faker.random_int())
+    email = factory.LazyAttribute(lambda x: faker.email())
+    # permissions
+
+class LibraryFactory(factory.Factory):
+    class Meta:
+        model = Library
+    name = factory.LazyAttribute(lambda x: faker.sentence(nb_words=3)[:49])
+    description = \
+        factory.LazyAttribute(lambda x: faker.sentence(nb_words=5)[:49])
+    public = False
+    read = False
+    write = False
+    bibcode = factory.LazyAttribute(lambda x: fake_biblist(nb_codes=1))
+
+class UserShop(object):
+
+    def __init__(self):
+
+        self.stub = UserFactory.stub()
+        self.headers = {}
+
+        for key in self.stub.__dict__.keys():
+            setattr(self, key, self.stub.__dict__[key])
+
+        self.create_header()
+
+    def create_header(self):
+        self.headers = {USER_ID_KEYWORD: self.absolute_uid}
+
+    def permission_view_post_data(self, permission, value):
+
+        post_data = dict(
+            email=self.email,
+            permission=permission,
+            value=value
+        )
+
+        return post_data
+
+    def permission_view_post_data_json(self, permission, value):
+
+        post_data = self.permission_view_post_data(permission, value)
+        return json.dumps(post_data)
+
+class LibraryShop(object):
+    """
+    UserView
+    ========
+
+    POST
+    ----
+    name: Name of the library
+    description: Description of the library
+    public: Boolean (defaults to False)
+
+
+    LibraryView
+    ============
+    GET
+    ---
+
+
+    DocumentView
+    ============
+    POST
+    ----
+    bibcode: bibcode
+    action: add/remove
+
+    """
+
+    def __init__(self):
+
+        self.stub = LibraryFactory.stub()
+
+        self.user_view_post_data = None
+        self.user_view_post_data_json = None
+
+        for key in self.stub.__dict__.keys():
+            setattr(self, key, self.stub.__dict__[key])
+
+        self.create_user_view_post_data()
+
+    def create_user_view_post_data(self):
+
+        post_data = dict(
+            name=self.name,
+            description=self.description,
+            read=False,
+            write=False,
+            public=False
+        )
+
+        json_data = json.dumps(post_data)
+
+        self.user_view_post_data = post_data
+        self.user_view_post_data_json = json_data
+
+    def document_view_post_data(self, action='add'):
+
+        post_data = dict(
+            bibcode=self.bibcode,
+            action=action
+        )
+        return post_data
+
+    def document_view_post_data_json(self, action='add'):
+
+        post_data = self.document_view_post_data(action)
+        return json.dumps(post_data)
 
 
 class StubDataDocument(object):
