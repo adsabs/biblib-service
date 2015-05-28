@@ -128,10 +128,13 @@ class TestAnonymousEpic(TestCase):
         number_of_scopeless = 0
         response = self.client.get('/resources')
         for end_point in response.json.keys():
+
             if len(response.json[end_point]['scopes']) == 0:
                 number_of_scopeless += 1
+                endpoint = end_point
 
         self.assertEqual(1, number_of_scopeless)
+        self.assertEqual('/libraries/<string:library>', endpoint)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

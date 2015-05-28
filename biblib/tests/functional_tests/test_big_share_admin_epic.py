@@ -102,7 +102,7 @@ class TestDeletionEpic(TestCase):
         number_of_documents = 20
         for i in range(number_of_documents):
             # Add document
-            url = url_for('libraryview', library=library_id_dave)
+            url = url_for('documentview', library=library_id_dave)
             stub_document = StubDataDocument().make_stub(action='add')
 
             libraries_added.append(stub_document['bibcode'])
@@ -201,7 +201,7 @@ class TestDeletionEpic(TestCase):
 
         # The student removes a few bibcodes and keeps a list of the ones she
         # removed just in case
-        url = url_for('libraryview', library=library_id_dave)
+        url = url_for('documentview', library=library_id_dave)
 
         libraries_removed = []
         for i in range(number_of_documents/2):
@@ -234,6 +234,7 @@ class TestDeletionEpic(TestCase):
 
         # Dave asks Mary to re-add the ones she removed because they were
         # actually useful
+        url = url_for('documentview', library=library_id_dave)
         for bibcode in libraries_removed:
             # Add documents
 
@@ -293,7 +294,7 @@ class TestDeletionEpic(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # The student tries to add content
-        url = url_for('libraryview', library=library_id_dave)
+        url = url_for('documentview', library=library_id_dave)
         stub_document['bibcode'] = 'failure'
         response = self.client.post(
             url,
