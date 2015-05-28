@@ -2,21 +2,13 @@
 Test webservices
 """
 
-__author__ = 'J. Elliott'
-__maintainer__ = 'J. Elliott'
-__copyright__ = 'ADS Copyright 2015'
-__version__ = '1.0'
-__email__ = 'ads@cfa.harvard.edu'
-__status__ = 'Production'
-__credit__ = ['V. Sudilovsky']
-__license__ = 'MIT'
-
 import sys
 import os
 
 PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
+
 
 import app
 import json
@@ -28,6 +20,7 @@ from models import db
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR
 from views import USER_ID_KEYWORD
+import tests.stubdata
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
 from tests.base import MockADSWSAPI
 

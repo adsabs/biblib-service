@@ -5,14 +5,6 @@ The database is not initiated here, but a pointer is created named db. This is
 to be passed to the app creator within the Flask blueprint.
 """
 
-__author__ = 'J. Elliott'
-__maintainer__ = 'J. Elliott'
-__copyright__ = 'ADS Copyright 2015'
-__version__ = '1.0'
-__email__ = 'ads@cfa.harvard.edu'
-__status__ = 'Production'
-__license__ = 'MIT'
-
 import uuid
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import ARRAY, UUID

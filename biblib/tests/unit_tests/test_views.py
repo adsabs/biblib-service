@@ -2,14 +2,6 @@
 Tests Views of the application
 """
 
-__author__ = 'J. Elliott'
-__maintainer__ = 'J. Elliott'
-__copyright__ = 'ADS Copyright 2015'
-__version__ = '1.0'
-__email__ = 'ads@cfa.harvard.edu'
-__status__ = 'Testing'
-__license__ = 'MIT'
-
 import sys
 import os
 

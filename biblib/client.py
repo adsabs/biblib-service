@@ -1,16 +1,7 @@
-"""
-Client
-"""
-
-__author__ = 'V. Sudilovsky'
-__maintainer__ = 'V. Sudilovsky'
-__copyright__ = 'ADS Copyright 2014, 2015'
-__version__ = '1.0'
-__email__ = 'ads@cfa.harvard.edu'
-__status__ = 'Production'
-__license__ = 'MIT'
-
 import requests
+from flask import current_app
+
+client = lambda: Client(current_app.config).session
 
 
 class Client:
@@ -19,22 +10,16 @@ class Client:
     place to set application specific parameters, such as the oauth2
     authorization header
     """
-    def __init__(self, client_config, send_oauth2_token=True):
+    def __init__(self, config):
         """
         Constructor
 
-        :param client_config: configuration dictionary of the client
-        :param send_oauth2_token: should the app send the oauth token
-        :return: no return
+        :param config: configuration dictionary of the client
         """
 
-        self.config = client_config
         self.session = requests.Session()
-
-        if send_oauth2_token:
-            # Better to raise KeyError than default to an unusable token
-            self.token = self.config['TOKEN']
-
+        self.token = config.get('BIBLIB_CLIENT_ADSWS_API_TOKEN')
+        if self.token:
             self.session.headers.update(
                 {'Authorization': 'Bearer %s' % self.token}
             )

@@ -1,24 +1,62 @@
 """
-Configuration file
+Configuration file. Please prefix application specific config values with
+the application name.
 """
 
-__author__ = 'J. Elliott'
-__maintainer__ = 'J. Elliott'
-__copyright__ = 'ADS Copyright 2015'
-__version__ = '1.0'
-__email__ = 'ads@cfa.harvard.edu'
-__status__ = 'Production'
-__credit__ = ['V. Sudilovsky']
-__license__ = 'MIT'
-
+import os
 import pwd
+
+LOG_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '../')
+)
+LOG_PATH = '{home}/logs/'.format(home=LOG_PATH)
+
+if not os.path.isdir(LOG_PATH):
+    os.mkdir(LOG_PATH)
 
 SAMPLE_APPLICATION_PARAM = {
     'message': 'config params should be prefixed with the application name',
     'reason': 'this will allow easier integration if this app is incorporated'
               ' as a python module',
 }
-USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
+
+BIBLIB_LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '%(levelname)s\t%(process)d '
+                      '[%(asctime)s]:\t%(message)s',
+            'datefmt': '%m/%d/%Y %H:%M:%S',
+        }
+    },
+    'handlers': {
+        'file': {
+            'formatter': 'default',
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': '{path}/app.log'.format(path=LOG_PATH),
+        },
+        'console': {
+            'formatter': 'default',
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler'
+        },
+        'syslog': {
+            'formatter': 'default',
+            'level': 'DEBUG',
+            'class': 'logging.handlers.SysLogHandler',
+            'address': '/dev/log'
+        }
+    },
+    'loggers': {
+        '': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
 
 # Database for microservice
 try:
@@ -33,8 +71,5 @@ except KeyError:
 
 # These lines are necessary only if the app needs to be a client of the
 # adsws-api
-from client import Client
-BIBLIB_CLIENT_ADSWS_API_TOKEN = 'this is a secret api token!'
-BIBLIB_CLIENT = Client(
-    {'TOKEN': BIBLIB_CLIENT_ADSWS_API_TOKEN}
-)
+USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
+BIBLIB_ADSWS_API_TOKEN = 'this is a secret api token!'

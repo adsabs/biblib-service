@@ -2,21 +2,14 @@
 Application
 """
 
-from flask import Flask
+import logging.config
 from views import UserView, LibraryView, DocumentView, PermissionView
+from models import db
+
+from flask import Flask
 from flask.ext.restful import Api
 from flask.ext.discoverer import Discoverer
-from models import db
-from utils import setup_logging_handler
-
-__author__ = 'J. Elliott'
-__maintainer__ = 'J. Elliott'
-__copyright__ = 'ADS Copyright 2015'
-__version__ = '1.0'
-__email__ = 'ads@cfa.harvard.edu'
-__status__ = 'Production'
-__credit__ = ['V. Sudilovsky']
-__license__ = 'MIT'
+from flask.ext.consulate import Consul, ConsulConnectionError
 
 
 def create_app(config_type='PRODUCTION'):
@@ -29,27 +22,19 @@ def create_app(config_type='PRODUCTION'):
     """
 
     app = Flask(__name__, static_folder=None)
-
     app.url_map.strict_slashes = False
 
-    config_dictionary = dict(
-        TEST='test_config.py',
-        LOCAL='local_config.py',
-        PRODUCTION='config.py'
+    # Load config and logging
+    Consul(app)  # load_config expects consul to be registered
+    load_config(app, config_type)
+    logging.config.dictConfig(
+        app.config['BIBLIB_LOGGING']
     )
 
-    app.config.from_pyfile(config_dictionary['PRODUCTION'])
-
-    if config_type in config_dictionary.keys():
-        try:
-            app.config.from_pyfile(config_dictionary[config_type])
-        except IOError:
-            app.logger.warning('Could not find specified config file: {0}'
-                               .format(config_dictionary[config_type]))
-            raise
-
-    # Initiate the blueprint
+    # Register extensions
     api = Api(app)
+    Discoverer(app)
+    db.init_app(app)
 
     # Add the end resource end points
     api.add_resource(UserView,
@@ -68,15 +53,43 @@ def create_app(config_type='PRODUCTION'):
                      '/permissions/<string:library>',
                      methods=['POST'])
 
-    # Initiate the database from the SQL Alchemy model
-    db.init_app(app)
-
-    # Add logging
-    handler = setup_logging_handler(level='DEBUG')
-    app.logger.addHandler(handler)
-
-    Discoverer(app)
     return app
+
+def load_config(app, config_type):
+    """
+    Loads configuration in the following order:
+        1. config.py
+        2. local_config.py (ignore failures)
+        3. consul (ignore failures)
+    :param app: flask.Flask application instance
+    :return: None
+    """
+
+    config_dictionary = dict(
+        TEST='test_config.py',
+        LOCAL='local_config.py',
+        PRODUCTION='config.py'
+    )
+
+    app.config.from_pyfile(config_dictionary['PRODUCTION'])
+
+    if config_type in config_dictionary.keys():
+        try:
+            app.config.from_pyfile(config_dictionary[config_type])
+        except IOError:
+            app.logger.warning('Could not find specified config file: {0}'
+                               .format(config_dictionary[config_type]))
+            raise
+    else:
+        try:
+            app.config.from_pyfile('local_config.py')
+        except IOError:
+            app.logger.warning('Could not load local_config.py')
+        try:
+            app.extensions['consul'].apply_remote_config()
+        except ConsulConnectionError as error:
+            app.logger.warning('Could not apply config from consul: {}'
+                               .format(error))
 
 if __name__ == '__main__':
     app_ = create_app()
