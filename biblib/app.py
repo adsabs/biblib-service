@@ -62,6 +62,7 @@ def load_config(app, config_type):
         2. local_config.py (ignore failures)
         3. consul (ignore failures)
     :param app: flask.Flask application instance
+    :param config_type: config file to use
     :return: None
     """
 

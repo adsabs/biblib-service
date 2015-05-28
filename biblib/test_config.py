@@ -20,54 +20,82 @@ SAMPLE_APPLICATION_PARAM = {
               ' as a python module',
 }
 
-BIBLIB_LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'default': {
-            'format': '%(levelname)s\t%(process)d '
-                      '[%(asctime)s]:\t%(message)s',
-            'datefmt': '%m/%d/%Y %H:%M:%S',
-        }
-    },
-    'handlers': {
-        'file': {
-            'formatter': 'default',
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': '{path}/app.log'.format(path=LOG_PATH),
-        },
-        'console': {
-            'formatter': 'default',
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler'
-        },
-        'syslog': {
-            'formatter': 'default',
-            'level': 'DEBUG',
-            'class': 'logging.handlers.SysLogHandler',
-            'address': '/dev/log'
-        }
-    },
-    'loggers': {
-        '': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-    },
-}
-
 # Database for microservice
 try:
     # For working on a VM as user vagrant
     pwd.getpwnam('vagrant')
     SQLALCHEMY_DATABASE_URI = \
         'postgresql+psycopg2://vagrant:vagrant@localhost/testdb'
+
+    BIBLIB_LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'default': {
+                'format': '%(levelname)s\t%(process)d '
+                          '[%(asctime)s]:\t%(message)s',
+                'datefmt': '%m/%d/%Y %H:%M:%S',
+            }
+        },
+        'handlers': {
+            'file': {
+                'formatter': 'default',
+                'level': 'DEBUG',
+                'class': 'logging.handlers.TimedRotatingFileHandler',
+                'filename': 'app.log',
+            },
+            'console': {
+                'formatter': 'default',
+                'level': 'DEBUG',
+                'class': 'logging.StreamHandler'
+            },
+            'syslog': {
+                'formatter': 'default',
+                'level': 'DEBUG',
+                'class': 'logging.handlers.SysLogHandler',
+                'address': '/dev/log'
+            }
+        },
+        'loggers': {
+            '': {
+                'handlers': ['file'],
+                'level': 'DEBUG',
+                'propagate': True,
+            },
+        },
+    }
+
 except KeyError:
     # For running tests on TravisCI
     SQLALCHEMY_DATABASE_URI = \
         'postgresql+psycopg2://postgres:@localhost/testdb'
+
+    BIBLIB_LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'default': {
+                'format': '%(levelname)s\t%(process)d '
+                          '[%(asctime)s]:\t%(message)s',
+                'datefmt': '%m/%d/%Y %H:%M:%S',
+            }
+        },
+        'handlers': {
+            'console': {
+                'formatter': 'default',
+                'level': 'DEBUG',
+                'class': 'logging.StreamHandler'
+            }
+        },
+        'loggers': {
+            '': {
+                'handlers': ['file'],
+                'level': 'DEBUG',
+                'propagate': True,
+            },
+        },
+    }
+
 
 # These lines are necessary only if the app needs to be a client of the
 # adsws-api
