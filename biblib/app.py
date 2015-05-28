@@ -62,7 +62,7 @@ def create_app(config_type='PRODUCTION'):
 
     api.add_resource(DocumentView,
                      '/documents/<string:library>',
-                     methods=['POST', 'DELETE'],)
+                     methods=['POST', 'DELETE'])
 
     api.add_resource(PermissionView,
                      '/permissions/<string:library>',
