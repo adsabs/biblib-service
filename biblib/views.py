@@ -144,6 +144,34 @@ class BaseView(Resource):
         if response.status_code == 200:
             return int(response.json()['uid'])
 
+    def helper_access_allowed(self, service_uid, library_id, access_type):
+        """
+        Determines if the given user has permissions to look at the content
+        of a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+        :param access_type: list of access types to check
+
+        :return: boolean, access (True), no access (False)
+        """
+
+        try:
+            permissions = Permissions.query.filter(
+                Permissions.library_id == library_id,
+                Permissions.user_id == service_uid
+            ).one()
+
+            return getattr(permissions, access_type)
+
+        except NoResultFound as error:
+            current_app.logger.error('No permissions for '
+                                     'user: {0}, library: {1}, permission: {2}'
+                                     ' [{3}]'.format(service_uid, library_id,
+                                                     access_type, error))
+            return False
+
+
 
 class UserView(BaseView):
     """
@@ -177,21 +205,6 @@ class UserView(BaseView):
                                      'added. Full traceback: {1}'
                                      .format(absolute_uid, error))
             raise
-
-    def user_exists(self, absolute_uid):
-        """
-        Checks if a use exists before it would attempt to create one
-
-        :param absolute_uid: UID from the API
-        :return: boolean for if the user exists
-        """
-
-        user_count = User.query.filter(User.absolute_uid == absolute_uid).all()
-        user_count = len(user_count)
-        if user_count == 1:
-            return True
-        elif user_count == 0:
-            return False
 
     def create_library(self, service_uid, library_data):
         """
@@ -352,7 +365,7 @@ class UserView(BaseView):
 
         # Check if the user exists, if not, generate a user in the database
         current_app.logger.info('Checking if the user exists')
-        if not self.user_exists(absolute_uid=user):
+        if not self.helper_user_exists(absolute_uid=user):
             current_app.logger.info('User: {0:d}, does not exist.'
                                     .format(user))
 
@@ -382,8 +395,11 @@ class UserView(BaseView):
 
 class LibraryView(BaseView):
     """
-    End point to interact with a specific library, by adding content and
-    removing content
+    End point to interact with a specific library, only returns library content
+    if the user has the correct privileges.
+
+    The GET requests are separate from the POST, DELETE requests as this class
+    must be scopeless, whereas the others will have scope.
 
     XXX: need to ignore the anon user, they should not be able to do anything
     XXX: document already exists (only add a bibcode once)
@@ -392,20 +408,131 @@ class LibraryView(BaseView):
 
     """
 
-    def user_exists(self, absolute_uid):
-        """
-        Checks if a use exists before it would attempt to create one
+    decorators = [advertise('scopes', 'rate_limit')]
+    scopes = []
+    rate_limit = [1000, 60*60*24]
 
-        :param absolute_uid: UID from the API
-        :return: boolean for if the user exists
+    def get_documents_from_library(self, library_id):
+        """
+        Retrieve all the documents that are within the library specified
+        :param library_id: the unique ID of the library
+
+        :return: bibcodes
         """
 
-        user_count = User.query.filter(User.absolute_uid == absolute_uid).all()
-        user_count = len(user_count)
-        if user_count == 1:
-            return True
-        elif user_count == 0:
-            return False
+        library = Library.query.filter(Library.id == library_id).one()
+        return library
+
+    def read_access(self, service_uid, library_id):
+        """
+        Defines which type of user has read permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+
+        read_allowed = ['read', 'write', 'admin', 'owner']
+        for access_type in read_allowed:
+            if self.helper_access_allowed(service_uid=service_uid,
+                                   library_id=library_id,
+                                   access_type=access_type):
+                return True
+
+        return False
+
+    # Methods
+    def get(self, library):
+        """
+        HTTP GET request that returns all the documents inside a given
+        user's library
+        :param library: library ID
+
+        :return: list of the users libraries with the relevant information
+
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post body:
+        ----------
+        No post content accepted.
+
+        XXX: Needs authentification still
+        """
+        try:
+            user = int(request.headers[USER_ID_KEYWORD])
+        except KeyError:
+            current_app.logger.error('No username passed')
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
+
+        current_app.logger.info('User: {0} requested library: {1}'
+                                .format(user, library))
+
+        # If the library is public, allow access
+        try:
+            library = self.get_documents_from_library(library_id=library)
+            documents = library.bibcode
+            if library.public:
+                current_app.logger.info('Library: {0} is public'
+                                        .format(library.id))
+                return {'documents': documents}, 200
+
+        except:
+            return {'error': MISSING_LIBRARY_ERROR['body']}, \
+                MISSING_LIBRARY_ERROR['number']
+
+        # If the user does not exist then there are no associated permissions
+        # If the user exists, they will have permissions
+        if self.helper_user_exists(absolute_uid=user):
+            service_uid = \
+                self.helper_absolute_uid_to_service_uid(absolute_uid=user)
+        else:
+            current_app.logger.error('User:{0} does not exist in the database.'
+                                     ' Therefore will not have extra '
+                                     'privileges to view the library: {1}'
+                                     .format(user, library.id))
+
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                NO_PERMISSION_ERROR['number']
+
+        # If they do not have access, exit
+        if not self.read_access(service_uid=service_uid, library_id=library.id):
+            current_app.logger.error(
+                'User: {0} does not have access to library: {1}. DENIED'
+                .format(service_uid, library.id)
+            )
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                NO_PERMISSION_ERROR['number']
+
+        # If they have access, let them obtain the requested content
+        current_app.logger.info('User: {0} has access to library: {1}. '
+                                'ALLOWED'
+                                .format(user, library.id))
+
+        return {'documents': documents}, 200
+
+
+class DocumentView(BaseView):
+    """
+    End point to interact with a specific library, by adding documents and
+    removing documents. You also use this endpoint to delete the entire
+    library as this method should be scoped.
+
+    XXX: need to ignore the anon user, they should not be able to do anything
+    XXX: document already exists (only add a bibcode once)
+    XXX: adding tags using PUT for RESTful endpoint?
+    XXX: public/private behaviour
+
+    """
+
+    decorators = [advertise('scopes', 'rate_limit')]
+    scopes = ['scope1', 'scope2']
+    rate_limit = [1000, 60*60*24]
 
     def add_document_to_library(self, library_id, document_data):
         """
@@ -450,17 +577,6 @@ class LibraryView(BaseView):
         current_app.logger.info('Removed document successfully: {0}'
                                 .format(library.bibcode))
 
-    def get_documents_from_library(self, library_id):
-        """
-        Retrieve all the documents that are within the library specified
-        :param library_id: the unique ID of the library
-
-        :return: bibcodes
-        """
-
-        library = Library.query.filter(Library.id == library_id).one()
-        return library.bibcode
-
     def delete_library(self, library_id):
         """
         Delete the entire library from the database
@@ -472,52 +588,6 @@ class LibraryView(BaseView):
         library = Library.query.filter(Library.id == library_id).one()
         db.session.delete(library)
         db.session.commit()
-
-    def access_allowed(self, service_uid, library_id, access_type):
-        """
-        Determines if the given user has permissions to look at the content
-        of a library.
-
-        :param service_uid: the user ID within this microservice
-        :param library_id: the unique ID of the library
-        :param access_type: list of access types to check
-
-        :return: boolean, access (True), no access (False)
-        """
-
-        try:
-            permissions = Permissions.query.filter(
-                Permissions.library_id == library_id,
-                Permissions.user_id == service_uid
-            ).one()
-
-            return getattr(permissions, access_type)
-
-        except NoResultFound as error:
-            current_app.logger.error('No permissions for '
-                                     'user: {0}, library: {1}, permission: {2}'
-                                     ' [{3}]'.format(service_uid, library_id,
-                                                     access_type, error))
-            return False
-
-    def read_access(self, service_uid, library_id):
-        """
-        Defines which type of user has read permissions to a library.
-
-        :param service_uid: the user ID within this microservice
-        :param library_id: the unique ID of the library
-
-        :return: boolean, access (True), no access (False)
-        """
-
-        read_allowed = ['read', 'write', 'admin', 'owner']
-        for access_type in read_allowed:
-            if self.access_allowed(service_uid=service_uid,
-                                   library_id=library_id,
-                                   access_type=access_type):
-                return True
-
-        return False
 
     def write_access(self, service_uid, library_id):
         """
@@ -531,79 +601,12 @@ class LibraryView(BaseView):
 
         read_allowed = ['write', 'admin', 'owner']
         for access_type in read_allowed:
-            if self.access_allowed(service_uid=service_uid,
+            if self.helper_access_allowed(service_uid=service_uid,
                                    library_id=library_id,
                                    access_type=access_type):
                 return True
 
         return False
-
-    # Methods
-    def get(self, library):
-        """
-        HTTP GET request that returns all the documents inside a given
-        user's library
-        :param library: library ID
-
-        :return: list of the users libraries with the relevant information
-
-
-        Header:
-        -------
-        Must contain the API forwarded user ID of the user accessing the end
-        point
-
-        Post body:
-        ----------
-        No post content accepted.
-
-        XXX: Needs authentification still
-        """
-        try:
-            user = int(request.headers[USER_ID_KEYWORD])
-        except KeyError:
-            current_app.logger.error('No username passed')
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
-
-        current_app.logger.info('User: {0} requested library: {1}'
-                                .format(user, library))
-
-        # If the library is public, allow access
-
-        # If the user does not exist then there are no associated permissions
-        # If the user exists, they will have permissions
-        if self.user_exists(absolute_uid=user):
-            service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
-        else:
-            current_app.logger.error('User:{0} does not exist in the database.'
-                                     ' Therefore will not have extra '
-                                     'privileges to view the library: {1}'
-                                     .format(user, library))
-
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
-
-        # If they do not have access, exit
-
-        if not self.read_access(service_uid=service_uid, library_id=library):
-            current_app.logger.error(
-                'User: {0} does not have access to library: {1}. DENIED'
-                .format(service_uid, library)
-            )
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
-
-        # If they have access, let them obtain the requested content
-        try:
-            current_app.logger.info('User: {0} has access to library: {1}. '
-                                    'ALLOWED'
-                                    .format(user, library))
-            documents = self.get_documents_from_library(library_id=library)
-            return {'documents': documents}, 200
-        except:
-            return {'error': MISSING_LIBRARY_ERROR['body']}, \
-                MISSING_LIBRARY_ERROR['number']
 
     def post(self, library):
         """

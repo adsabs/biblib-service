@@ -103,7 +103,7 @@ class TestWebservices(TestCase):
         :return: no return
         """
 
-        url = url_for('libraryview', library='test')
+        url = url_for('documentview', library='test')
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, MISSING_USERNAME_ERROR['number'])
@@ -164,7 +164,7 @@ class TestWebservices(TestCase):
 
     def test_add_document_to_library(self):
         """
-        Test the /libraries/<> end point with POST to add a document
+        Test the /documents/<> end point with POST to add a document
 
         :return: no return
         """
@@ -189,7 +189,7 @@ class TestWebservices(TestCase):
 
         # Add to the library
         self.stub_document['action'] = 'add'
-        url = url_for('libraryview', library=library_id)
+        url = url_for('documentview', library=library_id)
 
         response = self.client.post(
             url,
@@ -198,6 +198,7 @@ class TestWebservices(TestCase):
         )
 
         # Check the library was created and documents exist
+        url = url_for('libraryview', library=library_id)
         response = self.client.get(
             url,
             data=json.dumps(payload),
@@ -232,7 +233,7 @@ class TestWebservices(TestCase):
 
         # Add to the library
         self.stub_document['action'] = 'add'
-        url = url_for('libraryview', library=library_id)
+        url = url_for('documentview', library=library_id)
 
         response = self.client.post(
             url,
@@ -244,7 +245,7 @@ class TestWebservices(TestCase):
 
         # Delete the document
         self.stub_document['action'] = 'remove'
-        url = url_for('libraryview', library=library_id)
+        url = url_for('documentview', library=library_id)
 
         response = self.client.post(
             url,
@@ -325,7 +326,7 @@ class TestWebservices(TestCase):
         library_id = response.json['id']
 
         # Delete the library
-        url = url_for('libraryview', user=self.stub_user_id, library=library_id)
+        url = url_for('documentview', user=self.stub_user_id, library=library_id)
         response = self.client.delete(
             url,
             headers=headers
@@ -349,15 +350,15 @@ class TestWebservices(TestCase):
             headers=headers
         )
         self.assertEqual(response.status_code,
-                         NO_PERMISSION_ERROR['number'],
+                         MISSING_LIBRARY_ERROR['number'],
                          'Received response error: {0}'
                          .format(response.status_code))
         self.assertEqual(response.json['error'],
-                         NO_PERMISSION_ERROR['body'])
+                         MISSING_LIBRARY_ERROR['body'])
 
         # Try to delete even though it does not exist, this should return
         # some errors from the server
-        url = url_for('libraryview', library=library_id)
+        url = url_for('documentview', library=library_id)
 
         response = self.client.delete(
             url,
@@ -754,7 +755,7 @@ class TestWebservices(TestCase):
         # See if a random user can edit content of the library
         # Add to the library
         self.stub_document['action'] = 'add'
-        url = url_for('libraryview', library=library_id)
+        url = url_for('documentview', library=library_id)
 
         response = self.client.post(
             url,
@@ -772,6 +773,38 @@ class TestWebservices(TestCase):
             headers=headers_1
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_anonymous_users_can_access_public_libraries(self):
+
+        # Make a library for a given user, user 1
+        url = url_for('userview')
+        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
+
+        self.stub_library['public'] = True
+        response = self.client.post(
+            url,
+            data=json.dumps(self.stub_library),
+            headers=headers_1
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Request from user 2
+        # Given it is public, should be able to view it
+        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
+        url = url_for('libraryview', library=library_id)
+
+        response = self.client.get(
+            url,
+            headers=headers_2
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('documents', response.json)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

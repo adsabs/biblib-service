@@ -3,7 +3,7 @@ Application
 """
 
 from flask import Flask
-from views import UserView, LibraryView, PermissionView
+from views import UserView, LibraryView, DocumentView, PermissionView
 from flask.ext.restful import Api
 from flask.ext.discoverer import Discoverer
 from models import db
@@ -58,7 +58,11 @@ def create_app(config_type='PRODUCTION'):
 
     api.add_resource(LibraryView,
                      '/libraries/<string:library>',
-                     methods=['GET', 'POST', 'DELETE'])
+                     methods=['GET'])
+
+    api.add_resource(DocumentView,
+                     '/documents/<string:library>',
+                     methods=['POST', 'DELETE'],)
 
     api.add_resource(PermissionView,
                      '/permissions/<string:library>',
@@ -71,7 +75,7 @@ def create_app(config_type='PRODUCTION'):
     handler = setup_logging_handler(level='DEBUG')
     app.logger.addHandler(handler)
 
-    discoverer = Discoverer(app)
+    Discoverer(app)
     return app
 
 if __name__ == '__main__':

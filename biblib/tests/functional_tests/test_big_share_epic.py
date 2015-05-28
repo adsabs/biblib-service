@@ -106,7 +106,7 @@ class TestDeletionEpic(TestCase):
         number_of_documents = 20
         for i in range(number_of_documents):
             # Add document
-            url = url_for('libraryview', library=library_id_dave)
+            url = url_for('documentview', library=library_id_dave)
             stub_document = StubDataDocument().make_stub(action='add')
 
             response = self.client.post(

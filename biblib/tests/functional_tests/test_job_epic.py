@@ -80,8 +80,9 @@ class TestJobEpic(TestCase):
         # that will come from the ADSWS
         headers = {USER_ID_KEYWORD: self.stub_uid}
 
-        # Make the library
+        # Make the library and make it public to be viewed by employers
         url = url_for('userview')
+        self.stub_library['public'] = True
         response = self.client.post(
             url,
             data=json.dumps(self.stub_library),
@@ -104,7 +105,7 @@ class TestJobEpic(TestCase):
 
         # Then she submits the document (in this case a bibcode) to add to the
         # library
-        url = url_for('libraryview', library=library_id)
+        url = url_for('documentview', library=library_id)
         self.stub_document['action'] = 'add'
         response = self.client.post(
             url,
@@ -113,9 +114,9 @@ class TestJobEpic(TestCase):
         )
         self.assertEqual(response.status_code, 200, response)
 
-        # Mary realises she added one that is not hers and goes back to her list
-        # and deletes it from her library.
-        url = url_for('libraryview', library=library_id)
+        # Mary realises she added one that is not hers and goes back to her
+        # list and deletes it from her library.
+        url = url_for('documentview', library=library_id)
         self.stub_document['action'] = 'remove'
         response = self.client.post(
             url,
@@ -124,17 +125,23 @@ class TestJobEpic(TestCase):
         )
         self.assertEqual(response.status_code, 200, response)
 
-        response = response = self.client.get(
+        url = url_for('libraryview', library=library_id)
+        response = self.client.get(
             url,
             headers=headers
         )
         self.assertTrue(len(response.json['documents']) == 0, response.json)
 
-        # Happy with her library, she copies the link to the library and e-mails
-        # it to the prospective employer.
+        # Happy with her library, she copies the link to the library and
+        # e-mails it to the prospective employer.
 
-        # She then checks the link herself as she is paranoid it may not work,
-        # but it works fine.
+        # She then asks a friend to check the link, and it works fine.
+        random_headers = {USER_ID_KEYWORD: self.stub_uid*2}
+        response = self.client.get(
+            url,
+            headers=random_headers
+        )
+        self.assertEqual(response.status_code, 200)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

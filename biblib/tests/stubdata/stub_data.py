@@ -125,9 +125,9 @@ class StubDataLibrary(object):
         stub_library = dict(
             name=jumble,
             description='My first library',
-            read=True,
-            write=True,
-            public=True
+            read=False,
+            write=False,
+            public=False
         )
 
         return stub_library

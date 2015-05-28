@@ -23,7 +23,7 @@ from models import db, User, Library, Permissions
 from flask.ext.testing import TestCase
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from views import UserView, LibraryView, PermissionView
+from views import UserView, LibraryView, DocumentView, PermissionView
 from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
 from utils import BackendIntegrityError, PermissionDeniedError
 
@@ -120,7 +120,7 @@ class TestUserViews(TestCase):
 
         # Check if the user exists, given we have not added any user in this
         # test, it should return nothing.
-        exists = self.user_view.user_exists(absolute_uid=self.stub_uid)
+        exists = self.user_view.helper_user_exists(absolute_uid=self.stub_uid)
         self.assertFalse(exists)
 
         # Add the user with the given UID to the database
@@ -129,7 +129,7 @@ class TestUserViews(TestCase):
         db.session.commit()
 
         # Check that the user exists in the database
-        exists = self.user_view.user_exists(absolute_uid=self.stub_uid)
+        exists = self.user_view.helper_user_exists(absolute_uid=self.stub_uid)
         self.assertTrue(exists)
 
     def test_user_can_create_a_library(self):
@@ -214,7 +214,7 @@ class TestUserViews(TestCase):
 
 class TestLibraryViews(TestCase):
     """
-    Base class to test the Library view for GET/POST/DELETE (PUT for tags?)
+    Base class to test the Library view for GET
     """
 
     def __init__(self, *args, **kwargs):
@@ -261,61 +261,6 @@ class TestLibraryViews(TestCase):
         db.session.remove()
         db.drop_all()
 
-    def test_user_can_add_to_library(self):
-        """
-        Tests that adding a bibcode to a library works correctly
-
-        :return:
-        """
-
-        # Ensure a user exists
-        user = User(absolute_uid=self.stub_uid)
-        db.session.add(user)
-        db.session.commit()
-
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True)
-
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
-
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
-
-        library_id = library.id
-        user_id = user.id
-
-        # Get stub data for the document
-
-        # Add a document to the library
-        self.library_view.add_document_to_library(
-            library_id=library_id,
-            document_data=self.stub_document
-        )
-
-        # Check that the document is in the library
-        library = Library.query.filter(Library.id == library_id).all()
-        for _lib in library:
-            self.assertIn(self.stub_document['bibcode'], _lib.bibcode)
-
-        self.stub_document['bibcode'] = self.stub_document['bibcode'] + 'NEW'
-        # Add a different document to the library
-        self.library_view.add_document_to_library(
-            library_id=library_id,
-            document_data=self.stub_document
-        )
-
-        # Check that the document is in the library
-        library = Library.query.filter(Library.id == library_id).all()
-        for _lib in library:
-            self.assertIn(self.stub_document['bibcode'], _lib.bibcode)
-
     def test_user_can_get_documents_from_library(self):
         """
         Test that can retrieve all the bibcodes from a library
@@ -349,13 +294,16 @@ class TestLibraryViews(TestCase):
             library_id=library.id
         )
 
-    def test_user_can_remove_document_from_library(self):
+    def test_user_without_permission_cannot_access_private_library(self):
         """
-        Test that can remove a document from the library
+        Tests that the user requesting to see the contents of a library has
+        the correct permissions. In this case, they do not, and are refused to
+        see the library content.
 
         :return: no return
         """
 
+        # Make a fake user and library
         # Ensure a user exists
         user = User(absolute_uid=self.stub_uid)
         db.session.add(user)
@@ -377,19 +325,61 @@ class TestLibraryViews(TestCase):
         db.session.add_all([library, permission, user])
         db.session.commit()
 
-        # Remove the bibcode from the library
-        self.library_view.remove_documents_from_library(
-            library_id=library.id,
-            document_data=self.stub_document
-        )
+        # Make sure the second user is denied access
+        # add 1 to the UID to represent a random user
+        access = self.library_view.read_access(service_uid=user.id+1,
+                                               library_id=library.id)
+        self.assertIsNotNone(access)
+        self.assertFalse(access)
 
-        # Check it worked
-        library = Library.query.filter(Library.id == library.id).one()
 
-        self.assertTrue(
-            len(library.bibcode) == 0,
-            'There should be no bibcodes: {0}'.format(library.bibcode)
-        )
+class TestDocumentViews(TestCase):
+    """
+    Base class to test the Document view for POST/DELETE (PUT for tags?)
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor of the class
+
+        :param args: to pass on to the super class
+        :param kwargs: to pass on to the super class
+
+        :return: no return
+        """
+
+        super(TestCase, self).__init__(*args, **kwargs)
+        self.document_view = DocumentView()
+
+    def create_app(self):
+        """
+        Create the wsgi application for the flask test extension
+
+        :return: application instance
+        """
+
+        return app.create_app(config_type='TEST')
+
+    def setUp(self):
+        """
+        Set up the database for use
+
+        :return: no return
+        """
+
+        db.create_all()
+        self.stub_library, self.stub_uid = StubDataLibrary().make_stub()
+        self.stub_document = StubDataDocument().make_stub()
+
+    def tearDown(self):
+        """
+        Remove/delete the database and the relevant connections
+
+        :return: no return
+        """
+
+        db.session.remove()
+        db.drop_all()
 
     def test_user_can_delete_a_library(self):
         """
@@ -424,14 +414,111 @@ class TestLibraryViews(TestCase):
         library = Library.query.filter(Library.id == library.id).one()
         self.assertIsInstance(library, Library)
 
-        self.library_view.delete_library(library_id=library.id)
+        self.document_view.delete_library(library_id=library.id)
 
         with self.assertRaises(NoResultFound):
-            library = Library.query.filter(Library.id == library.id).one()
+            Library.query.filter(Library.id == library.id).one()
 
-    def test_user_without_permission_cannot_access_private_library(self):
+    def test_user_can_add_to_library(self):
         """
-        Tests that the user requesting to see the contents of a library has
+        Tests that adding a bibcode to a library works correctly
+
+        :return:
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True)
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        library_id = library.id
+        user_id = user.id
+
+        # Get stub data for the document
+
+        # Add a document to the library
+        self.document_view.add_document_to_library(
+            library_id=library_id,
+            document_data=self.stub_document
+        )
+
+        # Check that the document is in the library
+        library = Library.query.filter(Library.id == library_id).all()
+        for _lib in library:
+            self.assertIn(self.stub_document['bibcode'], _lib.bibcode)
+
+        self.stub_document['bibcode'] = self.stub_document['bibcode'] + 'NEW'
+        # Add a different document to the library
+        self.document_view.add_document_to_library(
+            library_id=library_id,
+            document_data=self.stub_document
+        )
+
+        # Check that the document is in the library
+        library = Library.query.filter(Library.id == library_id).all()
+        for _lib in library:
+            self.assertIn(self.stub_document['bibcode'], _lib.bibcode)
+
+    def test_user_can_remove_document_from_library(self):
+        """
+        Test that can remove a document from the library
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_document['bibcode']])
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        # Remove the bibcode from the library
+        self.document_view.remove_documents_from_library(
+            library_id=library.id,
+            document_data=self.stub_document
+        )
+
+        # Check it worked
+        library = Library.query.filter(Library.id == library.id).one()
+
+        self.assertTrue(
+            len(library.bibcode) == 0,
+            'There should be no bibcodes: {0}'.format(library.bibcode)
+        )
+
+    def test_user_without_permission_cannot_edit_private_library(self):
+        """
+        Tests that the user requesting to edit the contents of a library has
         the correct permissions. In this case, they do not, and are refused to
         see the library content.
 
@@ -460,14 +547,9 @@ class TestLibraryViews(TestCase):
         db.session.add_all([library, permission, user])
         db.session.commit()
 
-        # Make sure the second user is denied access
-        access = self.library_view.read_access(service_uid=user.id+1,
-                                               library_id=library.id)
-        self.assertIsNotNone(access)
-        self.assertFalse(access)
-
-        access = self.library_view.write_access(service_uid=user.id+1,
-                                                library_id=library.id)
+        # add 1 to the UID to represent a random user
+        access = self.document_view.write_access(service_uid=user.id+1,
+                                                 library_id=library.id)
         self.assertIsNotNone(access)
         self.assertFalse(access)
 

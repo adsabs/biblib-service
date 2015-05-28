@@ -124,7 +124,7 @@ class TestDeletionEpic(TestCase):
         library_id_2 = response.json['libraries'][1]['id']
 
         # Deletes the second library
-        url = url_for('libraryview', library=library_id_2)
+        url = url_for('documentview', library=library_id_2)
         response = self.client.delete(
             url,
             headers=headers
@@ -140,7 +140,7 @@ class TestDeletionEpic(TestCase):
         self.assertTrue(len(response.json['libraries']) == 1)
 
         # Deletes the first library
-        url = url_for('libraryview', library=library_id_1)
+        url = url_for('documentview', library=library_id_1)
         response = self.client.delete(
             url,
             headers=headers
