@@ -6,14 +6,6 @@ Job Epic
 Storyboard is defined within the comments of the program itself
 """
 
-__author__ = 'J. Elliott'
-__maintainer__ = 'J. Elliott'
-__copyright__ = 'ADS Copyright 2015'
-__version__ = '1.0'
-__email__ = 'ads@cfa.harvard.edu'
-__status__ = 'Production'
-__license__ = 'MIT'
-
 import sys
 import os
 

@@ -2,19 +2,11 @@
 Views
 """
 
-__author__ = 'J. Elliott'
-__maintainer__ = 'J. Elliott'
-__copyright__ = 'ADS Copyright 2015'
-__version__ = '1.0'
-__email__ = 'ads@cfa.harvard.edu'
-__status__ = 'Production'
-__credit__ = ['V. Sudilovsky']
-__license__ = 'MIT'
-
 from flask import request, current_app
 from flask.ext.restful import Resource
 from flask.ext.discoverer import advertise
 from models import db, User, Library, Permissions
+from client import client
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from utils import get_post_data, BackendIntegrityError, PermissionDeniedError
@@ -133,7 +125,7 @@ class BaseView(Resource):
                 api=current_app.config['USER_EMAIL_ADSWS_API_URL'],
                 email=permission_data['email']
             )
-            response = current_app.config['BIBLIB_CLIENT'].session.get(
+            response = client().get(
                 service
             )
         except KeyError as error:

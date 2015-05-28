@@ -9,3 +9,4 @@ local_config.py
 logs/
 *.coverage*
 *.ignore
+src/
