@@ -103,7 +103,7 @@ class LibraryShop(object):
 
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
 
         self.stub = LibraryFactory.stub()
 
@@ -113,6 +113,7 @@ class LibraryShop(object):
         for key in self.stub.__dict__.keys():
             setattr(self, key, self.stub.__dict__[key])
 
+        self.kwargs = kwargs
         self.create_user_view_post_data()
 
     def create_user_view_post_data(self):
@@ -124,6 +125,11 @@ class LibraryShop(object):
             write=False,
             public=False
         )
+
+        if self.kwargs:
+            for key in self.kwargs:
+                if key in post_data.keys():
+                    post_data[key] = self.kwargs[key]
 
         json_data = json.dumps(post_data)
 

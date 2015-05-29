@@ -9,60 +9,17 @@ PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
 
-
-import app
-import json
 import unittest
-from httpretty import HTTPretty
-from flask.ext.testing import TestCase
 from flask import url_for
-from models import db
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR
-from views import USER_ID_KEYWORD
+from tests.stubdata.stub_data import LibraryShop, UserShop
+from tests.base import MockEmailService, TestCaseDatabase
 
-from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument, \
-    LibraryShop, UserShop
-from tests.base import MockADSWSAPI
-
-class TestWebservices(TestCase):
+class TestWebservices(TestCaseDatabase):
     """
     Tests that each route is an http response
     """
-  
-    def create_app(self):
-        """
-        Create the wsgi application
-
-        :return: application instance
-        """
-        app_ = app.create_app(config_type='TEST')
-        return app_
-
-    def setUp(self):
-        """
-        Set up the database for use
-
-        :return: no return
-        """
-
-        db.create_all()
-
-        self.user = UserShop()
-        self.library = LibraryShop()
-
-        self.stub_library, self.stub_user_id = StubDataLibrary().make_stub()
-        self.stub_document = StubDataDocument().make_stub()
-
-    def tearDown(self):
-        """
-        Remove/delete the database and the relevant connections
-
-        :return: no return
-        """
-
-        db.session.remove()
-        db.drop_all()
 
     def test_when_no_user_information_passed_to_user_post(self):
         """
@@ -449,11 +406,7 @@ class TestWebservices(TestCase):
         url = url_for('permissionview', library=library_id)
 
         # This requires communication with the API
-        test_endpoint = '{api}/{email}'.format(
-            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-            email=stub_user_2.email
-        )
-        with MockADSWSAPI(test_endpoint, user_uid=stub_user_2.absolute_uid):
+        with MockEmailService(stub_user_2):
             response = self.client.post(
                 url,
                 data=stub_user_2.permission_view_post_data_json('read', True),
@@ -511,16 +464,12 @@ class TestWebservices(TestCase):
         # User requesting: user 2 that has no permissions
         # To modify: user 2 is trying to modify user 1, which is the owner of
         # the library
-        test_endpoint = '{api}/{email}'.format(
-            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-            email=stub_user_1.email
-        )
         # E-mail requested should correspond to the owner of the library,
         # which in this case is user 1
-        with MockADSWSAPI(test_endpoint, user_uid=stub_user_1.absolute_uid):
+        with MockEmailService(stub_user_1):
             response = self.client.post(
                 url,
-                data=stub_user_2.permission_view_post_data_json('read', True),
+                data=stub_user_1.permission_view_post_data_json('read', True),
                 headers=stub_user_2.headers
             )
 
@@ -535,14 +484,16 @@ class TestWebservices(TestCase):
         :return: no return
         """
 
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
         # Make a library for a given user, user 1
         url = url_for('userview')
-        headers = {USER_ID_KEYWORD: self.stub_user_id}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
         )
 
         self.assertEqual(response.status_code, 200)
@@ -553,26 +504,16 @@ class TestWebservices(TestCase):
 
         # Owner tries to modify owner permissions
         url = url_for('permissionview', library=library_id)
-        email = 'user@email.com'
-
         for permission_type in ['read', 'write', 'admin', 'owner']:
-            data_permissions = {
-                'email': email,
-                'permission': permission_type,
-                'value': True
-            }
 
-            test_endpoint = '{api}/{email}'.format(
-                api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-                email=data_permissions['email']
-            )
             # E-mail requested should correspond to user
-            with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id):
-
+            with MockEmailService(stub_user):
                 response = self.client.post(
                     url,
-                    data=json.dumps(data_permissions),
-                    headers=headers
+                    data=stub_user.permission_view_post_data_json(
+                        permission_type, False
+                    ),
+                    headers=stub_user.headers
                 )
 
             self.assertEqual(response.status_code,
@@ -587,16 +528,18 @@ class TestWebservices(TestCase):
         :return: no return
         """
 
+        # Stub data
+        stub_user_1 = UserShop()
+        stub_user_2 = UserShop()
+        stub_user_3 = UserShop()
+        stub_library = LibraryShop()
+
         # Make a library for a given user, user 1
         url = url_for('userview')
-        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
-        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
-        headers_3 = {USER_ID_KEYWORD: self.stub_user_id+2}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers_1
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user_1.headers
         )
 
         self.assertEqual(response.status_code, 200)
@@ -606,57 +549,29 @@ class TestWebservices(TestCase):
         library_id = response.json['id']
 
         # Give user 2 admin permissions
-        url = url_for('permissionview', library=library_id)
-        email = 'user2@email.com'
-
-        data_permissions = {
-            'email': email,
-            'permission': 'admin',
-            'value': True
-        }
-
         # This requires communication with the API
         # User requesting: user 1 owner of the library
         # To modify: user 1 is trying to modify user 2
-        test_endpoint = '{api}/{email}'.format(
-            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-            email=data_permissions['email']
-        )
         # E-mail requested should correspond to user 2
-        with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id+1):
-
+        url = url_for('permissionview', library=library_id)
+        with MockEmailService(stub_user_2):
             response = self.client.post(
                 url,
-                data=json.dumps(data_permissions),
-                headers=headers_1
+                data=stub_user_2.permission_view_post_data_json('admin', True),
+                headers=stub_user_1.headers
             )
-
         self.assertEqual(response.status_code, 200)
 
         # Now user 2 tries to give user 3 owner permissions. Even though user 2
         # has admin permissions, they should not be able to modify the owner.
+        # E-mail requested should correspond to user 3
         url = url_for('permissionview', library=library_id)
-        email = 'user3@email.com'
-
-        data_permissions = {
-            'email': email,
-            'permission': 'owner',
-            'value': True
-        }
-
-        test_endpoint = '{api}/{email}'.format(
-            api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-            email=data_permissions['email']
-        )
-        # E-mail requested should correspond to user 2
-        with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id+2):
-
+        with MockEmailService(stub_user_3):
             response = self.client.post(
                 url,
-                data=json.dumps(data_permissions),
-                headers=headers_2
+                data=stub_user_3.permission_view_post_data_json('owner', True),
+                headers=stub_user_2.headers
             )
-
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
@@ -667,15 +582,18 @@ class TestWebservices(TestCase):
 
         :return: no return
         """
+
+        # Stub data
+        stub_user_1 = UserShop()
+        stub_user_2 = UserShop()
+        stub_library = LibraryShop()
+
         # Make a library for a given user, user 1
         url = url_for('userview')
-        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
-        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers_1
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user_1.headers
         )
 
         self.assertEqual(response.status_code, 200)
@@ -686,28 +604,16 @@ class TestWebservices(TestCase):
 
         # Add the permissions for user 2
         url = url_for('permissionview', library=library_id)
-        email = 'user@email.com'
-
         for permission_type in ['read', 'write', 'admin']:
-            data_permissions = {
-                'email': email,
-                'permission': permission_type,
-                'value': True
-            }
-
-            # This requires communication with the API
-            test_endpoint = '{api}/{email}'.format(
-                api=self.app.config['USER_EMAIL_ADSWS_API_URL'],
-                email=data_permissions['email']
-            )
-            with MockADSWSAPI(test_endpoint, user_uid=self.stub_user_id+1):
-
+            with MockEmailService(stub_user_2):
                 response = self.client.post(
                     url,
-                    data=json.dumps(data_permissions),
-                    headers=headers_1
+                    data=stub_user_2.permission_view_post_data_json(
+                        permission_type,
+                        True
+                    ),
+                    headers=stub_user_1.headers
                 )
-
             self.assertEqual(response.status_code, 200)
 
     def test_user_cannot_edit_library_without_permission(self):
@@ -717,17 +623,19 @@ class TestWebservices(TestCase):
 
         :return:
         """
+
+        # Stub data
+        stub_user_1 = UserShop()
+        stub_user_2 = UserShop()
+        stub_library = LibraryShop()
+
         # Make a library
         url = url_for('userview')
-        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
-        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers_1
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user_1.headers
         )
-
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
@@ -736,40 +644,44 @@ class TestWebservices(TestCase):
 
         # See if a random user can edit content of the library
         # Add to the library
-        self.stub_document['action'] = 'add'
         url = url_for('documentview', library=library_id)
-
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_document),
-            headers=headers_2
+            data=stub_library.document_view_post_data_json('add'),
+            headers=stub_user_2.headers
         )
-
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
 
         # Check the owner can add/remove content
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_document),
-            headers=headers_1
+            data=stub_library.document_view_post_data_json('add'),
+            headers=stub_user_1.headers
         )
         self.assertEqual(response.status_code, 200)
 
     def test_anonymous_users_can_access_public_libraries(self):
+        """
+        Tests that a user with no ties to the ADS can view libraries that
+        are public
+
+        :return: no return
+        """
+        # Stub data
+        stub_user_1 = UserShop()
+        stub_user_2 = UserShop()
+        stub_library = LibraryShop(public=True)
 
         # Make a library for a given user, user 1
         url = url_for('userview')
-        headers_1 = {USER_ID_KEYWORD: self.stub_user_id}
-
-        self.stub_library['public'] = True
         response = self.client.post(
             url,
-            data=json.dumps(self.stub_library),
-            headers=headers_1
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user_1.headers
         )
-
         self.assertEqual(response.status_code, 200)
+
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
         # Get the library ID
@@ -777,14 +689,11 @@ class TestWebservices(TestCase):
 
         # Request from user 2
         # Given it is public, should be able to view it
-        headers_2 = {USER_ID_KEYWORD: self.stub_user_id+1}
         url = url_for('libraryview', library=library_id)
-
         response = self.client.get(
             url,
-            headers=headers_2
+            headers=stub_user_2.headers
         )
-
         self.assertEqual(response.status_code, 200)
         self.assertIn('documents', response.json)
 

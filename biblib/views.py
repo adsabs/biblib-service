@@ -125,6 +125,8 @@ class BaseView(Resource):
                 api=current_app.config['USER_EMAIL_ADSWS_API_URL'],
                 email=permission_data['email']
             )
+            current_app.logger.info('Obtaining UID of user: {0}'
+                                    .format(permission_data['email']))
             response = client().get(
                 service
             )

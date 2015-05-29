@@ -42,7 +42,7 @@ try:
                 'formatter': 'default',
                 'level': 'DEBUG',
                 'class': 'logging.handlers.TimedRotatingFileHandler',
-                'filename': 'app.log',
+                'filename': '{path}/app.log'.format(path=LOG_PATH),
             },
             'console': {
                 'formatter': 'default',
