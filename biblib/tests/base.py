@@ -41,7 +41,6 @@ class MockADSWSAPI(object):
             }
 
             for key in self.response_kwargs:
-                print key
                 resp_dict[key] = self.response_kwargs[key]
 
             resp = json.dumps(resp_dict)

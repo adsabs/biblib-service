@@ -18,40 +18,14 @@ import json
 import unittest
 from views import USER_ID_KEYWORD, NO_PERMISSION_ERROR
 from models import db
-from flask.ext.testing import TestCase
 from flask import url_for
-from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument, \
-    StubDataUser
+from tests.stubdata.stub_data import UserShop, LibraryShop
+from tests.base import TestCaseDatabase
 
-
-class TestAnonymousEpic(TestCase):
+class TestAnonymousEpic(TestCaseDatabase):
     """
     Base class used to test the Big Share Admin Epic
     """
-    def create_app(self):
-        """
-        Create the wsgi application for flask
-
-        :return: application instance
-        """
-        return app.create_app(config_type='TEST')
-
-    def setUp(self):
-        """
-        Set up the database for use
-
-        :return: no return
-        """
-        db.create_all()
-
-    def tearDown(self):
-        """
-        Remove/delete the database and the relevant connections
-!
-        :return: no return
-        """
-        db.session.remove()
-        db.drop_all()
 
     def test_anonymous_epic(self):
         """
@@ -65,43 +39,36 @@ class TestAnonymousEpic(TestCase):
         # Define two sets of stub data
         # user: who makes a library (e.g., Dave the librarian)
         # anon: someone using the BBB client
-        uid_anonymous = StubDataUser().get_user()
-        headers_anonymous = {USER_ID_KEYWORD: uid_anonymous}
-        email_anonymous = "mary@email.com"
-
-        library_dave, uid_dave = StubDataLibrary().make_stub()
-        headers_dave = {USER_ID_KEYWORD: uid_dave}
-        email_dave = "dave@email.com"
+        user_anonymous = UserShop()
+        user_dave = UserShop()
+        library_dave_private = LibraryShop(public=False)
+        library_dave_public = LibraryShop(public=True)
 
         # Dave makes two libraries
         # One private library
         # One public library
         url = url_for('userview')
-
-        library_dave['public'] = False
-        library_dave['name'] = 'Private'
         response = self.client.post(
             url,
-            data=json.dumps(library_dave),
-            headers=headers_dave
+            data=library_dave_private.user_view_post_data_json,
+            headers=user_dave.headers
         )
         library_id_private = response.json['id']
         self.assertEqual(response.status_code, 200, response)
 
-        library_dave['public'] = True
-        library_dave['name'] = 'Public'
         response = self.client.post(
             url,
-            data=json.dumps(library_dave),
-            headers=headers_dave
+            data=library_dave_public.user_view_post_data_json,
+            headers=user_dave.headers
         )
         library_id_public = response.json['id']
+        self.assertEqual(response.status_code, 200, response)
 
         # Anonymous user tries to access the private library. But cannot.
         url = url_for('libraryview', library=library_id_private)
         response = self.client.get(
             url,
-            headers=headers_anonymous
+            headers=user_anonymous.headers
         )
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
@@ -110,7 +77,7 @@ class TestAnonymousEpic(TestCase):
         url = url_for('libraryview', library=library_id_public)
         response = self.client.get(
             url,
-            headers=headers_anonymous
+            headers=user_anonymous.headers
         )
 
         self.assertEqual(response.status_code, 200)

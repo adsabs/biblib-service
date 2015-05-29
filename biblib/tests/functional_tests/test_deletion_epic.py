@@ -13,44 +13,16 @@ PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
 
-import app
-import json
 import unittest
-from views import USER_ID_KEYWORD
-from models import db
-from flask.ext.testing import TestCase
 from flask import url_for
-from tests.stubdata.stub_data import StubDataLibrary, StubDataDocument
+from tests.stubdata.stub_data import UserShop, LibraryShop
+from tests.base import TestCaseDatabase
 
 
-class TestDeletionEpic(TestCase):
+class TestDeletionEpic(TestCaseDatabase):
     """
     Base class used to test the Deletion Epic
     """
-    def create_app(self):
-        """
-        Create the wsgi application for flask
-
-        :return: application instance
-        """
-        return app.create_app(config_type='TEST')
-
-    def setUp(self):
-        """
-        Set up the database for use
-
-        :return: no return
-        """
-        db.create_all()
-
-    def tearDown(self):
-        """
-        Remove/delete the database and the relevant connections
-!
-        :return: no return
-        """
-        db.session.remove()
-        db.drop_all()
 
     def test_job_epic(self):
         """
@@ -67,38 +39,35 @@ class TestDeletionEpic(TestCase):
         # She then checks that they were deleted
 
         # Load stub data 1
-        stub_library_1, stub_uid = StubDataLibrary().make_stub()
-        # Make the header
-        # that will come from the ADSWS
-        headers = {USER_ID_KEYWORD: stub_uid}
+        stub_user = UserShop()
+        stub_library_1 = LibraryShop()
+        stub_library_2 = LibraryShop()
 
         # Makes the two libraries
         url = url_for('userview')
         response = self.client.post(
             url,
-            data=json.dumps(stub_library_1),
-            headers=headers
+            data=stub_library_1.user_view_post_data_json,
+            headers=stub_user.headers
         )
         library_name_1 = response.json['name']
 
         self.assertEqual(response.status_code, 200, response)
         self.assertTrue('name' in response.json)
-        self.assertTrue(library_name_1 == stub_library_1['name'])
+        self.assertTrue(library_name_1 == stub_library_1.name)
 
         # Second stub data
-        stub_library_2, tmp = StubDataLibrary().make_stub()
-
         url = url_for('userview')
         response = self.client.post(
             url,
-            data=json.dumps(stub_library_2),
-            headers=headers
+            data=stub_library_2.user_view_post_data_json,
+            headers=stub_user.headers
         )
         library_name_2 = response.json['name']
 
         self.assertEqual(response.status_code, 200, response)
         self.assertTrue('name' in response.json)
-        self.assertTrue(library_name_2 == stub_library_2['name'])
+        self.assertTrue(library_name_2 == stub_library_2.name)
 
         # Check the two libraries are not the same
         self.assertNotEqual(library_name_1,
@@ -110,7 +79,7 @@ class TestDeletionEpic(TestCase):
         url = url_for('userview')
         response = self.client.get(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
         library_id_1 = response.json['libraries'][0]['id']
         library_id_2 = response.json['libraries'][1]['id']
@@ -119,7 +88,7 @@ class TestDeletionEpic(TestCase):
         url = url_for('documentview', library=library_id_2)
         response = self.client.delete(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
         self.assertEqual(response.status_code, 200)
 
@@ -127,7 +96,7 @@ class TestDeletionEpic(TestCase):
         url = url_for('userview')
         response = self.client.get(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
         self.assertTrue(len(response.json['libraries']) == 1)
 
@@ -135,7 +104,7 @@ class TestDeletionEpic(TestCase):
         url = url_for('documentview', library=library_id_1)
         response = self.client.delete(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
         self.assertEqual(response.status_code, 200)
 
@@ -143,7 +112,7 @@ class TestDeletionEpic(TestCase):
         url = url_for('userview')
         response = self.client.get(
             url,
-            headers=headers
+            headers=stub_user.headers
         )
         self.assertTrue(len(response.json['libraries']) == 0)
 
