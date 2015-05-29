@@ -2,137 +2,242 @@
 Contains stub data that is to be used within the tests to avoid DRY
 """
 
-import random
+import json
+import factory
+from faker import Faker
+from models import User, Library
+from views import USER_ID_KEYWORD
 
+faker = Faker()
 
-class StubDataDocument(object):
+def fake_bibcode():
     """
-    Generator class for creating and returning stub data for testing the
-    users. It may be over kill currently, but I foresee its use will grow.
+    Generate a fake bibliographic code used by the ADS. This should be 19
+    digits maximum. Starts with the year, includes the providers abbreviated
+    name. The last letter is the authors first letter of the second name. This
+    is sufficient for the purposes of the tests.
+
+    :return: bibcode
+    """
+    year = faker.year()
+    author = faker.random_letter().upper()
+    provider = 3*author
+    bibcode = '{year}.....{provider}......{author}'\
+        .format(year=year,
+                provider=provider,
+                author=author)
+    return bibcode
+
+
+def fake_biblist(nb_codes):
+    """
+    Generate a list of fake bibcodes
+    :param nb_codes: number of bibcodes to generate
+
+    :return: list of bibcodes
     """
 
+    bibcodes = []
+    for i in range(nb_codes):
+        bibcodes.append(fake_bibcode())
+    return bibcodes
+
+
+class UserFactory(factory.Factory):
+    """
+    Factory for creating fake User models
+    """
+    class Meta:
+        """
+        Defines the model that describes this factory
+        """
+        model = User
+
+    id = factory.Sequence(lambda n: n)
+    absolute_uid = factory.LazyAttribute(lambda x: faker.random_int())
+    email = factory.LazyAttribute(lambda x: faker.email())
+
+
+class LibraryFactory(factory.Factory):
+    """
+    Factory for creating fake Library models
+    """
+
+    class Meta:
+        """
+        Defines the model that describes this factory
+        """
+        model = Library
+
+    name = factory.LazyAttribute(lambda x: faker.sentence(nb_words=3)[:49])
+    description = \
+        factory.LazyAttribute(lambda x: faker.sentence(nb_words=5)[:49])
+    public = False
+    read = False
+    write = False
+    bibcode = factory.LazyAttribute(lambda x: fake_biblist(nb_codes=1)[0])
+
+
+class UserShop(object):
+    """
+    A thin wrapper class that utilises the UserFactory to create extra stub
+    data that is expected to be used within the webservices.
+
+    PermissionView
+    ==============
+
+    POST
+    ----
+    email: email of the user to apply the permission
+    permission: permission to change
+    value: boolean for the permission
+    """
     def __init__(self):
         """
-        Class constructor
+        Constructor of the class
 
         :return: no return
         """
+        self.stub = UserFactory.stub()
+        self.headers = {}
 
-        self.name = 'Stub Data for User'
-        self.documents = []
+        for key in self.stub.__dict__.keys():
+            setattr(self, key, self.stub.__dict__[key])
 
-    def get_document(self, **kwargs):
+        self.create_header()
+
+    def create_header(self):
         """
-        Generate a fake document, e.g., a bibcode
-        :param kwargs: list of kwargs that will go into the output dictionary
-
-        :return: document in string format
-        """
-
-        year = '200{0}'.format(int(random.random()*9.0))
-        _id = (random.random()*99)+100
-        bibcode = '{year}MNRAS...{id}...J'.format(year=year,
-                                                  id=_id)
-        bibcode_payload = {'bibcode': bibcode}
-
-        for key in kwargs:
-            bibcode_payload[key] = kwargs[key]
-
-        return bibcode_payload
-
-    def make_stub(self, **kwargs):
-        """
-        Makes relevant stub data
-        :param kwargs: key word parameters to go in the outgoing document
-
-        :return: stub data for a document
-        """
-
-        new_document = self.get_document(**kwargs)
-        self.documents.append(new_document)
-
-        return new_document
-
-
-class StubDataUser(object):
-    """
-    Generator class for creating and returning stub data for testing the
-    users. It may be over kill currently, but I foresee its use will grow.
-    """
-
-    def __init__(self):
-        """
-        Class constructor
+        Create the header expected to come from the API
 
         :return: no return
         """
+        self.headers = {USER_ID_KEYWORD: self.absolute_uid}
 
-        self.name = 'Stub Data for User'
-
-    def get_user(self):
-
-        api_id = int(random.random()*1000)
-        return api_id
-
-
-class StubDataLibrary(object):
-    """
-    Generator class for creating and returning stub data for testing the
-    libraries. It may be over kill currently, but I foresee its use will grow.
-    """
-
-    def __init__(self):
+    def permission_view_post_data(self, permission, value):
         """
-        Class constructor
+        Expected data to be sent in a POST request to the PermissionView
+        end point, /permissions/<>
+        :param permission: permission to change
+        :param value: value of the permission (boolean)
+
+        :return: POST data in dictionary format
+        """
+        post_data = dict(
+            email=self.email,
+            permission=permission,
+            value=value
+        )
+
+        return post_data
+
+    def permission_view_post_data_json(self, permission, value):
+        """
+        Expected data to be sent in a POST request to the PermissionView.
+        This has been turned into json format.
+
+        :param permission: permission to change
+        :param value: value of the permission (boolean)
+
+        :return: POST data in JSON format
+        """
+        post_data = self.permission_view_post_data(permission, value)
+        return json.dumps(post_data)
+
+class LibraryShop(object):
+    """
+    A thin wrapper class that utilises the UserFactory to create extra stub
+    data that is expected to be used within the webservices.
+
+    UserView
+    ========
+
+    POST
+    ----
+    name: Name of the library
+    description: Description of the library
+    public: Boolean (defaults to False)
+
+
+    LibraryView
+    ============
+    GET
+    ---
+
+
+    DocumentView
+    ============
+    POST
+    ----
+    bibcode: bibcode
+    action: add/remove
+
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Constructor of the class
+        :param **kwargs: keyword arguments to pass on
 
         :return: no return
         """
+        self.stub = LibraryFactory.stub()
 
-        self.name = 'Stub Data for Libraries'
-        self.stub_user = None
-        self.stub_library = None
-        self.libraries = []
+        self.user_view_post_data = None
+        self.user_view_post_data_json = None
 
-    def get_library(self):
+        for key in self.stub.__dict__.keys():
+            setattr(self, key, self.stub.__dict__[key])
+
+        self.kwargs = kwargs
+        self.create_user_view_post_data()
+
+    def create_user_view_post_data(self):
         """
-        Generate and return stub data for a library
+        Expected data to be sent in a POST request to the UserView,
+        end point, /libraries
 
-        :return: dictionary of library stub data
+        :return: no return
         """
-
-        list_of_words = ['My', 'Library', 'first', 'second',
-                         'science', 'astronomy', 'word']
-
-        def random_word():
-            """Return a random word"""
-            return list_of_words[int((random.random()*len(list_of_words)))-1]
-
-        jumble = " ".join([random_word() for i in range(3)])
-
-        current_names = [j['name'] for j in zip(*self.libraries)]
-        while jumble in current_names:
-            jumble += random_word()
-
-        stub_library = dict(
-            name=jumble,
-            description='My first library',
+        post_data = dict(
+            name=self.name,
+            description=self.description,
             read=False,
             write=False,
             public=False
         )
 
-        return stub_library
+        if self.kwargs:
+            for key in self.kwargs:
+                if key in post_data.keys():
+                    post_data[key] = self.kwargs[key]
 
-    def make_stub(self):
+        json_data = json.dumps(post_data)
+
+        self.user_view_post_data = post_data
+        self.user_view_post_data_json = json_data
+
+    def document_view_post_data(self, action='add'):
         """
-        Make stub data which contains a user and a library
+        Expected data to be sent in a POST request to the DocumentView
+        end point, /documents/<>
+        :param action: action to perform with the bibcode (add, remove)
 
-        :return: stub library and user
+        :return: POST data in dictionary format
         """
+        post_data = dict(
+            bibcode=self.bibcode,
+            action=action
+        )
+        return post_data
 
-        self.stub_library = self.get_library()
-        self.stub_user = StubDataUser().get_user()
+    def document_view_post_data_json(self, action='add'):
+        """
+        Expected data to be sent in a POST request to the DocumentView
+        Converted into JSON.
+        :param action: action to perform with the bibcode (add, remove)
 
-        self.libraries.append([self.stub_library, self.stub_user])
-
-        return self.libraries[-1]
+        :return: POST data in JSON format
+        """
+        post_data = self.document_view_post_data(action)
+        return json.dumps(post_data)
