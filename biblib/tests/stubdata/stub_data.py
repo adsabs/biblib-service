@@ -39,7 +39,7 @@ def fake_biblist(nb_codes):
 
     bibcodes = []
     for i in range(nb_codes):
-        bibcodes.append(fake_biblist())
+        bibcodes.append(fake_bibcode())
     return bibcodes
 
 
