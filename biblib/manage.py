@@ -23,7 +23,7 @@ class CreateDatabase(Command):
 
 
 # Load the app with the factory
-app = create_app(config_type='TEST')
+app = create_app(config_type='LOCAL')
 
 # Set up the alembic migration
 migrate = Migrate(app, db)
