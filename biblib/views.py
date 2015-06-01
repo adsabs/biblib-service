@@ -2,6 +2,8 @@
 Views
 """
 
+import uuid
+import base64
 from flask import request, current_app
 from flask.ext.restful import Resource
 from flask.ext.discoverer import advertise
@@ -37,6 +39,51 @@ class BaseView(Resource):
     A base view class to keep a single version of common functions used between
     all of the views.
     """
+
+    def helper_uuid_to_slug(self, library_uuid):
+        """
+        Convert a UUID to a slug
+
+        See a discussion about the details here:
+        http://stackoverflow.com/questions/12270852/
+        convert-uuid-32-character-hex-string-into-a-
+        youtube-style-short-id-and-back
+        :param library_uuid: unique identifier for the library
+
+        :return: library_slug: base64 URL safe slug
+        """
+        library_slug = base64.urlsafe_b64encode(library_uuid.bytes)
+        library_slug = library_slug.rstrip('=\n').replace('/', '_')
+        current_app.logger.info('Converted uuid: {0} to slug: {1}'
+                                .format(library_uuid, library_slug))
+        return library_slug
+
+    def helper_slug_to_uuid(self, library_slug):
+        """
+        Convert a slug to a UUID
+
+        See a discussion about the details here:
+        http://stackoverflow.com/questions/12270852/
+        convert-uuid-32-character-hex-string-into-a-
+        youtube-style-short-id-and-back
+
+        Keep in mind that base64 only works on bytes, and so they have to be
+        encoded in ASCII. Flask uses unicode, and so you must modify the
+         encoding before passing it to base64. This is fine, given we output
+         all our encoded URLs for libraries as strings encoded in ASCII and do
+         not accept any unicode characters.
+
+        :param library_slug: base64 URL safe slug
+
+        :return: library_uuid: unique identifier for the library
+        """
+
+        library_uuid = (library_slug + '==').replace('_', '/')
+        library_uuid = library_uuid.encode('ascii')
+        library_uuid = uuid.UUID(bytes=base64.urlsafe_b64decode(library_uuid))
+        current_app.logger.info('Converted slug: {0} to uuid: {1}'
+                                .format(library_slug, library_uuid))
+        return str(library_uuid)
 
     def helper_get_user_id(self):
         """
@@ -183,9 +230,6 @@ class UserView(BaseView):
     """
     End point to create a library for a given user
 
-    XXX: need to ignore the anon user, they should not be able to create libs
-    XXX: public/private
-    XXX: name of the library already exists
     XXX: must give the library name/missing input function saves time
     """
 
@@ -302,7 +346,7 @@ class UserView(BaseView):
         for library in user_libraries:
             payload = {
                 'name': library.name,
-                'id': '{0}'.format(library.id),
+                'id': '{0}'.format(self.helper_uuid_to_slug(library.id)),
                 'description': library.description,
             }
             output_libraries.append(payload)
@@ -315,7 +359,6 @@ class UserView(BaseView):
         HTTP GET request that returns all the libraries that belong to a given
         user
 
-        :param user: user ID as given by the API
         :return: list of the users libraries with the relevant information
 
         Header:
@@ -325,8 +368,6 @@ class UserView(BaseView):
         Post body:
         ----------
         No post content accepted.
-
-        XXX: Check that user is not anon
         """
 
         # Check that they pass a user id
@@ -381,7 +422,8 @@ class UserView(BaseView):
             current_app.logger.info('User already exists.')
 
         # Switch to the service UID and not the API UID
-        service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
+        service_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user)
         current_app.logger.info('user_API: {0:d} is now user_service: {1:d}'
                                 .format(user, service_uid))
 
@@ -395,7 +437,7 @@ class UserView(BaseView):
                 DUPLICATE_LIBRARY_NAME_ERROR['number']
 
         return {'name': library.name,
-                'id': '{0}'.format(library.id),
+                'id': '{0}'.format(self.helper_uuid_to_slug(library.id)),
                 'description': library.description}, 200
 
 
@@ -469,12 +511,15 @@ class LibraryView(BaseView):
 
         XXX: Needs authentification still
         """
+
         try:
             user = int(request.headers[USER_ID_KEYWORD])
         except KeyError:
             current_app.logger.error('No username passed')
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
+
+        library = self.helper_slug_to_uuid(library)
 
         current_app.logger.info('User: {0} requested library: {1}'
                                 .format(user, library))
@@ -663,6 +708,9 @@ class DocumentView(BaseView):
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
 
+        # URL safe base64 string to UUID
+        library = self.helper_slug_to_uuid(library)
+
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
 
@@ -713,6 +761,9 @@ class DocumentView(BaseView):
         except KeyError:
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
+
+        # URL safe base64 string to UUID
+        library = self.helper_slug_to_uuid(library)
 
         if not self.helper_user_exists(user):
             return {'error': NO_PERMISSION_ERROR['body']}, \
@@ -959,6 +1010,9 @@ class PermissionView(BaseView):
         except KeyError:
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
+
+        # URL safe base64 string to UUID
+        library = self.helper_slug_to_uuid(library)
 
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)

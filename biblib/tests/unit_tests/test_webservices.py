@@ -505,7 +505,6 @@ class TestWebservices(TestCaseDatabase):
         # Owner tries to modify owner permissions
         url = url_for('permissionview', library=library_id)
         for permission_type in ['read', 'write', 'admin', 'owner']:
-
             # E-mail requested should correspond to user
             with MockEmailService(stub_user):
                 response = self.client.post(
