@@ -165,7 +165,19 @@ class BaseView(Resource):
                                                      access_type, error))
             return False
 
+    def helper_library_exists(self, library_id):
+        """
+        Helper function that checks if a library exists in the database or not
+        by catching the raise and returning a True/False statement.
+        :param: library_id: the unique ID of the library
 
+        :return: no return
+        """
+        try:
+            Library.query.filter(Library.id == library_id).one()
+            return True
+        except NoResultFound:
+            return False
 
 class UserView(BaseView):
     """
@@ -583,6 +595,20 @@ class DocumentView(BaseView):
         db.session.delete(library)
         db.session.commit()
 
+    def delete_access(self, service_uid, library_id):
+        """
+        Defines which type of user has delete permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+        delete_allowed = self.helper_access_allowed(service_uid=service_uid,
+                                                    library_id=library_id,
+                                                    access_type='owner')
+        return delete_allowed
+
     def write_access(self, service_uid, library_id):
         """
         Defines which type of user has write permissions to a library.
@@ -596,8 +622,8 @@ class DocumentView(BaseView):
         read_allowed = ['write', 'admin', 'owner']
         for access_type in read_allowed:
             if self.helper_access_allowed(service_uid=service_uid,
-                                   library_id=library_id,
-                                   access_type=access_type):
+                                          library_id=library_id,
+                                          access_type=access_type):
                 return True
 
         return False
@@ -644,7 +670,7 @@ class DocumentView(BaseView):
         if not self.write_access(service_uid=user_editing_uid,
                                  library_id=library):
             return {'error': NO_PERMISSION_ERROR['body']}, \
-                   NO_PERMISSION_ERROR['number']
+                NO_PERMISSION_ERROR['number']
 
         data = get_post_data(request)
         if data['action'] == 'add':
@@ -683,24 +709,49 @@ class DocumentView(BaseView):
         """
 
         try:
-            user = int(request.headers[USER_ID_KEYWORD])
+            user = self.helper_get_user_id()
         except KeyError:
-            current_app.logger.error('No username passed')
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
 
+        if not self.helper_user_exists(user):
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                NO_PERMISSION_ERROR['number']
+
+        if not self.helper_library_exists(library):
+            return {'error': MISSING_LIBRARY_ERROR['body']}, \
+                MISSING_LIBRARY_ERROR['number']
+
+        user_deleting_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user)
+
         try:
             current_app.logger.info('user_API: {0:d} '
-                                    'requesting to delete library: {0}'
-                                    .format(user, library))
+                                    'requesting to delete library: {1}'
+                                    .format(user_deleting_uid, library))
 
-            self.delete_library(library_id=library)
-            current_app.logger.info('Deleted library.')
+            if self.delete_access(service_uid=user_deleting_uid,
+                                  library_id=library):
+                self.delete_library(library_id=library)
+                current_app.logger.info('User: {0} deleted library: {1}.'
+                                        .format(user_deleting_uid,
+                                                library))
+            else:
+                current_app.logger.error('User: {0} has incorrect permissions '
+                                         'to delete: {1}.'
+                                         .format(user_deleting_uid,
+                                                 library))
+                raise PermissionDeniedError('Incorrect permissions')
 
         except NoResultFound as error:
             current_app.logger.info('Failed to delete: {0}'.format(error))
             return {'error': MISSING_LIBRARY_ERROR['body']}, \
                 MISSING_LIBRARY_ERROR['number']
+
+        except PermissionDeniedError as error:
+            current_app.logger.info('Failed to delete: {0}'.format(error))
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                NO_PERMISSION_ERROR['number']
 
         return {}, 200
 

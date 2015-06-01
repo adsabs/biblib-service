@@ -282,6 +282,31 @@ class TestLibraryViews(TestCaseDatabase):
         self.assertIsNotNone(access)
         self.assertFalse(access)
 
+    def test_if_a_library_exists_or_not(self):
+        """
+        Tests if a library exists or not
+
+        :return: no return
+        """
+
+        # Make a library
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_library.bibcode])
+        db.session.add(library)
+        db.session.commit()
+
+        exists = self.library_view.helper_library_exists(library_id=library.id)
+        self.assertTrue(exists)
+
+        db.session.delete(library)
+        db.session.commit()
+
+        exists = self.library_view.helper_library_exists(library_id=library.id)
+        self.assertFalse(exists)
+
+
 
 class TestDocumentViews(TestCaseDatabase):
     """
@@ -345,6 +370,76 @@ class TestDocumentViews(TestCaseDatabase):
 
         with self.assertRaises(NoResultFound):
             Library.query.filter(Library.id == library.id).one()
+
+    def test_user_cannot_delete_a_library_if_not_owner(self):
+        """
+        Tests that the user cannot delete a library if they are not the owner
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_library.bibcode])
+
+        # Give the user and library permissions
+        permission = Permissions(read=True, owner=False)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+        library = Library.query.filter(Library.id == library.id).one()
+        self.assertIsInstance(library, Library)
+
+        access = self.document_view.delete_access(service_uid=user.id,
+                                                  library_id=library.id)
+        self.assertFalse(access)
+
+    def test_user_can_delete_a_library_if_owner(self):
+        """
+        Tests that the user cannot delete a library if they are not the owner
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=[self.stub_library.bibcode])
+
+        # Give the user and library permissions
+        permission = Permissions(read=False, owner=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+        library = Library.query.filter(Library.id == library.id).one()
+        self.assertIsInstance(library, Library)
+
+        access = self.document_view.delete_access(service_uid=user.id,
+                                                  library_id=library.id)
+        self.assertTrue(access)
 
     def test_user_can_add_to_library(self):
         """
