@@ -92,12 +92,17 @@ class UserShop(object):
     permission: permission to change
     value: boolean for the permission
     """
-    def __init__(self):
+    def __init__(self, name=None):
         """
         Constructor of the class
 
         :return: no return
         """
+        if name:
+            self.name = name
+        else:
+            self.name = 'Noname'
+
         self.stub = UserFactory.stub()
         self.headers = {}
 
