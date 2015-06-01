@@ -48,8 +48,8 @@ BIBLIB_LOGGING = {
 }
 
 # Database for microservice
-SQLALCHEMY_DATABASE_URI = 'sqlite:////tmp/test.db'
+SQLALCHEMY_BINDS = {'libraries': 'sqlite:////tmp/test.db'} 
 
 # These lines are necessary only if the app needs to be a client of the API
-USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu'
+BIBLIB_USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
 BIBLIB_ADSWS_API_TOKEN = 'this is a secret api token!'

@@ -83,7 +83,7 @@ class MockEmailService(MockADSWSAPI):
     def __init__(self, stub_user):
 
         email_endpoint = '{api}/{email}'.format(
-            api=current_app.config['USER_EMAIL_ADSWS_API_URL'],
+            api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
             email=stub_user.email
         )
 
