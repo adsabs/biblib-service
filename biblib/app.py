@@ -12,7 +12,7 @@ from flask.ext.discoverer import Discoverer
 from flask.ext.consulate import Consul, ConsulConnectionError
 
 
-def create_app(config_type='PRODUCTION'):
+def create_app(config_type='STAGING'):
     """
     Create the application and return it to the user
     :param config_type: specifies which configuration file to load. Options are

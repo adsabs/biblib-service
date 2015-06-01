@@ -169,7 +169,7 @@ class BaseView(Resource):
         # XXX: general errors from the API (400)
         try:
             service = '{api}/{email}'.format(
-                api=current_app.config['USER_EMAIL_ADSWS_API_URL'],
+                api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
                 email=permission_data['email']
             )
             current_app.logger.info('Obtaining UID of user: {0}'

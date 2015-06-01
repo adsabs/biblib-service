@@ -113,6 +113,7 @@ class User(db.Model):
     Foreign-key absolute_uid is the primary key of the user in the user
     database microservice.
     """
+    __bind_key__ = 'libraries'
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     absolute_uid = db.Column(db.Integer, unique=True)
@@ -129,6 +130,7 @@ class Library(db.Model):
     This represents a collection of bibcodes, a biblist, and can be thought of
     much like a bibtex file.
     """
+    __bind_key__ = 'libraries'
     __tablename__ = 'library'
     id = db.Column(GUID, primary_key=True, default=uuid.uuid4)
     name = db.Column(db.String(50))
@@ -158,6 +160,7 @@ class Permissions(db.Model):
     User (1) to Permissions (Many)
     Library (1) to Permissions (Many)
     """
+    __bind_key__ = 'libraries'
     __tablename__ = 'permissions'
     id = db.Column(db.Integer, primary_key=True)
     read = db.Column(db.Boolean, default=False)

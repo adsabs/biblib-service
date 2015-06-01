@@ -24,8 +24,7 @@ SAMPLE_APPLICATION_PARAM = {
 try:
     # For working on a VM as user vagrant
     pwd.getpwnam('vagrant')
-    SQLALCHEMY_DATABASE_URI = \
-        'postgresql+psycopg2://vagrant:vagrant@localhost/testdb'
+    SQLALCHEMY_BINDS = {'libraries': 'postgresql+psycopg2://vagrant:vagrant@localhost/testdb'}
 
     BIBLIB_LOGGING = {
         'version': 1,
@@ -67,8 +66,7 @@ try:
 
 except KeyError:
     # For running tests on TravisCI
-    SQLALCHEMY_DATABASE_URI = \
-        'postgresql+psycopg2://postgres:@localhost/testdb'
+    SQLALCHEMY_BINDS = {'libraries': 'postgresql+psycopg2://postgres:@localhost/testdb'}
 
     BIBLIB_LOGGING = {
         'version': 1,
@@ -99,5 +97,5 @@ except KeyError:
 
 # These lines are necessary only if the app needs to be a client of the
 # adsws-api
-USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
+BIBLIB_USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
 BIBLIB_ADSWS_API_TOKEN = 'this is a secret api token!'
