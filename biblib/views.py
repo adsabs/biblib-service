@@ -641,6 +641,26 @@ class DocumentView(BaseView):
         current_app.logger.info('Removed document successfully: {0}'
                                 .format(library.bibcode))
 
+    def update_library(self, library_id, library_data):
+        """
+        Update the meta data of the library
+        :param library_id: the unique ID of the library
+
+        :return:
+        """
+        updateable = ['name', 'description']
+
+        library = Library.query.filter(Library.id == library_id).one()
+
+        for key in library_data:
+            if key not in updateable:
+                continue
+
+            setattr(library, key, library_data[key])
+
+        db.session.add(library)
+        db.session.commit()
+
     def delete_library(self, library_id):
         """
         Delete the entire library from the database

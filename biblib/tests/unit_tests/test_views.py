@@ -714,8 +714,8 @@ class TestDocumentViews(TestCaseDatabase):
                            description=new_description,
                            random=random_text)
 
-        self.document_view.update_library_meta_data(library_id=library.id,
-                                                    library_data=update_data)
+        self.document_view.update_library(library_id=library.id,
+                                          library_data=update_data)
 
         new_library = Library.query.filter(Library.id == library.id).one()
         self.assertEqual(new_library.name, new_name)
@@ -723,7 +723,6 @@ class TestDocumentViews(TestCaseDatabase):
         with self.assertRaises(AttributeError):
             library.random
 
-    @unittest.skip('Not implemented')
     def test_can_update_libraries_details_if_owner_or_admin(self):
         """
         Tests that a user can update the libraries details, such as name and
