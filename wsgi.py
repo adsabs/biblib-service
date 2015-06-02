@@ -8,7 +8,7 @@
 
 from werkzeug.serving import run_simple
 from werkzeug.wsgi import DispatcherMiddleware
-from gut import app
+from biblib import app
 
 application = app.create_app()
 
