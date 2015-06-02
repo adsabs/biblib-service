@@ -33,6 +33,9 @@ NO_PERMISSION_ERROR = {'body': 'You do not have the correct permissions or'
 
 USER_ID_KEYWORD = 'X-Adsws-Uid'
 
+DEFAULT_LIBRARY_NAME_PREFIX = 'Untitled Library'
+DEFAULT_LIBRARY_DESCRIPTION = 'My ADS library'
+
 
 class BaseView(Resource):
     """
@@ -266,15 +269,14 @@ class UserView(BaseView):
         :return: no return
         """
 
-        _name = library_data['name']
-        _description = library_data['description']
-        _read = library_data['read']
-        _write = library_data['write']
-        _public = library_data['public']
-        _owner = True
+        _name = library_data.get('name') or DEFAULT_LIBRARY_NAME_PREFIX
+        _description = library_data.get('description') or \
+            DEFAULT_LIBRARY_DESCRIPTION
+        _public = bool(library_data.get('public', False))
 
-        current_app.logger.info('Creating library for user_service: {0:d}'
-                                .format(service_uid))
+        current_app.logger.info('Creating library for user_service: {0:d}, '
+                                'with properties: {1}'
+                                .format(service_uid, library_data))
 
         # We want to ensure that the users have unique library names. However,
         # it should be possible that they have access to other libraries from
@@ -289,6 +291,16 @@ class UserView(BaseView):
                                      'exists: "{0}"'.format(_name))
             raise BackendIntegrityError('Library name already exists.')
 
+        if _name == DEFAULT_LIBRARY_NAME_PREFIX:
+            default_names = [lib_name for lib_name
+                             in library_names
+                             if DEFAULT_LIBRARY_NAME_PREFIX
+                             in lib_name]
+
+            _extension = len(default_names) + 1
+            _name = '{0} {1}'.format(_name,
+                                     _extension)
+
         try:
 
             # Make the library in the library table
@@ -299,9 +311,7 @@ class UserView(BaseView):
 
             # Make the permissions
             permission = Permissions(
-                read=_read,
-                write=_write,
-                owner=_owner,
+                owner=True,
             )
 
             # Use the ORM to link the permissions to the library and user,
@@ -532,6 +542,9 @@ class LibraryView(BaseView):
                 current_app.logger.info('Library: {0} is public'
                                         .format(library.id))
                 return {'documents': documents}, 200
+            else:
+                current_app.logger.warning('Library: {0} is private'
+                                           .format(library.id))
 
         except:
             return {'error': MISSING_LIBRARY_ERROR['body']}, \
@@ -738,6 +751,25 @@ class DocumentView(BaseView):
         else:
             current_app.logger.info('User requested a non-standard action')
             return {}, 400
+
+    def put(self, library):
+        """
+        HTTP PUT request that updates the meta-data of the library
+        :param library: library ID
+
+        :return: the response for if the library was updated
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post-body:
+        ---------
+        tba
+        """
+
+        return {}, 200
 
     def delete(self, library):
         """

@@ -12,7 +12,8 @@ sys.path.append(PROJECT_HOME)
 import unittest
 from flask import url_for
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
-    MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR
+    MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, DEFAULT_LIBRARY_NAME_PREFIX, \
+    DEFAULT_LIBRARY_DESCRIPTION
 from tests.stubdata.stub_data import LibraryShop, UserShop
 from tests.base import MockEmailService, TestCaseDatabase
 
@@ -752,6 +753,101 @@ class TestWebservices(TestCaseDatabase):
                              'User: {0}'.format(stub_user.name))
             self.assertEqual(response.json['error'],
                              NO_PERMISSION_ERROR['body'])
+
+    def test_when_no_post_content_or_empty_when_creating_library(self):
+        """
+        Tests that when a user posts no content or empty name and description
+        for creating a library, that the wanted behaviour happens.
+
+        :return: no return
+        """
+
+        # Stub data
+        user_mary = UserShop()
+        stub_library = LibraryShop(name='', description='')
+
+        # Mary creates a private library and
+        # Does not fill any of the details requested, and then looks at the
+        # newly created library.
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_mary.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual('{0} 1'.format(DEFAULT_LIBRARY_NAME_PREFIX),
+                         response.json['name'])
+        self.assertEqual(DEFAULT_LIBRARY_DESCRIPTION,
+                         response.json['description'])
+
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_mary.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual('{0} 2'.format(DEFAULT_LIBRARY_NAME_PREFIX),
+                         response.json['name'])
+        self.assertEqual(DEFAULT_LIBRARY_DESCRIPTION,
+                         response.json['description'])
+
+    def test_can_update_name_and_description(self):
+        """
+        Tests that when a user posts no content or empty name and description
+        for creating a library, that the wanted behaviour happens.
+
+        :return: no return
+        """
+
+        # Stub data
+        user_mary = UserShop()
+        stub_library = LibraryShop(name='', description='')
+
+        # Mary creates a private library and
+        # Does not fill any of the details requested, and then looks at the
+        # newly created library.
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_mary.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual('{0} 1'.format(DEFAULT_LIBRARY_NAME_PREFIX),
+                         response.json['name'])
+        self.assertEqual(DEFAULT_LIBRARY_DESCRIPTION,
+                         response.json['description'])
+
+        # Change the library name
+        url = url_for('documentview', library=library_id)
+        new_name = 'New name'
+        new_description = 'New description'
+        response = self.client.put(
+            url,
+            data=stub_library.document_view_put_data_json('name', new_name),
+            headers=user_mary.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual('New name',
+                         response.json['name'])
+        self.assertEqual(DEFAULT_LIBRARY_DESCRIPTION,
+                         response.json['description'])
+
+        # Change the library description
+        response = self.client.put(
+            url,
+            data=stub_library.document_view_put_data_json('description',
+                                                      new_description),
+            headers=user_mary.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(new_name,
+                         response.json['name'])
+        self.assertEqual(new_description,
+                         response.json['description'])
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
