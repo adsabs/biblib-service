@@ -9,6 +9,7 @@ PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
 
+import json
 import unittest
 from flask import url_for
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
@@ -792,7 +793,7 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(DEFAULT_LIBRARY_DESCRIPTION,
                          response.json['description'])
 
-    def test_can_update_name_and_description(self):
+    def test_can_update_name_and_description_with_permissions(self):
         """
         Tests that when a user posts no content or empty name and description
         for creating a library, that the wanted behaviour happens.
@@ -821,25 +822,50 @@ class TestWebservices(TestCaseDatabase):
                          response.json['description'])
 
         # Change the library name
-        url = url_for('documentview', library=library_id)
         new_name = 'New name'
         new_description = 'New description'
+
+        library_data = \
+            stub_library.document_view_put_data(name=new_name)
+        library_data.pop('description')
+        library_data = json.dumps(library_data)
+
+        url = url_for('documentview', library=library_id)
         response = self.client.put(
             url,
-            data=stub_library.document_view_put_data_json('name', new_name),
+            data=library_data,
+            headers=user_mary.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(new_name,
+                         response.json['name'],
+                         response.json)
+
+        # Change the library description
+        library_data = \
+            stub_library.document_view_put_data(description=new_description)
+        library_data.pop('name')
+        library_data = json.dumps(library_data)
+
+        response = self.client.put(
+            url,
+            data=library_data,
             headers=user_mary.headers
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual('New name',
-                         response.json['name'])
-        self.assertEqual(DEFAULT_LIBRARY_DESCRIPTION,
+        self.assertEqual(new_description,
                          response.json['description'])
 
-        # Change the library description
+        # Update both at the same time
+        new_name += ' new'
+        new_description += ' description'
         response = self.client.put(
             url,
-            data=stub_library.document_view_put_data_json('description',
-                                                      new_description),
+            data=stub_library.document_view_put_data_json(
+                name=new_name,
+                description=new_description
+            ),
             headers=user_mary.headers
         )
         self.assertEqual(response.status_code, 200)
@@ -848,6 +874,162 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(new_description,
                          response.json['description'])
 
+    def test_can_update_library_with_permissions_admin(self):
+        """
+        Tests that when a user updates the name it is possible when the user
+        has admin permissions.
+
+        :return: no return
+        """
+
+        # Stub data
+        user_mary = UserShop()
+        user_admin = UserShop()
+        stub_library = LibraryShop(name='', description='')
+
+        # Mary creates a private library and
+        # Does not fill any of the details requested, and then looks at the
+        # newly created library.
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_mary.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual('{0} 1'.format(DEFAULT_LIBRARY_NAME_PREFIX),
+                         response.json['name'])
+        self.assertEqual(DEFAULT_LIBRARY_DESCRIPTION,
+                         response.json['description'])
+
+        # Allocate admin permissions
+        url = url_for('permissionview', library=library_id)
+        with MockEmailService(user_admin):
+            response = self.client.post(
+                url,
+                data=user_admin.permission_view_post_data_json('admin', True),
+                headers=user_mary.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        # Change the library name
+        new_name = 'New name'
+        new_description = 'New description'
+
+        url = url_for('documentview', library=library_id)
+        response = self.client.put(
+            url,
+            data=stub_library.document_view_put_data_json(
+                name=new_name,
+                description=new_description
+            ),
+            headers=user_admin.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(new_name,
+                         response.json['name'])
+        self.assertEqual(new_description,
+                         response.json['description'])
+
+    def test_cannot_update_name_with_name_that_exists(self):
+        """
+        Should not be able to update the library with a name that already
+        exists for one of the users own libraries.
+
+        :return: no return
+        """
+
+        # Stub data
+        same_name = 'Same name'
+        user_mary = UserShop()
+        stub_library = LibraryShop(name=same_name, description='')
+
+        # Mary creates a private library and
+        # Does not fill any of the details requested, and then looks at the
+        # newly created library.
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_mary.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(same_name,
+                         response.json['name'])
+        self.assertEqual(DEFAULT_LIBRARY_DESCRIPTION,
+                         response.json['description'])
+
+        # Try to update the name with the same name
+        url = url_for('documentview', library=library_id)
+        response = self.client.put(
+            url,
+            data=stub_library.document_view_put_data_json(name=same_name),
+            headers=user_mary.headers
+        )
+
+        self.assertEqual(response.status_code,
+                         DUPLICATE_LIBRARY_NAME_ERROR['number'])
+        self.assertEqual(response.json['error'],
+                         DUPLICATE_LIBRARY_NAME_ERROR['body'])
+
+    def test_cannot_update_name_and_description_without_permissions(self):
+        """
+        Tests that users who have read, write, or no permissions, can not
+        update a library they can see.
+
+        :return: no return
+        """
+
+        # Stub data
+        user_mary = UserShop()
+        user_random = UserShop()
+        user_reader = UserShop()
+        user_write = UserShop()
+        stub_library = LibraryShop(name='', description='')
+
+        # Mary creates a private library and
+        # Does not fill any of the details requested, and then looks at the
+        # newly created library.
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_mary.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual('{0} 1'.format(DEFAULT_LIBRARY_NAME_PREFIX),
+                         response.json['name'])
+        self.assertEqual(DEFAULT_LIBRARY_DESCRIPTION,
+                         response.json['description'])
+
+        # Allocate permissions
+        url = url_for('permissionview', library=library_id)
+        for user, permission in [[user_reader, 'read'], [user_write, 'write']]:
+            with MockEmailService(user):
+                response = self.client.post(
+                    url,
+                    data=user.permission_view_post_data_json(permission, True),
+                    headers=user_mary.headers
+                )
+            self.assertEqual(response.status_code, 200)
+
+        # Change the library name
+        for user in [user_random, user_reader, user_write]:
+            url = url_for('documentview', library=library_id)
+            new_name = 'New name'
+            response = self.client.put(
+                url,
+                data=stub_library.document_view_put_data_json('name',
+                                                              new_name),
+                headers=user.headers
+            )
+            self.assertEqual(response.status_code,
+                             NO_PERMISSION_ERROR['number'])
+            self.assertEqual(response.json['error'],
+                             NO_PERMISSION_ERROR['body'])
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

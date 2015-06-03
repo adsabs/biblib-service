@@ -16,6 +16,7 @@ from models import db, User, Library, Permissions
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from views import UserView, LibraryView, DocumentView, PermissionView, BaseView
+from views import DEFAULT_LIBRARY_DESCRIPTION
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from utils import BackendIntegrityError, PermissionDeniedError
 from tests.base import TestCaseDatabase
@@ -231,7 +232,7 @@ class TestUserViews(TestCaseDatabase):
         """
 
         # Stub data
-        stub_library = LibraryShop(name='', description='')
+        stub_library = LibraryShop()
 
         # To make a library we need an actual user
         user = User(absolute_uid=self.stub_user.absolute_uid)
@@ -240,6 +241,11 @@ class TestUserViews(TestCaseDatabase):
 
         # Make the first library
         for i in range(2):
+            # On each loop the user view post will be modified, so lets just
+            # be explicit about what we want
+            stub_library.user_view_post_data['name'] = ''
+            stub_library.user_view_post_data['description'] = ''
+
             library = self.user_view.create_library(
                 service_uid=user.id,
                 library_data=stub_library.user_view_post_data
@@ -248,7 +254,7 @@ class TestUserViews(TestCaseDatabase):
             lib = Library.query.filter(Library.id == library.id).one()
             self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1),
                             lib.name)
-            self.assertTrue(lib.description == 'My ADS library.')
+            self.assertTrue(lib.description == DEFAULT_LIBRARY_DESCRIPTION)
 
     def test_default_name_and_description_given_when_no_content(self):
         """
@@ -269,8 +275,6 @@ class TestUserViews(TestCaseDatabase):
 
         stub_library.user_view_post_data.pop('name')
         stub_library.user_view_post_data.pop('description')
-        stub_library.user_view_post_data_json = \
-            json.dumps(stub_library.user_view_post_data)
 
         with self.assertRaises(KeyError):
             stub_library.user_view_post_data['name']
@@ -288,10 +292,15 @@ class TestUserViews(TestCaseDatabase):
                 library_data=stub_library.user_view_post_data
             )
 
+            # Library data is updated by the create library, but on the next
+            # loop we do not want this feature present
+            stub_library.user_view_post_data.pop('name')
+            stub_library.user_view_post_data.pop('description')
+
             lib = Library.query.filter(Library.id == library.id).one()
             self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1),
                             lib.name)
-            self.assertTrue(lib.description == 'My ADS library.')
+            self.assertTrue(lib.description == DEFAULT_LIBRARY_DESCRIPTION)
 
 
 class TestLibraryViews(TestCaseDatabase):
@@ -685,10 +694,11 @@ class TestDocumentViews(TestCaseDatabase):
         self.assertIsNotNone(access)
         self.assertFalse(access)
 
-    def test_can_update_libraries_detailsn(self):
+    def test_can_update_libraries_details(self):
         """
         Tests that a user can update the libraries details, such as name and
         description. This only works if they have owner or admin permission.
+
         :return: no return
         """
 
@@ -710,12 +720,50 @@ class TestDocumentViews(TestCaseDatabase):
         new_name = 'New name'
         new_description = 'New description'
         random_text = 'Not added'
+
+        # Update first just the name
+        update_data = dict(name=new_name,
+                           random=random_text)
+
+        return_data = self.document_view.update_library(
+            library_id=library.id,
+            library_data=update_data
+        )
+
+        self.assertIn('name', return_data)
+        self.assertNotIn('description', return_data)
+        self.assertEqual(return_data['name'], new_name)
+
+        # Then update the description
+        update_data = dict(description=new_description,
+                           random=random_text)
+
+        return_data = self.document_view.update_library(
+            library_id=library.id,
+            library_data=update_data
+        )
+
+        self.assertIn('description', return_data)
+        self.assertNotIn('name', return_data)
+        self.assertEqual(return_data['description'], new_description)
+
+        # Update both
+        # Then update the description
+        new_name += ' new'
+        new_description += ' new'
         update_data = dict(name=new_name,
                            description=new_description,
                            random=random_text)
 
-        self.document_view.update_library(library_id=library.id,
-                                          library_data=update_data)
+        return_data = self.document_view.update_library(
+            library_id=library.id,
+            library_data=update_data
+        )
+
+        self.assertIn('name', return_data)
+        self.assertIn('description', return_data)
+        self.assertEqual(return_data['name'], new_name)
+        self.assertEqual(return_data['description'], new_description)
 
         new_library = Library.query.filter(Library.id == library.id).one()
         self.assertEqual(new_library.name, new_name)
@@ -727,13 +775,15 @@ class TestDocumentViews(TestCaseDatabase):
         """
         Tests that a user can update the libraries details, such as name and
         description. This only works if they have owner or admin permission.
+
         :return: no return
         """
 
         # Make a fake user and library
         # Ensure a user exists
-        user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
+        user_owner = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_admin = User(absolute_uid=self.stub_user_2.absolute_uid)
+        db.session.add_all([user_owner, user_admin])
         db.session.commit()
 
         # Ensure a library exists
@@ -743,35 +793,41 @@ class TestDocumentViews(TestCaseDatabase):
                           bibcode=[self.stub_library.bibcode])
 
         # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+        permission_owner = Permissions(owner=True)
+        permission_admin = Permissions(admin=True, owner=False)
 
         # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
+        user_owner.permissions.append(permission_owner)
+        user_admin.permissions.append(permission_admin)
+
+        library.permissions.append(permission_owner)
+        library.permissions.append(permission_admin)
+        db.session.add_all([library, permission_owner, permission_admin,
+                            user_admin, user_owner])
         db.session.commit()
 
-        # add 1 to the UID to represent a random user
-        access = self.document_view.write_access(
-            service_uid=self.stub_user_2.absolute_uid,
-            library_id=library.id
-        )
-        self.assertIsNotNone(access)
-        self.assertFalse(access)
+        for user in [user_owner, user_admin]:
+            access = self.document_view.update_access(
+                service_uid=user.id,
+                library_id=library.id
+            )
+            self.assertTrue(access)
 
-    @unittest.skip('Not implemented')
     def test_cannot_update_libraries_details_if_not_owner_or_admin(self):
         """
-        Tests that a user can update the libraries details, such as name and
-        description.
+        Test that users with no permissions, read, and write permissions,
+        cannot alter the name or description of the library.
+
         :return: no return
         """
 
         # Make a fake user and library
         # Ensure a user exists
-        user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
+        user_read = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_write = User(absolute_uid=self.stub_user_2.absolute_uid)
+        user_random = User(absolute_uid=1)
+
+        db.session.add_all([user_random, user_read, user_write])
         db.session.commit()
 
         # Ensure a library exists
@@ -781,22 +837,25 @@ class TestDocumentViews(TestCaseDatabase):
                           bibcode=[self.stub_library.bibcode])
 
         # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+        permission_read = Permissions(read=True, owner=False)
+        permission_write = Permissions(write=True, owner=False)
 
         # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
+        user_read.permissions.append(permission_read)
+        user_write.permissions.append(permission_write)
+
+        library.permissions.append(permission_read)
+        library.permissions.append(permission_write)
+        db.session.add_all([library, permission_read, permission_write,
+                            user_read, user_write])
         db.session.commit()
 
-        # add 1 to the UID to represent a random user
-        access = self.document_view.write_access(
-            service_uid=self.stub_user_2.absolute_uid,
-            library_id=library.id
-        )
-        self.assertIsNotNone(access)
-        self.assertFalse(access)
+        for user in [user_random, user_read, user_write]:
+            access = self.document_view.update_access(
+                service_uid=user.id,
+                library_id=library.id
+            )
+            self.assertFalse(access)
 
 class TestPermissionViews(TestCaseDatabase):
     """

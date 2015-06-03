@@ -81,29 +81,79 @@ class TestMistakeEpic(TestCaseDatabase):
             self.assertEqual(library_description,
                              DEFAULT_LIBRARY_DESCRIPTION)
 
-        # Mary updates the name and description of the library to something
+        # Mary decides to update the name of the library to something more
         # sensible
-        for meta_data, update in [['name', 'test'], ['description', 'test2']]:
+        name = 'something sensible'
 
-            # Make the change
-            url = url_for('documentview', library=library_id)
-            response = self.client.put(
-                url,
-                data=stub_library.document_view_put_data_json(
-                    meta_data, update
-                ),
-                headers=user_mary.headers
-            )
-            self.assertEqual(response.status_code, 200)
+        url = url_for('documentview', library=library_id)
+        response = self.client.put(
+            url,
+            data=stub_library.document_view_put_data_json(
+                name=name
+            ),
+            headers=user_mary.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['name'], name)
 
-            # Check the change worked
-            url = url_for('userview', library=library_id)
-            response = self.client.get(
-                url,
-                headers=user_mary.headers
-            )
-            self.assertEqual(update,
-                             response.json['libraries'][0][meta_data])
+        # She checks the change worked
+        url = url_for('userview', library=library_id)
+        response = self.client.get(
+            url,
+            headers=user_mary.headers
+        )
+        self.assertEqual(name,
+                         response.json['libraries'][0]['name'])
+
+        # Mary decides to make the description also more relevant
+        description = 'something relevant'
+        url = url_for('documentview', library=library_id)
+        response = self.client.put(
+            url,
+            data=stub_library.document_view_put_data_json(
+                description=description
+            ),
+            headers=user_mary.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['description'], description)
+
+        # Mary checks that the change worked
+        url = url_for('userview', library=library_id)
+        response = self.client.get(
+            url,
+            headers=user_mary.headers
+        )
+        self.assertEqual(description,
+                         response.json['libraries'][0]['description'])
+
+        # Mary dislikes both her changes and makes both the changes at once
+        name = 'Disliked the other one'
+        description = 'It didn\'t make sense before'
+        url = url_for('documentview', library=library_id)
+        response = self.client.put(
+            url,
+            data=stub_library.document_view_put_data_json(
+                name=name,
+                description=description
+            ),
+            headers=user_mary.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['name'], name)
+        self.assertEqual(response.json['description'], description)
+
+        # Check the change worked
+        url = url_for('userview', library=library_id)
+        response = self.client.get(
+            url,
+            headers=user_mary.headers
+        )
+        self.assertEqual(name,
+                         response.json['libraries'][0]['name'])
+        self.assertEqual(description,
+                         response.json['libraries'][0]['description'])
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

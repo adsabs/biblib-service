@@ -229,6 +229,56 @@ class BaseView(Resource):
         except NoResultFound:
             return False
 
+    def helper_validate_library_data(self, service_uid, library_data):
+        """
+        Validates the library data to ensure the user does not give empty
+        content for the title and description.
+
+        :param service_uid: the user ID within this microservice
+        :param library_data: content needed to create a library
+
+        :return: validated name and description
+        """
+
+        _name = library_data.get('name') or DEFAULT_LIBRARY_NAME_PREFIX
+        _description = library_data.get('description') or \
+            DEFAULT_LIBRARY_DESCRIPTION
+
+        current_app.logger.info('Creating library for user_service: {0:d}, '
+                                'with properties: {1}'
+                                .format(service_uid, library_data))
+
+        # We want to ensure that the users have unique library names. However,
+        # it should be possible that they have access to other libraries from
+        # other people, that have the same name
+        library_names = \
+            [i.library.name for i in
+             Permissions.query.filter(Permissions.user_id == service_uid,
+                                      Permissions.owner == True).all()]
+
+        matches = [name for name in library_names if name == _name]
+        if matches:
+            current_app.logger.error('Name supplied for the library already '
+                                     'exists: "{0}" ["{1}"]'.format(_name,
+                                                                    matches))
+            raise BackendIntegrityError('Library name already exists.')
+
+        if _name == DEFAULT_LIBRARY_NAME_PREFIX:
+            default_names = [lib_name for lib_name
+                             in library_names
+                             if DEFAULT_LIBRARY_NAME_PREFIX
+                             in lib_name]
+
+            _extension = len(default_names) + 1
+            _name = '{0} {1}'.format(_name,
+                                     _extension)
+
+        library_data['name'] = _name
+        library_data['description'] = _description
+
+        return library_data
+
+
 class UserView(BaseView):
     """
     End point to create a library for a given user
@@ -269,37 +319,13 @@ class UserView(BaseView):
         :return: no return
         """
 
-        _name = library_data.get('name') or DEFAULT_LIBRARY_NAME_PREFIX
-        _description = library_data.get('description') or \
-            DEFAULT_LIBRARY_DESCRIPTION
+        library_data = self.helper_validate_library_data(
+            service_uid=service_uid,
+            library_data=library_data
+        )
+        _name = library_data.get('name')
+        _description = library_data.get('description')
         _public = bool(library_data.get('public', False))
-
-        current_app.logger.info('Creating library for user_service: {0:d}, '
-                                'with properties: {1}'
-                                .format(service_uid, library_data))
-
-        # We want to ensure that the users have unique library names. However,
-        # it should be possible that they have access to other libraries from
-        # other people, that have the same name
-        library_names = \
-            [i.library.name for i in
-             Permissions.query.filter(Permissions.user_id == service_uid,
-                                      Permissions.owner == True).all()]
-
-        if _name in library_names:
-            current_app.logger.error('Name supplied for the library already '
-                                     'exists: "{0}"'.format(_name))
-            raise BackendIntegrityError('Library name already exists.')
-
-        if _name == DEFAULT_LIBRARY_NAME_PREFIX:
-            default_names = [lib_name for lib_name
-                             in library_names
-                             if DEFAULT_LIBRARY_NAME_PREFIX
-                             in lib_name]
-
-            _extension = len(default_names) + 1
-            _name = '{0} {1}'.format(_name,
-                                     _extension)
 
         try:
 
@@ -586,13 +612,10 @@ class DocumentView(BaseView):
     End point to interact with a specific library, by adding documents and
     removing documents. You also use this endpoint to delete the entire
     library as this method should be scoped.
-
-    XXX: need to ignore the anon user, they should not be able to do anything
-    XXX: document already exists (only add a bibcode once)
-    XXX: adding tags using PUT for RESTful endpoint?
-    XXX: public/private behaviour
-
     """
+    # TODO: adding tags using PUT for RESTful endpoint?
+    # TODO: normalise input and check the content delivered. Can be placed in
+    # its own function
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = ['scope1', 'scope2']
@@ -649,17 +672,20 @@ class DocumentView(BaseView):
         :return:
         """
         updateable = ['name', 'description']
+        updated = {}
 
         library = Library.query.filter(Library.id == library_id).one()
 
         for key in library_data:
             if key not in updateable:
                 continue
-
             setattr(library, key, library_data[key])
+            updated[key] = library_data[key]
 
         db.session.add(library)
         db.session.commit()
+
+        return updated
 
     def delete_library(self, library_id):
         """
@@ -672,6 +698,24 @@ class DocumentView(BaseView):
         library = Library.query.filter(Library.id == library_id).one()
         db.session.delete(library)
         db.session.commit()
+
+    def update_access(self, service_uid, library_id):
+        """
+        Defines which type of user has delete permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+        update_allowed = ['admin', 'owner']
+        for access_type in update_allowed:
+            if self.helper_access_allowed(service_uid=service_uid,
+                                          library_id=library_id,
+                                          access_type=access_type):
+                return True
+
+        return False
 
     def delete_access(self, service_uid, library_id):
         """
@@ -705,6 +749,21 @@ class DocumentView(BaseView):
                 return True
 
         return False
+
+    def library_name_exists(self, service_uid, library_name):
+
+        library_names = \
+            [i.library.name for i in
+             Permissions.query.filter(Permissions.user_id == service_uid,
+                                      Permissions.owner == True).all()]
+
+        if library_name in library_names:
+            current_app.logger.error('Name supplied for the library already '
+                                     'exists: "{0}"'.format(library_name))
+
+            return True
+        else:
+            return False
 
     def post(self, library):
         """
@@ -788,8 +847,54 @@ class DocumentView(BaseView):
         ---------
         tba
         """
+        # TODO: see above, there is DRY here!
 
-        return {}, 200
+        try:
+            user = self.helper_get_user_id()
+        except KeyError:
+            return {'error': MISSING_USERNAME_ERROR['body']}, \
+                MISSING_USERNAME_ERROR['number']
+
+        # URL safe base64 string to UUID
+        library = self.helper_slug_to_uuid(library)
+
+        if not self.helper_user_exists(user):
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                NO_PERMISSION_ERROR['number']
+
+        if not self.helper_library_exists(library):
+            return {'error': MISSING_LIBRARY_ERROR['body']}, \
+                MISSING_LIBRARY_ERROR['number']
+
+        user_updating_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user)
+
+        if not self.update_access(service_uid=user_updating_uid,
+                                  library_id=library):
+            return {'error': NO_PERMISSION_ERROR['body']}, \
+                NO_PERMISSION_ERROR['number']
+
+        library_data = get_post_data(request)
+
+        # Remove content that is empty
+        for key in library_data.keys():
+            if not library_data[key]:
+                current_app.logger.warning('Removing key: {0} as its empty.'
+                                           .format(key))
+                library_data.pop(key)
+
+        # Check for duplicate namaes
+        if 'name' in library_data and \
+                self.library_name_exists(service_uid=user_updating_uid,
+                                         library_name=library_data['name']):
+
+                return {'error': DUPLICATE_LIBRARY_NAME_ERROR['body']}, \
+                   DUPLICATE_LIBRARY_NAME_ERROR['number']
+
+        response = self.update_library(library_id=library,
+                                       library_data=library_data)
+
+        return response, 200
 
     def delete(self, library):
         """

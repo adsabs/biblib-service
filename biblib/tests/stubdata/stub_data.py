@@ -274,5 +274,6 @@ class LibraryShop(object):
 
         :return: PUT data in JSON format
         """
-        put_data = self.document_view_put_data(name, description)
+        put_data = self.document_view_put_data(name=name,
+                                               description=description)
         return json.dumps(put_data)
