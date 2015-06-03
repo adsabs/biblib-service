@@ -47,7 +47,7 @@ def create_app(config_type='STAGING'):
 
     api.add_resource(DocumentView,
                      '/documents/<string:library>',
-                     methods=['POST', 'DELETE'])
+                     methods=['POST', 'DELETE', 'PUT'])
 
     api.add_resource(PermissionView,
                      '/permissions/<string:library>',

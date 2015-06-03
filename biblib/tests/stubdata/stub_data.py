@@ -177,6 +177,10 @@ class LibraryShop(object):
     bibcode: bibcode
     action: add/remove
 
+    PUT
+    ----
+    name: name
+    description: description
     """
 
     def __init__(self, **kwargs):
@@ -195,6 +199,12 @@ class LibraryShop(object):
             setattr(self, key, self.stub.__dict__[key])
 
         self.kwargs = kwargs
+
+        if self.kwargs:
+            for key in self.kwargs:
+                if key in self.__dict__.keys():
+                    setattr(self, key, self.kwargs[key])
+
         self.create_user_view_post_data()
 
     def create_user_view_post_data(self):
@@ -207,15 +217,8 @@ class LibraryShop(object):
         post_data = dict(
             name=self.name,
             description=self.description,
-            read=False,
-            write=False,
-            public=False
+            public=self.public
         )
-
-        if self.kwargs:
-            for key in self.kwargs:
-                if key in post_data.keys():
-                    post_data[key] = self.kwargs[key]
 
         json_data = json.dumps(post_data)
 
@@ -246,3 +249,31 @@ class LibraryShop(object):
         """
         post_data = self.document_view_post_data(action)
         return json.dumps(post_data)
+
+    def document_view_put_data(self, name='', description=''):
+        """
+        Expected data to be sent in a PUT request to the DocumentView
+        end point, /documents/<>
+        :param name: name of the library to change it to
+        :param description: description to change it to
+
+        :return: PUT data in dictionary format
+        """
+        put_data = dict(
+            name=name,
+            description=description
+        )
+        return put_data
+
+    def document_view_put_data_json(self, name='', description=''):
+        """
+        Expected data to be sent in a PUT request to the DocumentView
+        end point, /documents/<>
+        :param name: name of the library to change it to
+        :param description: description to change it to
+
+        :return: PUT data in JSON format
+        """
+        put_data = self.document_view_put_data(name=name,
+                                               description=description)
+        return json.dumps(put_data)
