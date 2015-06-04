@@ -14,7 +14,8 @@ import unittest
 from flask import url_for
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, DEFAULT_LIBRARY_NAME_PREFIX, \
-    DEFAULT_LIBRARY_DESCRIPTION
+    DEFAULT_LIBRARY_DESCRIPTION, WRONG_TYPE_LIST_ERROR, \
+    DUPLICATE_DOCUMENT_NAME_ERROR
 from tests.stubdata.stub_data import LibraryShop, UserShop
 from tests.base import MockEmailService, TestCaseDatabase
 
@@ -111,6 +112,7 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
         for key in ['name', 'id']:
             self.assertIn(key, response.json)
+        self.assertNotIn('bibcode', response.json)
 
         # Check the library exists in the database
         url = url_for('userview', user=stub_user.absolute_uid)
@@ -126,6 +128,70 @@ class TestWebservices(TestCaseDatabase):
             self.assertEqual(stub_library.name, library['name'])
             self.assertEqual(stub_library.description,
                              library['description'])
+
+    def test_create_library_resource_and_add_bibcodes(self):
+        """
+        Test the /libraries route
+        Creating the user and a library
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop(want_bibcode=True)
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+        for key in ['name', 'id', 'bibcode', 'description']:
+            self.assertIn(key, response.json)
+
+        # Check the library exists in the database
+        url = url_for('libraryview', library=library_id)
+        response = self.client.get(
+            url,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+
+        for document in response.json['documents']:
+            self.assertIn(document, stub_library.bibcode)
+
+    def test_create_library_resource_and_add_bibcodes_of_wrong_type(self):
+        """
+        Test the /libraries route
+        Creating the user and a library
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        library_data = stub_library.user_view_post_data
+        for bib_type in ['string', int(3), float(3.0), dict(test='test')]:
+
+            library_data['bibcode'] = bib_type
+
+            # Make the library
+            url = url_for('userview')
+            response = self.client.post(
+                url,
+                data=json.dumps(library_data),
+                headers=stub_user.headers
+            )
+            self.assertEqual(response.status_code,
+                             WRONG_TYPE_LIST_ERROR['number'])
+            self.assertEqual(response.json['error'],
+                             WRONG_TYPE_LIST_ERROR['body'])
 
     def test_add_document_to_library(self):
         """
@@ -169,7 +235,55 @@ class TestWebservices(TestCaseDatabase):
         )
 
         self.assertEqual(response.status_code, 200, response)
-        self.assertIn(stub_library.bibcode, response.json['documents'])
+        self.assertEqual(stub_library.bibcode, response.json['documents'])
+
+    def test_cannot_add_duplicate_documents_to_library(self):
+        """
+        Test the /documents/<> end point with POST to add a document. Should
+        not be able to add the same document more than once.
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Add to the library
+        url = url_for('documentview', library=library_id)
+        response = self.client.post(
+            url,
+            data=stub_library.document_view_post_data_json('add'),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Should not be able to add the same document
+        url = url_for('documentview', library=library_id)
+        response = self.client.post(
+            url,
+            data=stub_library.document_view_post_data_json('add'),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code,
+                         DUPLICATE_DOCUMENT_NAME_ERROR['number'])
+        self.assertEqual(response.json['error'],
+                         DUPLICATE_DOCUMENT_NAME_ERROR['body'])
 
     def test_remove_document_from_library(self):
         """
@@ -221,7 +335,8 @@ class TestWebservices(TestCaseDatabase):
             url,
             headers=stub_user.headers
         )
-        self.assertTrue(len(response.json['documents']) == 0)
+        self.assertTrue(len(response.json['documents']) == 0,
+                        response.json['documents'])
 
     def test_cannot_add_library_with_duplicate_names(self):
         """

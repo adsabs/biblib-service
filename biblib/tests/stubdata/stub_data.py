@@ -21,11 +21,15 @@ def fake_bibcode():
     """
     year = faker.year()
     author = faker.random_letter().upper()
-    provider = 3*author
+    provider = author
+    for i in range(2):
+        provider += faker.random_letter().upper()
+
     bibcode = '{year}.....{provider}......{author}'\
         .format(year=year,
                 provider=provider,
                 author=author)
+    
     return bibcode
 
 
@@ -75,7 +79,7 @@ class LibraryFactory(factory.Factory):
     public = False
     read = False
     write = False
-    bibcode = factory.LazyAttribute(lambda x: fake_biblist(nb_codes=1)[0])
+    bibcode = factory.LazyAttribute(lambda x: fake_biblist(nb_codes=1))
 
 
 class UserShop(object):
@@ -195,10 +199,20 @@ class LibraryShop(object):
         self.user_view_post_data = None
         self.user_view_post_data_json = None
 
+        self.kwargs = kwargs
+
+        self.want_bibcode = False
+
+        self.init_values()
+
+    def init_values(self):
+        """
+        Initialise all the values
+
+        :return:
+        """
         for key in self.stub.__dict__.keys():
             setattr(self, key, self.stub.__dict__[key])
-
-        self.kwargs = kwargs
 
         if self.kwargs:
             for key in self.kwargs:
@@ -219,6 +233,9 @@ class LibraryShop(object):
             description=self.description,
             public=self.public
         )
+
+        if self.want_bibcode:
+            post_data['bibcode'] = self.bibcode
 
         json_data = json.dumps(post_data)
 

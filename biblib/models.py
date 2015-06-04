@@ -88,6 +88,28 @@ class MutableList(Mutable, list):
         list.remove(self, value)
         self.changed()
 
+    def extend(self, value):
+        """
+        Define an extend action
+        :param value: list to extend with
+
+        :return: no return
+        """
+        list.extend(self, value)
+        self.changed()
+
+    def shorten(self, value):
+        """
+        Define a shorten action. Opposite to extend
+
+        :param value: values to remove
+
+        :return: no return
+        """
+        for item in value:
+            self.remove(item)
+
+
     @classmethod
     def coerce(cls, key, value):
         """
