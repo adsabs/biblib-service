@@ -11,8 +11,7 @@ sys.path.append(PROJECT_HOME)
 
 import unittest
 import uuid
-import json
-from models import db, User, Library, Permissions
+from models import db, User, Library, Permissions, MutableList
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from views import UserView, LibraryView, DocumentView, PermissionView, BaseView
@@ -165,13 +164,81 @@ class TestUserViews(TestCaseDatabase):
             library_data=self.stub_library.user_view_post_data
         )
 
+        self.assertIsNone(library.bibcode)
+
         # Check that the library was created with the correct permissions
         result = Permissions.query\
             .filter(User.id == Permissions.user_id)\
             .filter(library.id == Permissions.library_id)\
             .all()
 
+        with self.assertRaises(AttributeError):
+            result.library.bibcode
+
         self.assertTrue(len(result) == 1)
+
+    def test_user_can_create_a_library_passing_bibcodes(self):
+        """
+        Checks that a library is created and exists in the database. A set of
+        bibcodes is sent with the creation.
+
+        :return: no return
+        """
+
+        # Temporary stub data
+        stub_library = LibraryShop(want_bibcode=True)
+        self.assertIn('bibcode', stub_library.user_view_post_data.keys())
+
+        # Make the user we want the library to be associated with
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Create the library for the user we created
+        library = self.user_view.create_library(
+            service_uid=user.id,
+            library_data=stub_library.user_view_post_data
+        )
+
+        # Check that the library was created with the correct permissions
+        result = Permissions.query\
+            .filter(User.id == Permissions.user_id)\
+            .filter(library.id == Permissions.library_id)\
+            .all()
+
+        library = result[0].library
+        self.assertIs(MutableList, type(library.bibcode), type(library.bibcode))
+        self.assertTrue(
+            len(library.bibcode) == len(stub_library.bibcode)
+        )
+        self.assertTrue(len(result) == 1)
+
+    def test_user_cannot_create_a_library_passing_wrong_bibcode_type(self):
+        """
+        Tests when the user sends the wrong type for the bibcode
+
+        :return: no return
+        """
+
+        # Temporary stub data
+        stub_library = LibraryShop()
+
+        # Make the user we want the library to be associated with
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        library_data = stub_library.user_view_post_data
+
+        for bib_type in ['string', int(3), float(3.0), dict(test='test')]:
+
+            with self.assertRaises(TypeError):
+                library_data['bibcode'] = bib_type
+                # Create the library for the user we created
+                lib=self.user_view.create_library(
+                    service_uid=user.id,
+                    library_data=library_data
+                )
 
     def test_user_can_retrieve_library(self):
         """
@@ -343,7 +410,7 @@ class TestLibraryViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
         permission = Permissions(read=True,
@@ -380,7 +447,7 @@ class TestLibraryViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
         permission = Permissions(read=True,
@@ -411,7 +478,7 @@ class TestLibraryViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
         db.session.add(library)
         db.session.commit()
 
@@ -469,7 +536,7 @@ class TestDocumentViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
         permission = Permissions(read=True,
@@ -507,7 +574,7 @@ class TestDocumentViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
         permission = Permissions(read=True, owner=False)
@@ -542,7 +609,7 @@ class TestDocumentViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
         permission = Permissions(read=False, owner=True)
@@ -587,7 +654,6 @@ class TestDocumentViews(TestCaseDatabase):
         db.session.commit()
 
         library_id = library.id
-        user_id = user.id
 
         # Get stub data for the document
 
@@ -600,7 +666,7 @@ class TestDocumentViews(TestCaseDatabase):
         # Check that the document is in the library
         library = Library.query.filter(Library.id == library_id).all()
         for _lib in library:
-            self.assertIn(self.stub_library.bibcode, _lib.bibcode)
+            self.assertIn(self.stub_library.bibcode[0], _lib.bibcode)
 
         # Add a different document to the library
         self.document_view.add_document_to_library(
@@ -611,7 +677,50 @@ class TestDocumentViews(TestCaseDatabase):
         # Check that the document is in the library
         library = Library.query.filter(Library.id == library_id).all()
         for _lib in library:
-            self.assertIn(self.stub_library_2.bibcode, _lib.bibcode)
+            self.assertIn(self.stub_library_2.bibcode[0], _lib.bibcode)
+
+    def test_user_cannot_duplicate_same_document_in_library(self):
+        """
+        Tests that adding a bibcode to a library works correctly
+
+        :return:
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True)
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        library_id = library.id
+
+        # Get stub data for the document
+
+        # Add a document to the library
+        self.document_view.add_document_to_library(
+            library_id=library_id,
+            document_data=self.stub_library.document_view_post_data('add')
+        )
+
+        with self.assertRaises(BackendIntegrityError):
+            self.document_view.add_document_to_library(
+                library_id=library_id,
+                document_data=self.stub_library.document_view_post_data('add')
+            )
 
     def test_user_can_remove_document_from_library(self):
         """
@@ -629,7 +738,7 @@ class TestDocumentViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
         permission = Permissions(read=True,
@@ -674,7 +783,7 @@ class TestDocumentViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
         permission = Permissions(read=True,
@@ -712,7 +821,7 @@ class TestDocumentViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         db.session.add(library)
         db.session.commit()
@@ -790,7 +899,7 @@ class TestDocumentViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
         permission_owner = Permissions(owner=True)
@@ -834,7 +943,7 @@ class TestDocumentViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
         permission_read = Permissions(read=True, owner=False)
@@ -900,7 +1009,7 @@ class TestPermissionViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         db.session.add_all([user, library])
         db.session.commit()
@@ -940,7 +1049,7 @@ class TestPermissionViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         permission = Permissions()
         user_1.permissions.append(permission)
@@ -973,7 +1082,7 @@ class TestPermissionViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         permission = Permissions()
         permission.owner = True
@@ -1008,7 +1117,7 @@ class TestPermissionViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         permission_1 = Permissions()
         permission_1.admin = True
@@ -1048,7 +1157,7 @@ class TestPermissionViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         permission_1 = Permissions()
         permission_1.owner = True
@@ -1088,7 +1197,7 @@ class TestPermissionViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=[self.stub_library.bibcode])
+                          bibcode=self.stub_library.bibcode)
 
         permission_admin = Permissions()
         permission_admin.admin = True

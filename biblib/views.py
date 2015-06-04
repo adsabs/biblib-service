@@ -17,6 +17,10 @@ DUPLICATE_LIBRARY_NAME_ERROR = {'body': 'Library name given already '
                                         'exists and must be unique.',
                                 'number': 409}
 
+DUPLICATE_DOCUMENT_NAME_ERROR = {'body': 'Document given already '
+                                        'in the library.',
+                                'number': 409}
+
 MISSING_LIBRARY_ERROR = {'body': 'Library specified does not exist.',
                          'number': 410}
 
@@ -30,6 +34,9 @@ MISSING_USERNAME_ERROR = {'body': 'You did not supply enough user details',
 NO_PERMISSION_ERROR = {'body': 'You do not have the correct permissions or'
                                'this library does not exist.',
                        'number': 403}
+
+WRONG_TYPE_LIST_ERROR = {'body': 'You passed the wrong type. Expected a list.',
+                         'number': 400}
 
 USER_ID_KEYWORD = 'X-Adsws-Uid'
 
@@ -282,9 +289,9 @@ class BaseView(Resource):
 class UserView(BaseView):
     """
     End point to create a library for a given user
-
-    XXX: must give the library name/missing input function saves time
     """
+
+    # TODO: must give the library name/missing input function saves time
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
@@ -326,6 +333,7 @@ class UserView(BaseView):
         _name = library_data.get('name')
         _description = library_data.get('description')
         _public = bool(library_data.get('public', False))
+        _bibcode = library_data.get('bibcode', False)
 
         try:
 
@@ -333,6 +341,20 @@ class UserView(BaseView):
             library = Library(name=_name,
                               description=_description,
                               public=_public)
+
+            # If the user supplies bibcodes
+            if _bibcode and isinstance(_bibcode, list):
+
+                # Ensure unique content
+                _bibcode = list(set(_bibcode))
+                current_app.logger.info('User supplied bibcodes: {0}'
+                                        .format(_bibcode))
+                library.bibcode = _bibcode
+            elif _bibcode:
+                current_app.logger.error('Bibcode supplied not a list: {0}'
+                                         .format(_bibcode))
+                raise TypeError('Bibcode should be a list.')
+
             user = User.query.filter(User.id == service_uid).one()
 
             # Make the permissions
@@ -432,10 +454,11 @@ class UserView(BaseView):
         Post body:
         ----------
         KEYWORD, VALUE
-        name:        <string>    name of the library (must be unique for that
-                                 user)
-        description: <string>    description of the library
-        public:      <boolean>   is the library public to view
+        name:                   <string>    name of the library (must be unique
+                                            for that user)
+        description:            <string>    description of the library
+        public:                 <boolean>   is the library public to view
+        bibcode (OPTIONAL):     <list>      list of bibcodes to add
         """
 
         # Check that they pass a user id
@@ -469,12 +492,25 @@ class UserView(BaseView):
             library = \
                 self.create_library(service_uid=service_uid, library_data=data)
         except BackendIntegrityError as error:
+            current_app.logger.error(error)
             return {'error': DUPLICATE_LIBRARY_NAME_ERROR['body']}, \
                 DUPLICATE_LIBRARY_NAME_ERROR['number']
+        except TypeError as error:
+            current_app.logger.error(error)
+            return {'error': WRONG_TYPE_LIST_ERROR['body']}, \
+                WRONG_TYPE_LIST_ERROR['number']
 
-        return {'name': library.name,
-                'id': '{0}'.format(self.helper_uuid_to_slug(library.id)),
-                'description': library.description}, 200
+        return_data = {
+            'name': library.name,
+            'id': '{0}'.format(self.helper_uuid_to_slug(library.id)),
+            'description': library.description
+        }
+
+        # If they added bibcodes include in the response
+        if hasattr(library, 'bibcode') and library.bibcode:
+            return_data['bibcode'] = library.bibcode
+
+        return return_data, 200
 
 
 class LibraryView(BaseView):
@@ -484,13 +520,12 @@ class LibraryView(BaseView):
 
     The GET requests are separate from the POST, DELETE requests as this class
     must be scopeless, whereas the others will have scope.
-
-    XXX: need to ignore the anon user, they should not be able to do anything
-    XXX: document already exists (only add a bibcode once)
-    XXX: adding tags using PUT for RESTful endpoint?
-    XXX: public/private behaviour
-
     """
+
+    # TODO: need to ignore the anon user. Currently scopeless
+    # TODO: document already exists (only add a bibcode once)
+    # TODO: adding tags using PUT for RESTful endpoint?
+    # TODO: public/private behaviour
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
@@ -621,6 +656,22 @@ class DocumentView(BaseView):
     scopes = []
     rate_limit = [1000, 60*60*24]
 
+    @staticmethod
+    def type_check(document_data, document_data_expect):
+        """
+        Check the dictionary has the expected types
+        :param document_data: input dictionary
+        :param document_data_expect: expected dictionary types
+        :return:
+        """
+        for expect_data in document_data_expect:
+            if not isinstance(document_data[expect_data],
+                              document_data_expect[expect_data]):
+                raise TypeError(
+                    '{0} should be type: {1}'
+                    .format(expect_data, document_data_expect[expect_data])
+                )
+
     def add_document_to_library(self, library_id, document_data):
         """
         Adds a document to a user's library
@@ -630,18 +681,31 @@ class DocumentView(BaseView):
         :return: no return
         """
 
+        document_data_expect = {'bibcode': list}
+        self.type_check(document_data, document_data_expect)
+
         current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
                                 .format(document_data, library_id))
         # Find the specified library
         library = Library.query.filter(Library.id == library_id).one()
+
+        # Ensure unique content
+        _bibcodes = list(set(document_data['bibcode']))
+
         if not library.bibcode:
             current_app.logger.debug('Zero length array: {0}'
                                      .format(library.bibcode))
-            library.bibcode = [document_data['bibcode']]
+            library.bibcode = _bibcodes
         else:
+            matches = [_bibcode for _bibcode in _bibcodes
+                       if _bibcode in library.bibcode]
+
+            if matches:
+                raise BackendIntegrityError('Duplicate bibcodes passed')
+
             current_app.logger.debug('Non-Zero length array: {0}'
                                      .format(library.bibcode))
-            library.bibcode.append(document_data['bibcode'])
+            library.bibcode.extend(document_data['bibcode'])
 
         db.session.commit()
 
@@ -656,10 +720,13 @@ class DocumentView(BaseView):
 
         :return: no return
         """
+
+        self.type_check(document_data, {'bibcode': list})
+
         current_app.logger.info('Removing a document: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
         library = Library.query.filter(Library.id == library_id).one()
-        library.bibcode.remove(document_data['bibcode'])
+        library.bibcode.shorten(document_data['bibcode'])
         db.session.commit()
         current_app.logger.info('Removed document successfully: {0}'
                                 .format(library.bibcode))
@@ -781,17 +848,11 @@ class DocumentView(BaseView):
         ----------
         KEYWORD, VALUE
 
-        bibcode:  <string>        Bibcode to be added
+        bibcode:  <list>          List of bibcodes to be added
         action:   add, remove     add - adds a bibcode, remove - removes a
                                   bibcode
-
-        Notes:
-        Currently, bibcodes are just strings. If lists are required, then open
-        an issue on the repository.
-
-        XXX: Needs authentification still
-        XXX: Want a tidier try/except/return pattern
         """
+        # TODO: Want a tidier try/except/return pattern
 
         # Get the user requesting this from the header
         try:
@@ -815,9 +876,14 @@ class DocumentView(BaseView):
         data = get_post_data(request)
         if data['action'] == 'add':
             current_app.logger.info('User requested to add a document')
-            self.add_document_to_library(library_id=library,
-                                         document_data=data)
-            return {}, 200
+
+            try:
+                self.add_document_to_library(library_id=library,
+                                             document_data=data)
+                return {}, 200
+            except BackendIntegrityError:
+                return {'error': DUPLICATE_DOCUMENT_NAME_ERROR['body']}, \
+                    DUPLICATE_DOCUMENT_NAME_ERROR['number']
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')
@@ -845,7 +911,10 @@ class DocumentView(BaseView):
 
         Post-body:
         ---------
-        tba
+        name: name of the library
+        description: description of the library
+
+        Note: The above are optional, they can be empty if needed.
         """
         # TODO: see above, there is DRY here!
 
@@ -967,18 +1036,10 @@ class DocumentView(BaseView):
 class PermissionView(BaseView):
     """
     End point to manipulate the permissions between a user and a library
-
-
-    XXX: Users that do not have an account, cannot be added to permissions
-    XXX:   - send invitation?
-    XXX:   - if they exist in the API database but have not created a library
-             we still need to create a user entry in the database for them
-    XXX: add read, write, admin
-    XXX: remove read, write, admin
-    XXX: only an admin/owner can add permissions to someone
-    XXX: update permissions stub data (and stub data in general)
-    XXX: pass user and permissions as lists
     """
+    # TODO: Users that do not have an account, cannot be added to permissions
+    # TODO:   - send invitation?
+    # TODO: pass user and permissions as lists
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
