@@ -287,7 +287,7 @@ class UserView(BaseView):
     """
 
     decorators = [advertise('scopes', 'rate_limit')]
-    scopes = ['scope1', 'scope2']
+    scopes = []
     rate_limit = [1000, 60*60*24]
 
     def create_user(self, absolute_uid):
@@ -618,7 +618,7 @@ class DocumentView(BaseView):
     # its own function
 
     decorators = [advertise('scopes', 'rate_limit')]
-    scopes = ['scope1', 'scope2']
+    scopes = []
     rate_limit = [1000, 60*60*24]
 
     def add_document_to_library(self, library_id, document_data):
@@ -981,7 +981,7 @@ class PermissionView(BaseView):
     """
 
     decorators = [advertise('scopes', 'rate_limit')]
-    scopes = ['scope1', 'scope2']
+    scopes = []
     rate_limit = [1000, 60*60*24]
 
     def has_permission(self,
