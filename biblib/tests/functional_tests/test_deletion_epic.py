@@ -81,6 +81,8 @@ class TestDeletionEpic(TestCaseDatabase):
             url,
             headers=stub_user.headers
         )
+        print response.json
+        self.assertTrue(len(response.json['libraries']) == 2)
         library_id_1 = response.json['libraries'][0]['id']
         library_id_2 = response.json['libraries'][1]['id']
 
@@ -92,12 +94,13 @@ class TestDeletionEpic(TestCaseDatabase):
         )
         self.assertEqual(response.status_code, 200)
 
-        # Looks to check there are is only one libraries
+        # Looks to check there are is only one library
         url = url_for('userview')
         response = self.client.get(
             url,
             headers=stub_user.headers
         )
+        print response.json
         self.assertTrue(len(response.json['libraries']) == 1)
 
         # Deletes the first library

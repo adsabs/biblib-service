@@ -115,7 +115,7 @@ class TestWebservices(TestCaseDatabase):
         self.assertNotIn('bibcode', response.json)
 
         # Check the library exists in the database
-        url = url_for('userview', user=stub_user.absolute_uid)
+        url = url_for('userview')
 
         response = self.client.get(
             url,
@@ -128,6 +128,40 @@ class TestWebservices(TestCaseDatabase):
             self.assertEqual(stub_library.name, library['name'])
             self.assertEqual(stub_library.description,
                              library['description'])
+
+    def test_create_library_resource(self):
+        """
+        Test the /libraries GET end point
+        Ensuring the response contains the data we expect. For now, this is
+        defined within the stub data.
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Check the library exists in the database
+        url = url_for('userview')
+        response = self.client.get(
+            url,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+
+        for library in response.json['libraries']:
+            for expected_type in stub_library.user_view_get_response():
+                self.assertIn(expected_type, library.keys())
 
     def test_create_library_resource_and_add_bibcodes(self):
         """
@@ -918,7 +952,7 @@ class TestWebservices(TestCaseDatabase):
 
         # Stub data
         user_mary = UserShop()
-        stub_library = LibraryShop(name='', description='')
+        stub_library = LibraryShop(name='', description='', public=False)
 
         # Mary creates a private library and
         # Does not fill any of the details requested, and then looks at the
@@ -939,10 +973,12 @@ class TestWebservices(TestCaseDatabase):
         # Change the library name
         new_name = 'New name'
         new_description = 'New description'
+        new_publicity = True
 
         library_data = \
             stub_library.document_view_put_data(name=new_name)
         library_data.pop('description')
+        library_data.pop('public')
         library_data = json.dumps(library_data)
 
         url = url_for('documentview', library=library_id)
@@ -961,6 +997,7 @@ class TestWebservices(TestCaseDatabase):
         library_data = \
             stub_library.document_view_put_data(description=new_description)
         library_data.pop('name')
+        library_data.pop('public')
         library_data = json.dumps(library_data)
 
         response = self.client.put(
@@ -972,22 +1009,44 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(new_description,
                          response.json['description'])
 
+        # Change the publicity
+        library_data = \
+            stub_library.document_view_put_data(public=new_publicity)
+        library_data.pop('name')
+        library_data.pop('description')
+        library_data = json.dumps(library_data)
+
+        url = url_for('documentview', library=library_id)
+        response = self.client.put(
+            url,
+            data=library_data,
+            headers=user_mary.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(new_publicity,
+                         response.json['public'])
+
         # Update both at the same time
         new_name += ' new'
         new_description += ' description'
+        new_publicity = False
         response = self.client.put(
             url,
             data=stub_library.document_view_put_data_json(
                 name=new_name,
-                description=new_description
+                description=new_description,
+                public=new_publicity
             ),
             headers=user_mary.headers
         )
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(new_name,
                          response.json['name'])
         self.assertEqual(new_description,
                          response.json['description'])
+        self.assertEqual(new_publicity,
+                         response.json['public'])
 
     def test_can_update_library_with_permissions_admin(self):
         """
@@ -1031,6 +1090,7 @@ class TestWebservices(TestCaseDatabase):
         # Change the library name
         new_name = 'New name'
         new_description = 'New description'
+        new_publicity = True
 
         url = url_for('documentview', library=library_id)
         response = self.client.put(

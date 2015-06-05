@@ -13,33 +13,37 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from utils import get_post_data, BackendIntegrityError, PermissionDeniedError
 
-DUPLICATE_LIBRARY_NAME_ERROR = {'body': 'Library name given already '
-                                        'exists and must be unique.',
-                                'number': 409}
-
-DUPLICATE_DOCUMENT_NAME_ERROR = {'body': 'Document given already '
-                                        'in the library.',
-                                'number': 409}
-
-MISSING_LIBRARY_ERROR = {'body': 'Library specified does not exist.',
-                         'number': 410}
-
-
-MISSING_DOCUMENT_ERROR = {'body': 'Document specified does not exist.',
-                          'number': 410}
-
-MISSING_USERNAME_ERROR = {'body': 'You did not supply enough user details',
-                          'number': 400}
-
-NO_PERMISSION_ERROR = {'body': 'You do not have the correct permissions or'
-                               'this library does not exist.',
-                       'number': 403}
-
-WRONG_TYPE_LIST_ERROR = {'body': 'You passed the wrong type. Expected a list.',
-                         'number': 400}
-
+# Some user defined HTTP errors
+DUPLICATE_LIBRARY_NAME_ERROR = dict(
+    body='Library name given already exists and must be unique.',
+    number=409
+)
+DUPLICATE_DOCUMENT_NAME_ERROR = dict(
+    body='Document given already in the library.',
+    number=409
+)
+MISSING_LIBRARY_ERROR = dict(
+    body='Library specified does not exist.',
+    number=410
+)
+MISSING_DOCUMENT_ERROR = dict(
+    body='Document specified does not exist.',
+    number=410
+)
+MISSING_USERNAME_ERROR = dict(
+    body='You did not supply enough user details',
+    number=400
+)
+NO_PERMISSION_ERROR = dict(
+    body='You do not have the correct permissions or the library does not '
+         'exist.',
+    number=403
+)
+WRONG_TYPE_LIST_ERROR = dict(
+    body='You passed the wrong type. Expected a list.',
+    number=400
+)
 USER_ID_KEYWORD = 'X-Adsws-Uid'
-
 DEFAULT_LIBRARY_NAME_PREFIX = 'Untitled Library'
 DEFAULT_LIBRARY_DESCRIPTION = 'My ADS library'
 
@@ -390,23 +394,67 @@ class UserView(BaseView):
             db.session.rollback()
             raise
 
-    def get_libraries(self, absolute_uid):
+    def get_libraries(self, service_uid):
         """
         Get all the libraries a user has
-        :param absolute_uid: api UID of the user
+        :param service_uid: microservice UID of the user
 
         :return: list of libraries in json format
         """
-        user_libraries = \
-            Library.query.filter(User.absolute_uid == absolute_uid).all()
+
+        # Get all the permissions for a user
+        # This can be improved into one database call rather than having
+        # one per each permission, but needs some checks in place.
+        user_permissions = Permissions.query.filter(
+            Permissions.user_id == service_uid
+        ).all()
 
         output_libraries = []
-        for library in user_libraries:
-            payload = {
-                'name': library.name,
-                'id': '{0}'.format(self.helper_uuid_to_slug(library.id)),
-                'description': library.description,
-            }
+        for permission in user_permissions:
+
+            # For this permission get the library
+            library = Library.query.filter(
+                Library.id == permission.library_id
+            ).one()
+
+            # For this library get all the people who have permissions
+            users = Permissions.query.filter(
+                Permissions.library_id == library.id
+            ).all()
+
+            num_documents = 0
+            if library.bibcode:
+                num_documents = len(library.bibcode)
+
+            if permission.owner:
+                main_permission = 'owner'
+            elif permission.admin:
+                main_permission = 'admin'
+            elif permission.write:
+                main_permission = 'write'
+            elif permission.read:
+                main_permission = 'read'
+            else:
+                main_permission = 'none'
+
+            if permission.owner or permission.admin and not library.public:
+                num_users = len(users)
+            elif library.public:
+                num_users = len(users)
+            else:
+                num_users = 0
+
+            payload = dict(
+                name=library.name,
+                id='{0}'.format(self.helper_uuid_to_slug(library.id)),
+                description=library.description,
+                num_documents=num_documents,
+                date_created=library.date_created.isoformat(),
+                date_last_modified=library.date_last_modified.isoformat(),
+                permission=main_permission,
+                public=library.public,
+                num_users=num_users
+            )
             output_libraries.append(payload)
 
         return output_libraries
@@ -426,17 +474,25 @@ class UserView(BaseView):
         Post body:
         ----------
         No post content accepted.
+
+
+        Permissions:
+        -----------
+        The following type of user can read a library:
+          - user scope (authenticated via the API)
         """
 
         # Check that they pass a user id
         try:
-            user = int(request.headers[USER_ID_KEYWORD])
+            user = self.helper_get_user_id()
         except KeyError:
-            current_app.logger.error('No username passed')
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
 
-        user_libraries = self.get_libraries(absolute_uid=user)
+        service_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user)
+
+        user_libraries = self.get_libraries(service_uid=service_uid)
         return {'libraries': user_libraries}, 200
 
     def post(self):
@@ -459,6 +515,12 @@ class UserView(BaseView):
         description:            <string>    description of the library
         public:                 <boolean>   is the library public to view
         bibcode (OPTIONAL):     <list>      list of bibcodes to add
+
+
+        Permissions:
+        -----------
+        The following type of user can create a library
+          - must be logged in, i.e., scope = user
         """
 
         # Check that they pass a user id
@@ -580,8 +642,16 @@ class LibraryView(BaseView):
         ----------
         No post content accepted.
 
-        XXX: Needs authentification still
+        Permissions:
+        -----------
+        The following type of user can read a library:
+          - owner
+          - admin
+          - write
+          - read
         """
+
+        # TODO: Needs authentification still
 
         try:
             user = int(request.headers[USER_ID_KEYWORD])
@@ -735,10 +805,11 @@ class DocumentView(BaseView):
         """
         Update the meta data of the library
         :param library_id: the unique ID of the library
+        :param library_data: dictionary containing the updateable values
 
-        :return:
+        :return: values updated
         """
-        updateable = ['name', 'description']
+        updateable = ['name', 'description', 'public']
         updated = {}
 
         library = Library.query.filter(Library.id == library_id).one()
@@ -851,6 +922,13 @@ class DocumentView(BaseView):
         bibcode:  <list>          List of bibcodes to be added
         action:   add, remove     add - adds a bibcode, remove - removes a
                                   bibcode
+
+        Permissions:
+        -----------
+        The following type of user can add documents:
+          - owner
+          - admin
+          - write
         """
         # TODO: Want a tidier try/except/return pattern
 
@@ -913,8 +991,15 @@ class DocumentView(BaseView):
         ---------
         name: name of the library
         description: description of the library
+        public: boolean
 
         Note: The above are optional, they can be empty if needed.
+
+        Permissions:
+        -----------
+        The following type of user can update a library:
+          - owner
+          - admin
         """
         # TODO: see above, there is DRY here!
 
@@ -947,7 +1032,7 @@ class DocumentView(BaseView):
 
         # Remove content that is empty
         for key in library_data.keys():
-            if not library_data[key]:
+            if library_data[key] == ''.strip(' '):
                 current_app.logger.warning('Removing key: {0} as its empty.'
                                            .format(key))
                 library_data.pop(key)
@@ -958,7 +1043,7 @@ class DocumentView(BaseView):
                                          library_name=library_data['name']):
 
                 return {'error': DUPLICATE_LIBRARY_NAME_ERROR['body']}, \
-                   DUPLICATE_LIBRARY_NAME_ERROR['number']
+                    DUPLICATE_LIBRARY_NAME_ERROR['number']
 
         response = self.update_library(library_id=library,
                                        library_data=library_data)
@@ -980,6 +1065,11 @@ class DocumentView(BaseView):
         Post-body:
         ----------
         No post content accepted.
+
+        Permissions:
+        -----------
+        The following type of user can update a library:
+          - owner
         """
 
         try:
@@ -1199,8 +1289,14 @@ class PermissionView(BaseView):
                      admin
         value:   boolean,          whether the user has this permission
 
+        Permissions:
+        -----------
+        The following type of user can update a permission:
+          - owner
+          - admin
+
         Notes:
-        Currently, the posts are per user, per permission. If it wanted that
+        Currently, the posts are per user, per permission. If its wanted that
         lists can be passed, then open an issue. In my mind, it made more
         sense that you can retrieve the correct errors in a request/response
         cycle, rather than complicating the response with a mixture of success
@@ -1213,14 +1309,15 @@ class PermissionView(BaseView):
         for a list input and the backend handling it, then open an issue on the
         repository.
 
-        XXX: Need a helper function to check the user gave the right input
-        XXX: Need a check that there is the correct content passed
-        XXX: Need to handle when there is no e-mail for the user as they do not
-             exist in the API
-        XXX: Need a get endpoint to find out what permissions people have as
-             well
-        XXX: input values should be type checked as well in a systematic way
         """
+
+        # TODO: Need a helper function to check the user gave the right input
+        # TODO: Need a check that there is the correct content passed
+        # TODO: Need to handle when there is no e-mail for the user as they do
+        # not exist in the API
+        # TODO: Need a get endpoint to find out what permissions people have as
+        #     well
+        # TODO: input values should be type checked as well in a systematic way
 
         # Get the user requesting this from the header
         try:
