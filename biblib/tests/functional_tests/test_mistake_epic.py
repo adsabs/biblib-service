@@ -16,7 +16,7 @@ sys.path.append(PROJECT_HOME)
 import unittest
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import TestCaseDatabase
+from tests.base import TestCaseDatabase, MockEmailService
 from views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION
 
 class TestMistakeEpic(TestCaseDatabase):
@@ -72,10 +72,12 @@ class TestMistakeEpic(TestCaseDatabase):
 
             # Check the change did not work
             url = url_for('userview', library=library_id)
-            response = self.client.get(
-                url,
-                headers=user_mary.headers
-            )
+            with MockEmailService(user_mary, end_type='uid'):
+                response = self.client.get(
+                    url,
+                    headers=user_mary.headers
+                )
+            self.assertEqual(response.status_code, 200)
             self.assertEqual(library_name,
                              '{0} 1'.format(DEFAULT_LIBRARY_NAME_PREFIX))
             self.assertEqual(library_description,
@@ -98,10 +100,11 @@ class TestMistakeEpic(TestCaseDatabase):
 
         # She checks the change worked
         url = url_for('userview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockEmailService(user_mary, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         self.assertEqual(name,
                          response.json['libraries'][0]['name'])
 
@@ -120,10 +123,11 @@ class TestMistakeEpic(TestCaseDatabase):
 
         # Mary checks that the change worked
         url = url_for('userview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockEmailService(user_mary, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         self.assertEqual(description,
                          response.json['libraries'][0]['description'])
 
@@ -145,10 +149,11 @@ class TestMistakeEpic(TestCaseDatabase):
 
         # Check the change worked
         url = url_for('userview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockEmailService(user_mary, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         self.assertEqual(name,
                          response.json['libraries'][0]['name'])
         self.assertEqual(description,

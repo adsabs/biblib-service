@@ -51,16 +51,18 @@ class TestReturnedDataEpic(TestCaseDatabase):
 
         # Dave looks at the library from the user view page and checks some
         # of the parameters displayed to him.
-        response = self.client.get(
-            url,
-            headers=user_dave.headers
-        )
+        with MockEmailService(user_dave, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=user_dave.headers
+            )
         self.assertTrue(len(response.json['libraries']) == 1)
         library = response.json['libraries'][0]
         self.assertTrue(library['num_documents'] == 0)
         self.assertTrue(library['num_users'] == 1)
         self.assertTrue(library['permission'] == 'owner')
         self.assertEqual(library['public'], False)
+        self.assertEqual(library['owner'], user_dave.email.split('@')[0])
         date_created = datetime.strptime(library['date_created'],
                                          '%Y-%m-%dT%H:%M:%S.%f')
         date_last_modified = datetime.strptime(library['date_last_modified'],
@@ -88,10 +90,11 @@ class TestReturnedDataEpic(TestCaseDatabase):
         # Dave looks in the library overview and sees that his library size
         # has increased
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=user_dave.headers
-        )
+        with MockEmailService(user_dave, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=user_dave.headers
+            )
         self.assertTrue(len(response.json['libraries'])==1)
         self.assertEqual(response.status_code, 200)
         library = response.json['libraries'][0]
@@ -109,10 +112,11 @@ class TestReturnedDataEpic(TestCaseDatabase):
 
         # Mary sees that the number of users of the library has increased by 1
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockEmailService(user_mary, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
 
         library = response.json['libraries'][0]
 
@@ -139,10 +143,11 @@ class TestReturnedDataEpic(TestCaseDatabase):
         # Dave sees that the number of bibcodes has increased and that the
         # last modified date has changed, but the created date has not
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=user_dave.headers
-        )
+        with MockEmailService(user_dave, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=user_dave.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.json['libraries']) == 1)
         self.assertTrue(
@@ -164,10 +169,11 @@ class TestReturnedDataEpic(TestCaseDatabase):
 
         # Dave sees that the lock sign from his library page has dissapeared
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=user_dave.headers
-        )
+        with MockEmailService(user_dave, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=user_dave.headers
+            )
         self.assertEqual(response.status_code, 200)
         libraries = response.json['libraries']
         self.assertTrue(len(libraries) == 1)
