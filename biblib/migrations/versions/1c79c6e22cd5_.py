@@ -1,14 +1,14 @@
-"""First migrate
+"""dates included in models
 
-Revision ID: 4fc01902d29f
-Revises: None
-Create Date: 2015-06-01 14:46:04.498021
+Revision ID: 1c79c6e22cd5
+Revises: 4fc01902d29f
+Create Date: 2015-06-08 10:02:01.216103
 
 """
 
 # revision identifiers, used by Alembic.
-revision = '4fc01902d29f'
-down_revision = None
+revision = '1c79c6e22cd5'
+down_revision = '4fc01902d29f'
 
 from alembic import op
 import sqlalchemy as sa
@@ -22,6 +22,8 @@ def upgrade():
     sa.Column('description', sa.String(length=50), nullable=True),
     sa.Column('public', sa.Boolean(), nullable=True),
     sa.Column('bibcode', postgresql.ARRAY(sa.String(length=50)), nullable=True),
+    sa.Column('date_created', sa.DateTime(), nullable=False),
+    sa.Column('date_last_modified', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user',

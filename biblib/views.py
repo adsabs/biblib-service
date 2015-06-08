@@ -284,10 +284,13 @@ class BaseView(Resource):
             _name = '{0} {1}'.format(_name,
                                      _extension)
 
-        library_data['name'] = _name
-        library_data['description'] = _description
+        library_out = {}
+        for key in library_data:
+            library_out[key] = library_data[key]
+        library_out['name'] = _name
+        library_out['description'] = _description
 
-        return library_data
+        return library_out
 
 
 class UserView(BaseView):
@@ -405,17 +408,13 @@ class UserView(BaseView):
         # Get all the permissions for a user
         # This can be improved into one database call rather than having
         # one per each permission, but needs some checks in place.
-        user_permissions = Permissions.query.filter(
-            Permissions.user_id == service_uid
-        ).all()
+        result = db.session.query(Permissions, Library)\
+            .join(Permissions.library)\
+            .filter(Permissions.user_id == service_uid)\
+            .all()
 
         output_libraries = []
-        for permission in user_permissions:
-
-            # For this permission get the library
-            library = Library.query.filter(
-                Library.id == permission.library_id
-            ).one()
+        for permission, library in result:
 
             # For this library get all the people who have permissions
             users = Permissions.query.filter(

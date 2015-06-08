@@ -129,7 +129,7 @@ class TestWebservices(TestCaseDatabase):
             self.assertEqual(stub_library.description,
                              library['description'])
 
-    def test_create_library_resource(self):
+    def test_create_library_resource_response_content(self):
         """
         Test the /libraries GET end point
         Ensuring the response contains the data we expect. For now, this is

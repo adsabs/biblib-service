@@ -81,7 +81,6 @@ class TestDeletionEpic(TestCaseDatabase):
             url,
             headers=stub_user.headers
         )
-        print response.json
         self.assertTrue(len(response.json['libraries']) == 2)
         library_id_1 = response.json['libraries'][0]['id']
         library_id_2 = response.json['libraries'][1]['id']
@@ -100,7 +99,6 @@ class TestDeletionEpic(TestCaseDatabase):
             url,
             headers=stub_user.headers
         )
-        print response.json
         self.assertTrue(len(response.json['libraries']) == 1)
 
         # Deletes the first library

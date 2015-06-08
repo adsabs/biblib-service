@@ -140,8 +140,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     absolute_uid = db.Column(db.Integer, unique=True)
     permissions = db.relationship('Permissions',
-                                  backref='user',
-                                  cascade='delete')
+                                  backref='user')
 
     def __repr__(self):
         return '<User {0}, {1}>'\

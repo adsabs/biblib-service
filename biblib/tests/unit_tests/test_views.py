@@ -264,37 +264,73 @@ class TestUserViews(TestCaseDatabase):
             )
 
         # Get the library created
-        libraries = self.user_view.get_libraries(self.stub_user.absolute_uid)
+        libraries = self.user_view.get_libraries(service_uid=user.id)
         self.assertEqual(len(libraries), number_of_libs)
 
-    def test_user_can_retrieve_library(self):
+    def test_user_retrieves_correct_library_content(self):
         """
         Test that the contents returned from the user_view contains all the
         information that we want
 
         :return: no return
         """
+        # Stub data
+        stub_library_other = LibraryShop()
 
         # To make a library we need an actual user
-        user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
+        user = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_other = User(absolute_uid=self.stub_user_2.absolute_uid)
+        db.session.add_all([user, user_other])
         db.session.commit()
 
+        # The random user has a library
+        self.user_view.create_library(
+            service_uid=user_other.id,
+            library_data=stub_library_other.user_view_post_data
+        )
+
         # Make a library that ensures we get one back
-        number_of_libs = 2
+        number_of_libs = 3
+        libs = []
         for i in range(number_of_libs):
             stub_library = LibraryShop()
-            self.user_view.create_library(
+            _lib = self.user_view.create_library(
                 service_uid=user.id,
                 library_data=stub_library.user_view_post_data
             )
+            libs.append(stub_library)
+
+        # Give random permission to the random user
+        self.permission_view.add_permission(library_id=_lib.id,
+                                            service_uid=user_other.id,
+                                            permission='read',
+                                            value=True)
 
         # Get the library created
-        libraries = self.user_view.get_libraries(self.stub_user.absolute_uid)
+        libraries = self.user_view.get_libraries(service_uid=user.id)
+        self.assertTrue(len(libraries) == number_of_libs)
         for library in libraries:
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
                                                    .format(key))
+        for i in range(number_of_libs):
+            for key in ['name', 'description', 'public']:
+                self.assertEqual(libraries[i][key],
+                                 libs[i].user_view_post_data[key])
+
+            self.assertEqual(libraries[i]['num_documents'], 0)
+
+            if libraries[i]['id'] == \
+                    self.user_view.helper_uuid_to_slug(_lib.id):
+                self.assertEqual(libraries[i]['num_users'], 2)
+            else:
+                self.assertEqual(libraries[i]['num_users'], 1)
+
+            self.assertEqual(libraries[i]['permission'], 'owner')
+
+        # Get the library created
+        libraries = self.user_view.get_libraries(service_uid=user_other.id)
+        self.assertTrue(len(libraries) == 2)
 
     def test_dates_of_updates_change_correctly(self):
         """
@@ -506,11 +542,6 @@ class TestUserViews(TestCaseDatabase):
                 service_uid=user.id,
                 library_data=stub_library.user_view_post_data
             )
-
-            # Library data is updated by the create library, but on the next
-            # loop we do not want this feature present
-            stub_library.user_view_post_data.pop('name')
-            stub_library.user_view_post_data.pop('description')
 
             lib = Library.query.filter(Library.id == library.id).one()
             self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1),
@@ -774,7 +805,6 @@ class TestDocumentViews(TestCaseDatabase):
                                                   library_id=library.id)
         self.assertTrue(access)
 
-    @unittest.skip('Not implemented')
     def test_when_delete_library_it_removes_permissions(self):
         """
         Tests that when a library is deleted, the associated permissions are
@@ -782,7 +812,63 @@ class TestDocumentViews(TestCaseDatabase):
 
         :return: no return
         """
-        self.fail()
+
+        # Make the user, library, and permissions
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        user_2 = User(absolute_uid=self.stub_user_2.absolute_uid)
+        db.session.add_all([user, user_2])
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=self.stub_library.bibcode)
+
+        # Give the user and library permissions
+        permission = Permissions(owner=True)
+        permission_2 = Permissions(owner=False, read=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        user_2.permissions.append(permission_2)
+
+        library.permissions.append(permission)
+        library.permissions.append(permission_2)
+
+        db.session.add_all([library, permission, user, user_2, permission_2])
+        db.session.commit()
+
+        search_library = Library.query.filter(
+            Library.id == library.id
+        ).one()
+        search_permission = Permissions.query.filter(
+            Permissions.id == permission.id
+        ).all()
+        self.assertIsInstance(search_library, Library)
+        self.assertTrue(len(search_permission), 2)
+
+        self.document_view.delete_library(library_id=library.id)
+
+        with self.assertRaises(NoResultFound):
+            Library.query.filter(
+                Library.id == library.id
+            ).one()
+
+        with self.assertRaises(NoResultFound):
+            Permissions.query.filter(
+                Permissions.id == permission.id
+            ).one()
+
+        with self.assertRaises(NoResultFound):
+            Permissions.query.filter(
+                Permissions.id == permission_2.id
+            ).one()
+
+        with self.assertRaises(NoResultFound):
+            Permissions.query.filter(
+                Permissions.library_id == library.id
+            ).one()
 
     @unittest.skip('Not tested as cannot delete users yet')
     def test_when_delete_user_it_removes_permissions_and_libraries(self):
