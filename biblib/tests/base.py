@@ -44,7 +44,11 @@ class MockADSWSAPI(object):
                 resp_dict[key] = self.response_kwargs[key]
 
             resp = json.dumps(resp_dict)
-            return 200, headers, resp
+
+            if self.response_kwargs['fail']:
+                return 404, headers, {}
+            else:
+                return 200, headers, resp
 
         HTTPretty.register_uri(
             HTTPretty.GET,
@@ -92,9 +96,14 @@ class MockEmailService(MockADSWSAPI):
             ep=ep
         )
 
+        fail = False
+        if stub_user.name == 'fail':
+            fail = True
+
         response_kwargs = {
             'uid': stub_user.absolute_uid,
             'email': stub_user.email,
+            'fail': fail,
         }
 
         super(MockEmailService, self).__init__(

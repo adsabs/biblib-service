@@ -15,7 +15,7 @@ from flask import url_for
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, DEFAULT_LIBRARY_NAME_PREFIX, \
     DEFAULT_LIBRARY_DESCRIPTION, WRONG_TYPE_LIST_ERROR, \
-    DUPLICATE_DOCUMENT_NAME_ERROR
+    DUPLICATE_DOCUMENT_NAME_ERROR, API_MISSING_USER_EMAIL, API_MISSING_USER_UID
 from tests.stubdata.stub_data import LibraryShop, UserShop
 from tests.base import MockEmailService, TestCaseDatabase
 
@@ -1150,6 +1150,79 @@ class TestWebservices(TestCaseDatabase):
                          DUPLICATE_LIBRARY_NAME_ERROR['number'])
         self.assertEqual(response.json['error'],
                          DUPLICATE_LIBRARY_NAME_ERROR['body'])
+
+    def test_return_error_when_user_email_not_exist_api(self):
+        """
+        When the user does not exist the API database, the web service should
+        pass on the message
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_random = UserShop(name='fail')
+        stub_library = LibraryShop(name='', description='')
+
+        # Fake library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+
+        # Allocate permissions
+        url = url_for('permissionview', library=library_id)
+        with MockEmailService(stub_random):
+            response = self.client.post(
+                url,
+                data=stub_random.permission_view_post_data_json('read',
+                                                              True),
+                headers=stub_user.headers
+            )
+
+        self.assertEqual(response.status_code,
+                         API_MISSING_USER_EMAIL['number'])
+        self.assertEqual(response.json['error'],
+                         API_MISSING_USER_EMAIL['body'])
+
+    def test_return_error_when_user_uid_not_exist_api(self):
+        """
+        When the user does not exist in the API database, the web service
+        should pass on the message.
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop(name='fail')
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Check the library exists in the database
+        url = url_for('userview')
+
+        with MockEmailService(stub_user, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+
+        self.assertTrue(
+            response.json['libraries'][0]['owner'] == 'Not available'
+        )
 
     def test_cannot_update_name_and_description_without_permissions(self):
         """
