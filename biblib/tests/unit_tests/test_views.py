@@ -55,6 +55,44 @@ class TestBaseViews(TestCaseDatabase):
 
         self.assertEqual(expected_slug, output_slug)
 
+    def test_api_email_does_exist(self):
+        """
+        Tests that the api email resolver returns 200 if e-mail exists
+
+        :return: no return
+        """
+
+        stub_random = UserShop()
+
+        # Allocate permissions
+        with MockEmailService(stub_random):
+            email = BaseView().helper_email_to_api_uid(
+                permission_data=stub_random.permission_view_post_data(
+                    'read',
+                    True
+                )
+            )
+        self.assertEqual(email, stub_random.absolute_uid)
+
+    def test_api_email_does_not_exist(self):
+        """
+        Tests that the api email resolver raises an exception if the e-mail
+        does not exist
+
+        :return: no return
+        """
+
+        stub_random = UserShop(name='fail')
+
+        with self.assertRaises(NoResultFound):
+            # Allocate permissions
+            with MockEmailService(stub_random):
+                BaseView().helper_email_to_api_uid(
+                    permission_data=stub_random.permission_view_post_data(
+                        'read',
+                        True
+                    )
+                )
 
 
 class TestUserViews(TestCaseDatabase):
@@ -270,6 +308,33 @@ class TestUserViews(TestCaseDatabase):
                 absolute_uid=user.absolute_uid
             )
         self.assertEqual(len(libraries), number_of_libs)
+
+    def test_user_can_retrieve_library_when_uid_does_not_exist(self):
+        """
+        Test that we can obtain the libraries that correspond to a given user
+
+        :return: no return
+        """
+
+        # To make a library we need an actual user
+        stub_user = UserShop(name='fail')
+        user = User(absolute_uid=stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Make a library that ensures we get one back
+        self.user_view.create_library(
+            service_uid=user.id,
+            library_data=self.stub_library.user_view_post_data
+        )
+
+        # Get the library created
+        with MockEmailService(stub_user, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user.id,
+                absolute_uid=user.absolute_uid
+            )
+        self.assertEqual(libraries[0]['owner'], 'Not available')
 
     def test_user_retrieves_correct_library_content(self):
         """

@@ -43,6 +43,15 @@ WRONG_TYPE_LIST_ERROR = dict(
     body='You passed the wrong type. Expected a list.',
     number=400
 )
+API_MISSING_USER_EMAIL = dict(
+    body='User does not exist in the API database',
+    number=404
+)
+API_MISSING_USER_UID = dict(
+    body='User does not exist in the API database',
+    number=404
+)
+
 USER_ID_KEYWORD = 'X-Adsws-Uid'
 DEFAULT_LIBRARY_NAME_PREFIX = 'Untitled Library'
 DEFAULT_LIBRARY_DESCRIPTION = 'My ADS library'
@@ -192,12 +201,16 @@ class BaseView(Resource):
                 service
             )
         except KeyError as error:
-            current_app.logger.error('No user email provided.')
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
+            current_app.logger.error('No user email provided. [{0}]'
+                                     .format(error))
+            raise
 
         if response.status_code == 200:
             return int(response.json()['uid'])
+        elif response.status_code == 404:
+            raise NoResultFound('API does not have this user')
+        else:
+            raise Exception('Unknown internal error')
 
     def helper_access_allowed(self, service_uid, library_id, access_type):
         """
@@ -452,7 +465,13 @@ class UserView(BaseView):
             response = client().get(
                 service
             )
-            owner = response.json()['email'].split('@')[0]
+
+            if response.status_code != 200:
+                current_app.logger.error('Could not find user in the API'
+                                         'database: {0}.'.format(service))
+                owner = 'Not available'
+            else:
+                owner = response.json()['email'].split('@')[0]
 
             payload = dict(
                 name=library.name,
@@ -565,6 +584,11 @@ class UserView(BaseView):
             current_app.logger.error('No username passed')
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
+        except NoResultFound as error:
+            current_app.logger.error('Username does not exist: {0}'
+                                     .format(request.headers[USER_ID_KEYWORD]))
+            return {'error': API_MISSING_USER_EMAIL['body']},\
+                   API_MISSING_USER_EMAIL['number']
 
         # Check if the user exists, if not, generate a user in the database
         current_app.logger.info('Checking if the user exists')
@@ -1400,10 +1424,14 @@ class PermissionView(BaseView):
                                         user_editing_uid)
                                 )
 
-        secondary_user = self.helper_email_to_api_uid(permission_data)
-        current_app.logger.info('User: {0} corresponds to: {1}'
-                                .format(permission_data['email'],
-                                        secondary_user))
+        try:
+            secondary_user = self.helper_email_to_api_uid(permission_data)
+            current_app.logger.info('User: {0} corresponds to: {1}'
+                                    .format(permission_data['email'],
+                                            secondary_user))
+        except NoResultFound:
+            return {'error': API_MISSING_USER_EMAIL['body']}, \
+                API_MISSING_USER_EMAIL['number']
 
         secondary_service_uid = \
             self.helper_absolute_uid_to_service_uid(
