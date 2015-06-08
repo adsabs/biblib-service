@@ -487,6 +487,22 @@ class UserView(BaseView):
         No post content accepted.
 
 
+        Return data:
+        -----------
+        name:                 <string>  Name of the library
+        id:                   <string>  ID of the library
+        description:          <string>  Description of the library
+        num_documents:        <int>     Number of documents in the library
+        date_created:         <string>  ISO date library was created
+        date_last_modified:   <string>  ISO date library was last modified
+        permission:           <sting>   Permission type, can be: 'read',
+                                        'write', 'admin', or 'owner'
+        public:               <boolean> True means it is public
+        num_users:            <int>     Number of users with permissions to
+                                        this library
+        owner:                <string>  Identifier of the user who created
+                                        the library
+
         Permissions:
         -----------
         The following type of user can read a library:
@@ -527,6 +543,13 @@ class UserView(BaseView):
         description:            <string>    description of the library
         public:                 <boolean>   is the library public to view
         bibcode (OPTIONAL):     <list>      list of bibcodes to add
+
+
+        Return data:
+        -----------
+        name:           <string>    Name of the library
+        id:             <string>    ID of the library
+        description:    <string>    Description of the library
 
 
         Permissions:
@@ -654,6 +677,13 @@ class LibraryView(BaseView):
         ----------
         No post content accepted.
 
+        Return data:
+        -----------
+        documents:    <list>   Currently, a list containing the bibcodes.
+
+        Note. in the future this will be modified to include all the content
+        of the library.
+
         Permissions:
         -----------
         The following type of user can read a library:
@@ -708,7 +738,8 @@ class LibraryView(BaseView):
                 NO_PERMISSION_ERROR['number']
 
         # If they do not have access, exit
-        if not self.read_access(service_uid=service_uid, library_id=library.id):
+        if not self.read_access(service_uid=service_uid,
+                                library_id=library.id):
             current_app.logger.error(
                 'User: {0} does not have access to library: {1}. DENIED'
                 .format(service_uid, library.id)
@@ -935,6 +966,10 @@ class DocumentView(BaseView):
         action:   add, remove     add - adds a bibcode, remove - removes a
                                   bibcode
 
+        Return data:
+        -----------
+        No data
+
         Permissions:
         -----------
         The following type of user can add documents:
@@ -1007,6 +1042,10 @@ class DocumentView(BaseView):
 
         Note: The above are optional, they can be empty if needed.
 
+        Return data:
+        -----------
+        returns the key/value that was requested to be updated
+
         Permissions:
         -----------
         The following type of user can update a library:
@@ -1077,6 +1116,10 @@ class DocumentView(BaseView):
         Post-body:
         ----------
         No post content accepted.
+
+        Return data:
+        -----------
+        No data
 
         Permissions:
         -----------
@@ -1300,6 +1343,10 @@ class PermissionView(BaseView):
         permission:  read, write,  specifies which permission to change
                      admin
         value:   boolean,          whether the user has this permission
+
+        Return data:
+        -----------
+        No data
 
         Permissions:
         -----------
