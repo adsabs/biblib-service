@@ -307,5 +307,5 @@ class LibraryShop(object):
 
         expected_types = ['name', 'description', 'id', 'num_documents',
                           'date_created', 'date_last_modified', 'permission',
-                          'public', 'num_users']
+                          'public', 'num_users', 'owner']
         return expected_types

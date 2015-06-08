@@ -16,7 +16,7 @@ sys.path.append(PROJECT_HOME)
 import unittest
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import TestCaseDatabase
+from tests.base import TestCaseDatabase, MockEmailService
 
 class TestJobEpic(TestCaseDatabase):
     """
@@ -56,10 +56,11 @@ class TestJobEpic(TestCaseDatabase):
         # Mary searches for an article and then adds it to her private library.
         # First she picks which library to add it to.
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockEmailService(user_mary, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         library_id = response.json['libraries'][0]['id']
 
         # Then she submits the document (in this case a bibcode) to add to the

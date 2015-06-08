@@ -16,7 +16,7 @@ sys.path.append(PROJECT_HOME)
 import unittest
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import TestCaseDatabase
+from tests.base import TestCaseDatabase, MockEmailService
 
 
 class TestDeletionEpic(TestCaseDatabase):
@@ -77,10 +77,11 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Deletes the first library
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
+        with MockEmailService(stub_user, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
         self.assertTrue(len(response.json['libraries']) == 2)
         library_id_1 = response.json['libraries'][0]['id']
         library_id_2 = response.json['libraries'][1]['id']
@@ -95,10 +96,11 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Looks to check there are is only one library
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
+        with MockEmailService(stub_user, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
         self.assertTrue(len(response.json['libraries']) == 1)
 
         # Deletes the first library
@@ -111,10 +113,11 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Looks to check there are is only one libraries
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
+        with MockEmailService(stub_user, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
         self.assertTrue(len(response.json['libraries']) == 0)
 
 if __name__ == '__main__':

@@ -117,11 +117,11 @@ class TestWebservices(TestCaseDatabase):
         # Check the library exists in the database
         url = url_for('userview')
 
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
-
+        with MockEmailService(stub_user, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
         self.assertEqual(response.status_code, 200)
 
         for library in response.json['libraries']:
@@ -153,10 +153,11 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library exists in the database
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
+        with MockEmailService(stub_user, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
         self.assertEqual(response.status_code, 200)
 
         for library in response.json['libraries']:
@@ -446,10 +447,11 @@ class TestWebservices(TestCaseDatabase):
 
         # Check its deleted
         url = url_for('userview')
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
+        with MockEmailService(stub_user, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
         self.assertTrue(len(response.json['libraries']) == 0,
                         response.json)
 

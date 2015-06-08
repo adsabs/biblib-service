@@ -397,7 +397,7 @@ class UserView(BaseView):
             db.session.rollback()
             raise
 
-    def get_libraries(self, service_uid):
+    def get_libraries(self, service_uid, absolute_uid):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
@@ -443,6 +443,17 @@ class UserView(BaseView):
             else:
                 num_users = 0
 
+            service = '{api}/{uid}'.format(
+                api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
+                uid=absolute_uid
+            )
+            current_app.logger.info('Obtaining email of user: {0} [API UID]'
+                                    .format(absolute_uid))
+            response = client().get(
+                service
+            )
+            owner = response.json()['email'].split('@')[0]
+
             payload = dict(
                 name=library.name,
                 id='{0}'.format(self.helper_uuid_to_slug(library.id)),
@@ -452,7 +463,8 @@ class UserView(BaseView):
                 date_last_modified=library.date_last_modified.isoformat(),
                 permission=main_permission,
                 public=library.public,
-                num_users=num_users
+                num_users=num_users,
+                owner=owner
             )
             output_libraries.append(payload)
 
@@ -491,7 +503,8 @@ class UserView(BaseView):
         service_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
-        user_libraries = self.get_libraries(service_uid=service_uid)
+        user_libraries = self.get_libraries(service_uid=service_uid,
+                                            absolute_uid=user)
         return {'libraries': user_libraries}, 200
 
     def post(self):
