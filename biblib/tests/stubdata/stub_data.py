@@ -267,7 +267,7 @@ class LibraryShop(object):
         post_data = self.document_view_post_data(action)
         return json.dumps(post_data)
 
-    def document_view_put_data(self, name='', description=''):
+    def document_view_put_data(self, name='', description='', public=''):
         """
         Expected data to be sent in a PUT request to the DocumentView
         end point, /documents/<>
@@ -278,11 +278,12 @@ class LibraryShop(object):
         """
         put_data = dict(
             name=name,
-            description=description
+            description=description,
+            public=public
         )
         return put_data
 
-    def document_view_put_data_json(self, name='', description=''):
+    def document_view_put_data_json(self, name='', description='', public=''):
         """
         Expected data to be sent in a PUT request to the DocumentView
         end point, /documents/<>
@@ -292,5 +293,19 @@ class LibraryShop(object):
         :return: PUT data in JSON format
         """
         put_data = self.document_view_put_data(name=name,
-                                               description=description)
+                                               description=description,
+                                               public=public)
         return json.dumps(put_data)
+
+    @staticmethod
+    def user_view_get_response():
+        """
+        Expected return data from the user view GET end point
+
+        :return: GET data in dictionary format
+        """
+
+        expected_types = ['name', 'description', 'id', 'num_documents',
+                          'date_created', 'date_last_modified', 'permission',
+                          'public', 'num_users']
+        return expected_types

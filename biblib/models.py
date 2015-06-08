@@ -6,6 +6,7 @@ to be passed to the app creator within the Flask blueprint.
 """
 
 import uuid
+from datetime import datetime
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.ext.mutable import Mutable
@@ -109,7 +110,6 @@ class MutableList(Mutable, list):
         for item in value:
             self.remove(item)
 
-
     @classmethod
     def coerce(cls, key, value):
         """
@@ -139,7 +139,8 @@ class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     absolute_uid = db.Column(db.Integer, unique=True)
-    permissions = db.relationship('Permissions', backref='user')
+    permissions = db.relationship('Permissions',
+                                  backref='user')
 
     def __repr__(self):
         return '<User {0}, {1}>'\
@@ -159,7 +160,20 @@ class Library(db.Model):
     description = db.Column(db.String(50))
     public = db.Column(db.Boolean)
     bibcode = db.Column(MutableList.as_mutable(ARRAY(db.String(50))))
-    permissions = db.relationship('Permissions', backref='library')
+    date_created = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+    date_last_modified = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+    permissions = db.relationship('Permissions',
+                                  backref='library',
+                                  cascade='delete')
 
     def __repr__(self):
         return '<Library, library_id: {0} name: {1}, ' \
@@ -195,5 +209,6 @@ class Permissions(db.Model):
 
     def __repr__(self):
         return '<Permissions, user_id: {0}, library_id: {1}, read: {2}, '\
-               'write: {3}'\
-            .format(self.user_id, self.library_id, self.read, self.write)
+               'write: {3}, admin: {4}, owner: {5}'\
+            .format(self.user_id, self.library_id, self.read, self.write,
+                    self.admin, self.owner)
