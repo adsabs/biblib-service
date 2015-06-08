@@ -10,7 +10,7 @@ from datetime import datetime
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.ext.mutable import Mutable
-from sqlalchemy.types import TypeDecorator, CHAR
+from sqlalchemy.types import TypeDecorator, CHAR, String
 
 
 db = SQLAlchemy()
@@ -57,6 +57,14 @@ class GUID(TypeDecorator):
         else:
             return uuid.UUID(value)
 
+    def compare_against_backend(self, dialect, conn_type):
+        # return True if the types are different,
+        # False if not, or None to allow the default implementation
+        # to compare these types
+        if dialect.name == 'postgresql':
+            return isinstance(conn_type, UUID)
+        else:
+            return isinstance(conn_type, String)
 
 class MutableList(Mutable, list):
     """

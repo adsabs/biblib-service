@@ -18,7 +18,7 @@ from views import UserView, LibraryView, DocumentView, PermissionView, BaseView
 from views import DEFAULT_LIBRARY_DESCRIPTION
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from utils import BackendIntegrityError, PermissionDeniedError
-from tests.base import TestCaseDatabase
+from tests.base import TestCaseDatabase, MockEmailService
 
 
 class TestBaseViews(TestCaseDatabase):
@@ -264,7 +264,11 @@ class TestUserViews(TestCaseDatabase):
             )
 
         # Get the library created
-        libraries = self.user_view.get_libraries(service_uid=user.id)
+        with MockEmailService(self.stub_user, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user.id,
+                absolute_uid=user.absolute_uid
+            )
         self.assertEqual(len(libraries), number_of_libs)
 
     def test_user_retrieves_correct_library_content(self):
@@ -276,10 +280,12 @@ class TestUserViews(TestCaseDatabase):
         """
         # Stub data
         stub_library_other = LibraryShop()
+        stub_user_1 = UserShop()
+        stub_user_2 = UserShop()
 
         # To make a library we need an actual user
-        user = User(absolute_uid=self.stub_user_1.absolute_uid)
-        user_other = User(absolute_uid=self.stub_user_2.absolute_uid)
+        user = User(absolute_uid=stub_user_1.absolute_uid)
+        user_other = User(absolute_uid=stub_user_2.absolute_uid)
         db.session.add_all([user, user_other])
         db.session.commit()
 
@@ -307,7 +313,12 @@ class TestUserViews(TestCaseDatabase):
                                             value=True)
 
         # Get the library created
-        libraries = self.user_view.get_libraries(service_uid=user.id)
+        with MockEmailService(stub_user_1, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user.id,
+                absolute_uid=user.absolute_uid
+            )
+
         self.assertTrue(len(libraries) == number_of_libs)
         for library in libraries:
             for key in self.stub_library.user_view_get_response():
@@ -329,7 +340,12 @@ class TestUserViews(TestCaseDatabase):
             self.assertEqual(libraries[i]['permission'], 'owner')
 
         # Get the library created
-        libraries = self.user_view.get_libraries(service_uid=user_other.id)
+        with MockEmailService(stub_user_2, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user_other.id,
+                absolute_uid=user_other.absolute_uid
+            )
+
         self.assertTrue(len(libraries) == 2)
 
     def test_dates_of_updates_change_correctly(self):
@@ -369,9 +385,12 @@ class TestUserViews(TestCaseDatabase):
         :return: no return
         """
 
+        # Stub data
+        stub_user_other = UserShop()
+
         # To make a library we need an actual user
-        user = User(absolute_uid=self.stub_user_1.absolute_uid)
-        user_other = User(absolute_uid=self.stub_user_2.absolute_uid)
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        user_other = User(absolute_uid=stub_user_other.absolute_uid)
         db.session.add_all([user, user_other])
         db.session.commit()
 
@@ -389,8 +408,12 @@ class TestUserViews(TestCaseDatabase):
                                                 permission=permission,
                                                 value=value)
             # Get the library created
-            libraries = \
-                self.user_view.get_libraries(service_uid=user_other.id)
+            with MockEmailService(stub_user_other, end_type='uid'):
+                libraries = self.user_view.get_libraries(
+                    service_uid=user_other.id,
+                    absolute_uid=user_other.absolute_uid
+                )
+
             self.assertEqual(permission, libraries[0]['permission'])
 
     def test_can_only_see_number_of_people_with_admin_or_owner(self):
@@ -416,10 +439,21 @@ class TestUserViews(TestCaseDatabase):
         db.session.commit()
 
         # Get the library created
-        for stub_user in [user_admin, user_owner]:
-            libraries = \
-                self.user_view.get_libraries(service_uid=stub_user.id)[0]
-            self.assertTrue(libraries['num_users'] > 0)
+        # For user admin
+        with MockEmailService(self.stub_user_2, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user_admin.id,
+                absolute_uid=user_admin.absolute_uid
+            )[0]
+        self.assertTrue(libraries['num_users'] > 0)
+
+        # For user owner
+        with MockEmailService(self.stub_user_1, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user_owner.id,
+                absolute_uid=user_owner.absolute_uid
+            )[0]
+        self.assertTrue(libraries['num_users'] > 0)
 
     def test_cannot_see_number_of_people_with_lower_than_admin(self):
         """
@@ -444,10 +478,21 @@ class TestUserViews(TestCaseDatabase):
         db.session.commit()
 
         # Get the library created
-        for stub_user in [user_read, user_write]:
-            libraries = \
-                self.user_view.get_libraries(service_uid=stub_user.id)[0]
-            self.assertTrue(libraries['num_users'] == 0)
+        # For user read
+        with MockEmailService(self.stub_user_1, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user_read.id,
+                absolute_uid=user_read.absolute_uid
+            )[0]
+        self.assertTrue(libraries['num_users'] == 0)
+
+        # For user write
+        with MockEmailService(self.stub_user_2, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user_write.id,
+                absolute_uid=user_write.absolute_uid
+            )[0]
+        self.assertTrue(libraries['num_users'] == 0)
 
     def test_user_cannot_add_two_libraries_with_the_same_name(self):
         """

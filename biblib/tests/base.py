@@ -80,17 +80,25 @@ class MockEmailService(MockADSWSAPI):
     Very thin wrapper around MockADSWSAPI given that I may want to use the
     default class later.
     """
-    def __init__(self, stub_user):
+    def __init__(self, stub_user, end_type='email'):
 
-        email_endpoint = '{api}/{email}'.format(
+        if end_type == 'email':
+            ep = stub_user.email
+        elif end_type == 'uid':
+            ep = stub_user.absolute_uid
+
+        endpoint = '{api}/{ep}'.format(
             api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
-            email=stub_user.email
+            ep=ep
         )
 
-        response_kwargs = {'uid': stub_user.absolute_uid}
+        response_kwargs = {
+            'uid': stub_user.absolute_uid,
+            'email': stub_user.email,
+        }
 
         super(MockEmailService, self).__init__(
-            api_endpoint=email_endpoint,
+            api_endpoint=endpoint,
             response_kwargs=response_kwargs
         )
 
