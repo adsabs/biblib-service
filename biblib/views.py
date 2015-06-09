@@ -4,6 +4,7 @@ Views
 
 import uuid
 import base64
+from StringIO import StringIO
 from flask import request, current_app
 from flask.ext.restful import Resource
 from flask.ext.discoverer import advertise
@@ -681,6 +682,32 @@ class LibraryView(BaseView):
                 return True
 
         return False
+
+    def solr_big_query(self, bibcodes):
+        """
+        A thin wrapper for the solr bigquery service.
+
+        :param bibcodes: list of bibcodes
+        :return: solr bigquery end point response
+        """
+
+        bibcodes.insert(0, 'bibcode')
+        bibcodes = '\n'.join(bibcodes)
+
+        params = {
+            'q': '*:*',
+            'fl': 'bibcode',
+            'fq': '{!bitset}',
+        }
+        current_app.logger.info('Obtaining UID of user: {0}, {1}'
+                                .format(params, bibcodes))
+        response = client().post(
+            url=current_app.config['BIBLIB_SOLR_BIG_QUERY_URL'],
+            params=params,
+            data=bibcodes
+        )
+
+        return response
 
     # Methods
     def get(self, library):

@@ -1,0 +1,66 @@
+"""
+Functional test
+
+Returned Solr Data Epic
+
+Storyboard is defined within the comments of the program itself
+"""
+
+import sys
+import os
+
+PROJECT_HOME = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '../../'))
+sys.path.append(PROJECT_HOME)
+
+import time
+import unittest
+from datetime import datetime, timedelta
+from flask import url_for
+from tests.stubdata.stub_data import UserShop, LibraryShop
+from tests.base import MockEmailService, TestCaseDatabase
+
+
+class TestReturnedSolrDataEpic(TestCaseDatabase):
+    """
+    Base class used to test the Returned Solr Data Epic
+    """
+
+    def test_returned_data_user_view_epic(self):
+        """
+        Carries out the epic 'Returned Solr Data', for the LibraryView GET
+        end point
+
+        This communicates with the external solr bigquery service. Any calls
+        to the service are mocked in this test.
+
+        :return: no return
+        """
+
+        # Stub data
+        user_dave = UserShop()
+        stub_library = LibraryShop(want_bibcode=True)
+
+        # Librarian Dave makes a library with a few bibcodes
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_dave.headers
+        )
+        self.assertEqual(response.status_code, 200, response)
+        library_id_dave = response.json['id']
+
+        # Dave clicks the library to open it and sees that the content is
+        # filled with the same information found on the normal search pages.
+        url = url_for('libraryview', library=library_id_dave)
+        response = self.client.get(
+            url,
+            headers=user_dave.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('documents', response.json)
+        self.assertIn('solr', response.json)
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)

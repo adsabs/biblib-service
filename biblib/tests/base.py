@@ -14,7 +14,7 @@ class MockADSWSAPI(object):
     """
     Mock of the ADSWS API
     """
-    def __init__(self, api_endpoint, response_kwargs):
+    def __init__(self, api_endpoint, response_kwargs={}):
         """
         Constructor
         :param api_endpoint: name of the API end point
@@ -54,7 +54,7 @@ class MockADSWSAPI(object):
             HTTPretty.GET,
             self.api_endpoint,
             body=request_callback,
-            content_type="application/json"
+            content_type='application/json'
         )
 
     def __enter__(self):
@@ -77,7 +77,71 @@ class MockADSWSAPI(object):
         HTTPretty.reset()
         HTTPretty.disable()
 
+class MockSolrBigqueryService(MockADSWSAPI):
 
+    def __init__(self, **kwargs):
+
+        """
+        Constructor
+        :param api_endpoint: name of the API end point
+        :param user_uid: unique API user ID to be returned
+        :return: no return
+        """
+
+        self.kwargs = kwargs
+        self.api_endpoint = current_app.config['BIBLIB_SOLR_BIG_QUERY_URL']
+
+        def request_callback(request, uri, headers):
+            """
+            :param request: HTTP request
+            :param uri: URI/URL to send the request
+            :param headers: header of the HTTP request
+            :return:
+            """
+
+            resp_dict = {
+                'api-response': 'success',
+                'token': request.headers.get(
+                    'Authorization', 'No Authorization header passed!'
+                )
+            }
+
+            for key in self.kwargs:
+                resp_dict[key] = self.kwargs[key]
+
+            resp = json.dumps(resp_dict)
+
+            if 'fail' in self.kwargs:
+                return 404, headers, {}
+            else:
+                return 200, headers, resp
+
+        HTTPretty.register_uri(
+            HTTPretty.POST,
+            self.api_endpoint,
+            body=request_callback,
+            content_type='application/json'
+        )
+
+    def __enter__(self):
+        """
+        Defines the behaviour for __enter__
+        :return: no return
+        """
+
+        HTTPretty.enable()
+
+    def __exit__(self, etype, value, traceback):
+        """
+        Defines the behaviour for __exit__
+        :param etype: exit type
+        :param value: exit value
+        :param traceback: the traceback for the exit
+        :return: no return
+        """
+
+        HTTPretty.reset()
+        HTTPretty.disable()
 class MockEmailService(MockADSWSAPI):
 
     """

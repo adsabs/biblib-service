@@ -199,6 +199,40 @@ class TestWebservices(TestCaseDatabase):
         for document in response.json['documents']:
             self.assertIn(document, stub_library.bibcode)
 
+    def test_get_solr_data_for_documents(self):
+        """
+        Test the /libraries/<> route to check that solr data is returned by
+        the service
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop(want_bibcode=True)
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+        for key in ['name', 'id', 'bibcode', 'description']:
+            self.assertIn(key, response.json)
+
+        # Check the library exists in the database
+        url = url_for('libraryview', library=library_id)
+        response = self.client.get(
+            url,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('documents', response.json)
+        self.assertIn('solr', response.json)
+
     def test_create_library_resource_and_add_bibcodes_of_wrong_type(self):
         """
         Test the /libraries route
