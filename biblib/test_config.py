@@ -97,5 +97,6 @@ except KeyError:
 
 # These lines are necessary only if the app needs to be a client of the
 # adsws-api
+BIBLIB_SOLR_BIG_QUERY_URL = 'https://api.adsabs.search/v1/bigquery'
 BIBLIB_USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
 BIBLIB_ADSWS_API_TOKEN = 'this is a secret api token!'

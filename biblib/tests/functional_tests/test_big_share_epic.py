@@ -17,7 +17,8 @@ import unittest
 from views import NO_PERMISSION_ERROR
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import MockEmailService, TestCaseDatabase
+from tests.base import MockEmailService, MockSolrBigqueryService,\
+    TestCaseDatabase
 
 
 class TestDeletionEpic(TestCaseDatabase):
@@ -83,20 +84,22 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Check they all got added
         url = url_for('libraryview', library=library_id_dave)
-        response = self.client.get(
-            url,
-            headers=user_dave.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_dave.headers
+            )
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
         # Dave has made his library private, and his library friend Mary says
         # she cannot access the library.
         # Dave selects her e-mail address
         url = url_for('libraryview', library=library_id_dave)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
 
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertNotIn('documents', response.json.keys())
@@ -116,10 +119,11 @@ class TestDeletionEpic(TestCaseDatabase):
         # Mary writes back to say she can see his libraries and is happy but
         # wants to add content herself
         url = url_for('libraryview', library=library_id_dave)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
@@ -148,10 +152,11 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Mary realises she can no longer read content
         url = url_for('libraryview', library=library_id_dave)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertNotIn('documents', response.json.keys())
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])

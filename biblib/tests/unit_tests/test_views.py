@@ -18,7 +18,8 @@ from views import UserView, LibraryView, DocumentView, PermissionView, BaseView
 from views import DEFAULT_LIBRARY_DESCRIPTION
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from utils import BackendIntegrityError, PermissionDeniedError
-from tests.base import TestCaseDatabase, MockEmailService
+from tests.base import TestCaseDatabase, MockEmailService, \
+    MockSolrBigqueryService
 
 
 class TestBaseViews(TestCaseDatabase):
@@ -716,6 +717,42 @@ class TestLibraryViews(TestCaseDatabase):
             library_id=library.id
         )
         self.assertEqual(library.bibcode, response_library.bibcode)
+
+    def test_that_solr_data_is_returned(self):
+        """
+        Test that can retrieve all the bibcodes from a library with the data
+        returned from the solr bigquery end point
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=self.stub_library.bibcode)
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        # Retrieve the bibcodes using the web services
+        with MockSolrBigqueryService():
+            response_library = self.library_view.solr_big_query(
+                bibcodes=library.bibcode
+            )
+        self.assertIn('responseHeader', response_library.json())
 
     def test_user_without_permission_cannot_access_private_library(self):
         """

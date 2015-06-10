@@ -13,14 +13,12 @@ PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
 
-import app
-import json
 import unittest
 from views import USER_ID_KEYWORD, NO_PERMISSION_ERROR
-from models import db
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import MockEmailService, TestCaseDatabase
+from tests.base import MockEmailService, MockSolrBigqueryService,\
+    TestCaseDatabase
 
 
 class TestDeletionEpic(TestCaseDatabase):
@@ -72,10 +70,11 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Checks they are all in the library
         url = url_for('libraryview', library=library_id_dave)
-        response = self.client.get(
-            url,
-            headers=user_dave.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_dave.headers
+            )
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
         # Dave is too busy to do any work on the library and so asks his
@@ -104,10 +103,11 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Mary looks at the library
         url = url_for('libraryview', library=library_id_dave)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.json['documents']) == number_of_documents)
 
@@ -130,10 +130,11 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # She checks that they got removed
         url = url_for('libraryview', library=library_id_dave)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         self.assertTrue(
             len(response.json['documents']) == number_of_documents/2
         )
@@ -154,10 +155,11 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # She checks that they got added
         url = url_for('libraryview', library=library_id_dave)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         self.assertTrue(
             len(response.json['documents']) == number_of_documents
         )

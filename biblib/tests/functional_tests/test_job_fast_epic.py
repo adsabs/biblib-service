@@ -17,7 +17,7 @@ import unittest
 from views import DUPLICATE_DOCUMENT_NAME_ERROR
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import TestCaseDatabase
+from tests.base import TestCaseDatabase, MockSolrBigqueryService
 
 class TestJobEpic(TestCaseDatabase):
     """
@@ -60,10 +60,11 @@ class TestJobEpic(TestCaseDatabase):
 
         # She then asks a friend to check the link, and it works fine.
         url = url_for('libraryview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=user_random.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_random.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json['documents']),
                          len(stub_library.bibcode))

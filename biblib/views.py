@@ -4,6 +4,7 @@ Views
 
 import uuid
 import base64
+import json
 from flask import request, current_app
 from flask.ext.restful import Resource
 from flask.ext.discoverer import advertise
@@ -682,6 +683,31 @@ class LibraryView(BaseView):
 
         return False
 
+    def solr_big_query(self, bibcodes):
+        """
+        A thin wrapper for the solr bigquery service.
+
+        :param bibcodes: list of bibcodes
+        :return: solr bigquery end point response
+        """
+
+        bibcodes = 'bibcode\n' + '\n'.join(bibcodes)
+
+        params = {
+            'q': '*:*',
+            'wt': 'json',
+            'fl': 'bibcode',
+        }
+        current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
+                                .format(params, bibcodes))
+        response = client().post(
+            url=current_app.config['BIBLIB_SOLR_BIG_QUERY_URL'],
+            params=params,
+            data=bibcodes
+        )
+
+        return response
+
     # Methods
     def get(self, library):
         """
@@ -733,19 +759,41 @@ class LibraryView(BaseView):
 
         # If the library is public, allow access
         try:
+            # Try to load the dictionary and obtain the solr content
             library = self.get_documents_from_library(library_id=library)
+            # pay attention to any functions that try to mutate the list
+            # this will alter expected returns later
             documents = library.bibcode
-            if library.public:
-                current_app.logger.info('Library: {0} is public'
-                                        .format(library.id))
-                return {'documents': documents}, 200
-            else:
-                current_app.logger.warning('Library: {0} is private'
-                                           .format(library.id))
 
-        except:
+            try:
+                solr = self.solr_big_query(bibcodes=documents).json()
+            except Exception as error:
+                current_app.logger.warning('Could not parse solr data: {0}'
+                                           .format(error))
+                solr = {'error': 'Could not parse solr data'}
+
+            # Make the response dictionary
+            response = dict(
+                documents=documents,
+                solr=solr
+            )
+
+        except Exception as error:
+            current_app.logger.warning(
+                'Library missing or solr endpoint failed: {0}'
+                .format(error)
+            )
             return {'error': MISSING_LIBRARY_ERROR['body']}, \
                 MISSING_LIBRARY_ERROR['number']
+
+        # Skip anymore logic if the library is public
+        if library.public:
+            current_app.logger.info('Library: {0} is public'
+                                    .format(library.id))
+            return response, 200
+        else:
+            current_app.logger.warning('Library: {0} is private'
+                                       .format(library.id))
 
         # If the user does not exist then there are no associated permissions
         # If the user exists, they will have permissions
@@ -776,7 +824,7 @@ class LibraryView(BaseView):
                                 'ALLOWED'
                                 .format(user, library.id))
 
-        return {'documents': documents}, 200
+        return response, 200
 
 
 class DocumentView(BaseView):

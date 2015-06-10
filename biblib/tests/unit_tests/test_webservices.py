@@ -17,7 +17,8 @@ from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     DEFAULT_LIBRARY_DESCRIPTION, WRONG_TYPE_LIST_ERROR, \
     DUPLICATE_DOCUMENT_NAME_ERROR, API_MISSING_USER_EMAIL, API_MISSING_USER_UID
 from tests.stubdata.stub_data import LibraryShop, UserShop
-from tests.base import MockEmailService, TestCaseDatabase
+from tests.base import MockEmailService, MockSolrBigqueryService,\
+    TestCaseDatabase
 
 class TestWebservices(TestCaseDatabase):
     """
@@ -81,7 +82,8 @@ class TestWebservices(TestCaseDatabase):
         """
 
         url = url_for('libraryview', library='test')
-        response = self.client.get(url)
+        with MockSolrBigqueryService():
+            response = self.client.get(url)
 
         self.assertEqual(response.status_code,
                          MISSING_USERNAME_ERROR['number'])
@@ -190,14 +192,50 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library exists in the database
         url = url_for('libraryview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
         self.assertEqual(response.status_code, 200)
 
         for document in response.json['documents']:
             self.assertIn(document, stub_library.bibcode)
+
+    def test_get_solr_data_for_documents(self):
+        """
+        Test the /libraries/<> route to check that solr data is returned by
+        the service
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop(want_bibcode=True)
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+        for key in ['name', 'id', 'bibcode', 'description']:
+            self.assertIn(key, response.json)
+
+        # Check the library exists in the database
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('documents', response.json)
+        self.assertIn('solr', response.json)
 
     def test_create_library_resource_and_add_bibcodes_of_wrong_type(self):
         """
@@ -264,10 +302,11 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library was created and documents exist
         url = url_for('libraryview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
 
         self.assertEqual(response.status_code, 200, response)
         self.assertEqual(stub_library.bibcode, response.json['documents'])
@@ -366,10 +405,11 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library is empty
         url = url_for('libraryview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
         self.assertTrue(len(response.json['documents']) == 0,
                         response.json['documents'])
 
@@ -457,10 +497,11 @@ class TestWebservices(TestCaseDatabase):
 
         # Check there is no document content
         url = url_for('libraryview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=stub_user.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
         self.assertEqual(response.status_code,
                          MISSING_LIBRARY_ERROR['number'],
                          'Received response error: {0}'
@@ -511,10 +552,11 @@ class TestWebservices(TestCaseDatabase):
         # does not have the permissions
         # Check the library is empty
         url = url_for('libraryview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=stub_user_2.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=stub_user_2.headers
+            )
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
@@ -569,10 +611,11 @@ class TestWebservices(TestCaseDatabase):
 
         # The user can now access the content of the library
         url = url_for('libraryview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=stub_user_2.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=stub_user_2.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertTrue('documents' in response.json)
 
@@ -842,10 +885,11 @@ class TestWebservices(TestCaseDatabase):
         # Request from user 2
         # Given it is public, should be able to view it
         url = url_for('libraryview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=stub_user_2.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=stub_user_2.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertIn('documents', response.json)
 
