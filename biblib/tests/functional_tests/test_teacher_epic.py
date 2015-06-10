@@ -18,7 +18,8 @@ from views import NO_PERMISSION_ERROR
 
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import MockEmailService, TestCaseDatabase
+from tests.base import MockEmailService, MockSolrBigqueryService, \
+    TestCaseDatabase
 
 
 class TestDeletionEpic(TestCaseDatabase):
@@ -57,10 +58,11 @@ class TestDeletionEpic(TestCaseDatabase):
         for user in [user_student_1, user_student_2]:
             # The students check they can see the content
             url = url_for('libraryview', library=library_id_teacher)
-            response = self.client.get(
-                url,
-                headers=user.headers
-            )
+            with MockSolrBigqueryService():
+                response = self.client.get(
+                    url,
+                    headers=user.headers
+                )
             self.assertEqual(
                 response.status_code,
                 NO_PERMISSION_ERROR['number']
@@ -84,10 +86,11 @@ class TestDeletionEpic(TestCaseDatabase):
 
             # The students check they can see the content
             url = url_for('libraryview', library=library_id_teacher)
-            response = self.client.get(
-                url,
-                headers=user.headers
-            )
+            with MockSolrBigqueryService():
+                response = self.client.get(
+                    url,
+                    headers=user.headers
+                )
             self.assertEqual(response.status_code, 200)
             self.assertIn('documents', response.json)
 
@@ -104,19 +107,21 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Student 2 cannot see the content
         url = url_for('libraryview', library=library_id_teacher)
-        response = self.client.get(
-            url,
-            headers=user_student_2.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_student_2.headers
+            )
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
         # Student 1 can see the content still
         url = url_for('libraryview', library=library_id_teacher)
-        response = self.client.get(
-            url,
-            headers=user_student_1.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_student_1.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertIn('documents', response.json)
 

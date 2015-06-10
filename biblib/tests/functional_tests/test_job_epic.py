@@ -16,7 +16,8 @@ sys.path.append(PROJECT_HOME)
 import unittest
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import TestCaseDatabase, MockEmailService
+from tests.base import TestCaseDatabase, MockEmailService, \
+    MockSolrBigqueryService
 
 class TestJobEpic(TestCaseDatabase):
     """
@@ -85,20 +86,22 @@ class TestJobEpic(TestCaseDatabase):
 
         # Checks that there are no documents in the library
         url = url_for('libraryview', library=library_id)
-        response = self.client.get(
-            url,
-            headers=user_mary.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
         self.assertTrue(len(response.json['documents']) == 0, response.json)
 
         # Happy with her library, she copies the link to the library and
         # e-mails it to the prospective employer.
 
         # She then asks a friend to check the link, and it works fine.
-        response = self.client.get(
-            url,
-            headers=user_random.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_random.headers
+            )
         self.assertEqual(response.status_code, 200)
 
 if __name__ == '__main__':

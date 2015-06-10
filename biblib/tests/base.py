@@ -99,22 +99,31 @@ class MockSolrBigqueryService(MockADSWSAPI):
             :return:
             """
 
-            resp_dict = {
-                'api-response': 'success',
-                'token': request.headers.get(
-                    'Authorization', 'No Authorization header passed!'
-                )
+            resp = {
+                'responseHeader': {
+                    'status': 0,
+                    'QTime': 152,
+                    'params': {
+                        'fl': 'bibcode',
+                        'q': '*:*',
+                        'wt': 'json'
+                    }
+                },
+                'response': {
+                    'numFound': 1,
+                    'start': 0,
+                    'docs': [
+                        {
+                            'bibcode': 'bibcode'
+                        }
+                    ]
+                }
             }
 
-            for key in self.kwargs:
-                resp_dict[key] = self.kwargs[key]
+            resp = json.dumps(resp)
 
-            resp = json.dumps(resp_dict)
-
-            if 'fail' in self.kwargs:
-                return 404, headers, {}
-            else:
-                return 200, headers, resp
+            status = self.kwargs.get('status', 200)
+            return status, headers, resp
 
         HTTPretty.register_uri(
             HTTPretty.POST,

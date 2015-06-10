@@ -752,7 +752,7 @@ class TestLibraryViews(TestCaseDatabase):
             response_library = self.library_view.solr_big_query(
                 bibcodes=library.bibcode
             )
-        self.assertIn('solr', response_library)
+        self.assertIn('responseHeader', response_library.json())
 
     def test_user_without_permission_cannot_access_private_library(self):
         """

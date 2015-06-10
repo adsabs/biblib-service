@@ -13,14 +13,11 @@ PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
 
-import app
-import json
 import unittest
 from views import USER_ID_KEYWORD, NO_PERMISSION_ERROR
-from models import db
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import TestCaseDatabase
+from tests.base import TestCaseDatabase, MockSolrBigqueryService
 
 class TestAnonymousEpic(TestCaseDatabase):
     """
@@ -66,19 +63,21 @@ class TestAnonymousEpic(TestCaseDatabase):
 
         # Anonymous user tries to access the private library. But cannot.
         url = url_for('libraryview', library=library_id_private)
-        response = self.client.get(
-            url,
-            headers=user_anonymous.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_anonymous.headers
+            )
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
         # Anonymous user tries to access the public library. And can.
         url = url_for('libraryview', library=library_id_public)
-        response = self.client.get(
-            url,
-            headers=user_anonymous.headers
-        )
+        with MockSolrBigqueryService():
+            response = self.client.get(
+                url,
+                headers=user_anonymous.headers
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('documents', response.json)
