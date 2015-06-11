@@ -38,7 +38,7 @@ class TestBaseViews(TestCaseDatabase):
         input_slug = '878JECDeTX6hoI77gq1Y2Q'
         expected_uuid = 'f3bf0910-20de-4d7e-a1a0-8efb82ad58d9'
 
-        output_uuid = BaseView().helper_slug_to_uuid(input_slug)
+        output_uuid = BaseView.helper_slug_to_uuid(input_slug)
 
         self.assertEqual(expected_uuid, output_uuid)
 
@@ -52,7 +52,7 @@ class TestBaseViews(TestCaseDatabase):
         input_uuid = uuid.UUID('f3bf0910-20de-4d7e-a1a0-8efb82ad58d9')
         expected_slug = '878JECDeTX6hoI77gq1Y2Q'
 
-        output_slug = BaseView().helper_uuid_to_slug(input_uuid)
+        output_slug = BaseView.helper_uuid_to_slug(input_uuid)
 
         self.assertEqual(expected_slug, output_slug)
 
@@ -67,7 +67,7 @@ class TestBaseViews(TestCaseDatabase):
 
         # Allocate permissions
         with MockEmailService(stub_random):
-            email = BaseView().helper_email_to_api_uid(
+            email = BaseView.helper_email_to_api_uid(
                 permission_data=stub_random.permission_view_post_data(
                     'read',
                     True
@@ -88,7 +88,7 @@ class TestBaseViews(TestCaseDatabase):
         with self.assertRaises(NoResultFound):
             # Allocate permissions
             with MockEmailService(stub_random):
-                BaseView().helper_email_to_api_uid(
+                BaseView.helper_email_to_api_uid(
                     permission_data=stub_random.permission_view_post_data(
                         'read',
                         True
@@ -113,8 +113,8 @@ class TestUserViews(TestCaseDatabase):
 
         super(TestCaseDatabase, self).__init__(*args, **kwargs)
         self.user_view = UserView()
-        self.document_view = DocumentView()
-        self.permission_view = PermissionView()
+        self.document_view = DocumentView
+        self.permission_view = PermissionView
 
         # Stub data
         self.stub_user = self.stub_user_1 = UserShop()
@@ -676,8 +676,8 @@ class TestLibraryViews(TestCaseDatabase):
         """
 
         super(TestCaseDatabase, self).__init__(*args, **kwargs)
-        self.user_view = UserView()
-        self.library_view = LibraryView()
+        self.user_view = UserView
+        self.library_view = LibraryView
 
         self.stub_user = self.stub_user_1 = UserShop()
         self.stub_user_2 = UserShop()
@@ -835,7 +835,7 @@ class TestDocumentViews(TestCaseDatabase):
         """
 
         super(TestCaseDatabase, self).__init__(*args, **kwargs)
-        self.document_view = DocumentView()
+        self.document_view = DocumentView
 
         # Stub data
         self.stub_user = self.stub_user_1 = UserShop()
@@ -1405,8 +1405,8 @@ class TestPermissionViews(TestCaseDatabase):
         """
 
         super(TestCaseDatabase, self).__init__(*args, **kwargs)
-        self.permission_view = PermissionView()
-        self.user_view = UserView()
+        self.permission_view = PermissionView
+        self.user_view = UserView
 
         # Stub data
         self.stub_user = self.stub_user_1 = UserShop()

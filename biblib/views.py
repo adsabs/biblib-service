@@ -4,7 +4,6 @@ Views
 
 import uuid
 import base64
-import json
 from flask import request, current_app
 from flask.ext.restful import Resource
 from flask.ext.discoverer import advertise
@@ -64,7 +63,8 @@ class BaseView(Resource):
     all of the views.
     """
 
-    def helper_uuid_to_slug(self, library_uuid):
+    @staticmethod
+    def helper_uuid_to_slug(library_uuid):
         """
         Convert a UUID to a slug
 
@@ -82,7 +82,8 @@ class BaseView(Resource):
                                 .format(library_uuid, library_slug))
         return library_slug
 
-    def helper_slug_to_uuid(self, library_slug):
+    @staticmethod
+    def helper_slug_to_uuid(library_slug):
         """
         Convert a slug to a UUID
 
@@ -109,7 +110,8 @@ class BaseView(Resource):
                                 .format(library_slug, library_uuid))
         return str(library_uuid)
 
-    def helper_get_user_id(self):
+    @staticmethod
+    def helper_get_user_id():
         """
         Helper function: get the user id from the header, otherwise raise
         a key error exception
@@ -125,7 +127,8 @@ class BaseView(Resource):
             current_app.logger.error('No username passed')
             raise
 
-    def helper_create_user(self, absolute_uid):
+    @staticmethod
+    def helper_create_user(absolute_uid):
         """
         Creates a user in the database with a UID from the API
         :param absolute_uid: UID from the API
@@ -149,7 +152,8 @@ class BaseView(Resource):
                                      .format(absolute_uid, error))
             raise
 
-    def helper_user_exists(self, absolute_uid):
+    @staticmethod
+    def helper_user_exists(absolute_uid):
         """
         Checks if a use exists before it would attempt to create one
 
@@ -168,7 +172,8 @@ class BaseView(Resource):
                                        '[API]'.format(absolute_uid))
             return False
 
-    def helper_absolute_uid_to_service_uid(self, absolute_uid):
+    @staticmethod
+    def helper_absolute_uid_to_service_uid(absolute_uid):
         """
         Convert the API UID to the BibLib service ID.
 
@@ -178,8 +183,8 @@ class BaseView(Resource):
         :return: BibLib service ID
         """
 
-        if not self.helper_user_exists(absolute_uid=absolute_uid):
-            user = self.helper_create_user(absolute_uid=absolute_uid)
+        if not BaseView.helper_user_exists(absolute_uid=absolute_uid):
+            user = BaseView.helper_create_user(absolute_uid=absolute_uid)
         else:
             user = User.query.filter(User.absolute_uid == absolute_uid).one()
         current_app.logger.info('User found: {0} -> {1}'
@@ -187,10 +192,15 @@ class BaseView(Resource):
 
         return user.id
 
-    def helper_email_to_api_uid(self, permission_data):
-        # XXX: The user does not exist (404 returned)
-        # XXX: The api timesout on response
-        # XXX: general errors from the API (400)
+    @staticmethod
+    def helper_email_to_api_uid(permission_data):
+        """
+        A proxy to the user/e-mail resolver service. Passes on any errors from
+        the API.
+
+        :param permission_data: dictionary that should contain an e-mail key
+        :return: int of the user id
+        """
         try:
             service = '{api}/{email}'.format(
                 api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
@@ -213,7 +223,8 @@ class BaseView(Resource):
         else:
             raise Exception('Unknown internal error')
 
-    def helper_access_allowed(self, service_uid, library_id, access_type):
+    @staticmethod
+    def helper_access_allowed(service_uid, library_id, access_type):
         """
         Determines if the given user has permissions to look at the content
         of a library.
@@ -240,13 +251,14 @@ class BaseView(Resource):
                                                      access_type, error))
             return False
 
-    def helper_library_exists(self, library_id):
+    @staticmethod
+    def helper_library_exists(library_id):
         """
         Helper function that checks if a library exists in the database or not
         by catching the raise and returning a True/False statement.
-        :param: library_id: the unique ID of the library
+        :param library_id: the unique ID of the library
 
-        :return: no return
+        :return: bool for exists (True) or does not (False)
         """
         try:
             Library.query.filter(Library.id == library_id).one()
@@ -254,7 +266,8 @@ class BaseView(Resource):
         except NoResultFound:
             return False
 
-    def helper_validate_library_data(self, service_uid, library_data):
+    @staticmethod
+    def helper_validate_library_data(service_uid, library_data):
         """
         Validates the library data to ensure the user does not give empty
         content for the title and description.
@@ -318,7 +331,8 @@ class UserView(BaseView):
     scopes = []
     rate_limit = [1000, 60*60*24]
 
-    def create_user(self, absolute_uid):
+    @staticmethod
+    def create_user(absolute_uid):
         """
         Creates a user in the database with a UID from the API
         :param absolute_uid: UID from the API
@@ -337,7 +351,8 @@ class UserView(BaseView):
                                      .format(absolute_uid, error))
             raise
 
-    def create_library(self, service_uid, library_data):
+    @staticmethod
+    def create_library(service_uid, library_data):
         """
         Creates a library for a user
 
@@ -347,7 +362,7 @@ class UserView(BaseView):
         :return: no return
         """
 
-        library_data = self.helper_validate_library_data(
+        library_data = BaseView.helper_validate_library_data(
             service_uid=service_uid,
             library_data=library_data
         )
@@ -411,10 +426,12 @@ class UserView(BaseView):
             db.session.rollback()
             raise
 
-    def get_libraries(self, service_uid, absolute_uid):
+    @classmethod
+    def get_libraries(cls, service_uid, absolute_uid):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
+        :param absolute_uid: unique UID of the user in the API
 
         :return: list of libraries in json format
         """
@@ -476,7 +493,7 @@ class UserView(BaseView):
 
             payload = dict(
                 name=library.name,
-                id='{0}'.format(self.helper_uuid_to_slug(library.id)),
+                id='{0}'.format(cls.helper_uuid_to_slug(library.id)),
                 description=library.description,
                 num_documents=num_documents,
                 date_created=library.date_created.isoformat(),
@@ -586,10 +603,11 @@ class UserView(BaseView):
             return {'error': MISSING_USERNAME_ERROR['body']}, \
                 MISSING_USERNAME_ERROR['number']
         except NoResultFound as error:
-            current_app.logger.error('Username does not exist: {0}'
-                                     .format(request.headers[USER_ID_KEYWORD]))
+            current_app.logger.error('Username does not exist: {0} [{1}]'
+                                     .format(request.headers[USER_ID_KEYWORD]),
+                                     error)
             return {'error': API_MISSING_USER_EMAIL['body']},\
-                   API_MISSING_USER_EMAIL['number']
+                API_MISSING_USER_EMAIL['number']
 
         # Check if the user exists, if not, generate a user in the database
         current_app.logger.info('Checking if the user exists')
@@ -653,7 +671,8 @@ class LibraryView(BaseView):
     scopes = []
     rate_limit = [1000, 60*60*24]
 
-    def get_documents_from_library(self, library_id):
+    @staticmethod
+    def get_documents_from_library(library_id):
         """
         Retrieve all the documents that are within the library specified
         :param library_id: the unique ID of the library
@@ -664,7 +683,8 @@ class LibraryView(BaseView):
         library = Library.query.filter(Library.id == library_id).one()
         return library
 
-    def read_access(self, service_uid, library_id):
+    @classmethod
+    def read_access(cls, service_uid, library_id):
         """
         Defines which type of user has read permissions to a library.
 
@@ -676,14 +696,15 @@ class LibraryView(BaseView):
 
         read_allowed = ['read', 'write', 'admin', 'owner']
         for access_type in read_allowed:
-            if self.helper_access_allowed(service_uid=service_uid,
-                                   library_id=library_id,
-                                   access_type=access_type):
+            if cls.helper_access_allowed(service_uid=service_uid,
+                                         library_id=library_id,
+                                         access_type=access_type):
                 return True
 
         return False
 
-    def solr_big_query(self, bibcodes):
+    @staticmethod
+    def solr_big_query(bibcodes):
         """
         A thin wrapper for the solr bigquery service.
 
@@ -730,6 +751,7 @@ class LibraryView(BaseView):
         Return data:
         -----------
         documents:    <list>   Currently, a list containing the bibcodes.
+        solr:         <dict>   The response from the solr bigquery end point
 
         Note. in the future this will be modified to include all the content
         of the library.
@@ -857,7 +879,8 @@ class DocumentView(BaseView):
                     .format(expect_data, document_data_expect[expect_data])
                 )
 
-    def add_document_to_library(self, library_id, document_data):
+    @classmethod
+    def add_document_to_library(cls, library_id, document_data):
         """
         Adds a document to a user's library
         :param library_id: the library id to update
@@ -867,7 +890,7 @@ class DocumentView(BaseView):
         """
 
         document_data_expect = {'bibcode': list}
-        self.type_check(document_data, document_data_expect)
+        cls.type_check(document_data, document_data_expect)
 
         current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
                                 .format(document_data, library_id))
@@ -896,7 +919,8 @@ class DocumentView(BaseView):
 
         current_app.logger.info(library.bibcode)
 
-    def remove_documents_from_library(self, library_id, document_data):
+    @classmethod
+    def remove_documents_from_library(cls, library_id, document_data):
         """
         Remove a given document from a specific library
 
@@ -906,7 +930,7 @@ class DocumentView(BaseView):
         :return: no return
         """
 
-        self.type_check(document_data, {'bibcode': list})
+        cls.type_check(document_data, {'bibcode': list})
 
         current_app.logger.info('Removing a document: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
@@ -916,7 +940,8 @@ class DocumentView(BaseView):
         current_app.logger.info('Removed document successfully: {0}'
                                 .format(library.bibcode))
 
-    def update_library(self, library_id, library_data):
+    @staticmethod
+    def update_library(library_id, library_data):
         """
         Update the meta data of the library
         :param library_id: the unique ID of the library
@@ -940,7 +965,8 @@ class DocumentView(BaseView):
 
         return updated
 
-    def delete_library(self, library_id):
+    @staticmethod
+    def delete_library(library_id):
         """
         Delete the entire library from the database
         :param library_id: the unique ID of the library
@@ -952,7 +978,8 @@ class DocumentView(BaseView):
         db.session.delete(library)
         db.session.commit()
 
-    def update_access(self, service_uid, library_id):
+    @classmethod
+    def update_access(cls, service_uid, library_id):
         """
         Defines which type of user has delete permissions to a library.
 
@@ -963,14 +990,15 @@ class DocumentView(BaseView):
         """
         update_allowed = ['admin', 'owner']
         for access_type in update_allowed:
-            if self.helper_access_allowed(service_uid=service_uid,
-                                          library_id=library_id,
-                                          access_type=access_type):
+            if cls.helper_access_allowed(service_uid=service_uid,
+                                         library_id=library_id,
+                                         access_type=access_type):
                 return True
 
         return False
 
-    def delete_access(self, service_uid, library_id):
+    @classmethod
+    def delete_access(cls, service_uid, library_id):
         """
         Defines which type of user has delete permissions to a library.
 
@@ -979,12 +1007,13 @@ class DocumentView(BaseView):
 
         :return: boolean, access (True), no access (False)
         """
-        delete_allowed = self.helper_access_allowed(service_uid=service_uid,
-                                                    library_id=library_id,
-                                                    access_type='owner')
+        delete_allowed = cls.helper_access_allowed(service_uid=service_uid,
+                                                   library_id=library_id,
+                                                   access_type='owner')
         return delete_allowed
 
-    def write_access(self, service_uid, library_id):
+    @classmethod
+    def write_access(cls, service_uid, library_id):
         """
         Defines which type of user has write permissions to a library.
 
@@ -996,14 +1025,24 @@ class DocumentView(BaseView):
 
         read_allowed = ['write', 'admin', 'owner']
         for access_type in read_allowed:
-            if self.helper_access_allowed(service_uid=service_uid,
-                                          library_id=library_id,
-                                          access_type=access_type):
+            if cls.helper_access_allowed(service_uid=service_uid,
+                                         library_id=library_id,
+                                         access_type=access_type):
                 return True
 
         return False
 
-    def library_name_exists(self, service_uid, library_name):
+    @staticmethod
+    def library_name_exists(service_uid, library_name):
+        """
+        Checks to see if a library name already exists in the user's created
+        libraries
+
+        :param service_uid: the user ID within this microservice
+        :param library_name: name to check if it exists
+
+        :return: True (exists), False (does not exist)
+        """
 
         library_names = \
             [i.library.name for i in
@@ -1262,8 +1301,8 @@ class PermissionView(BaseView):
     scopes = []
     rate_limit = [1000, 60*60*24]
 
-    def has_permission(self,
-                       service_uid_editor,
+    @staticmethod
+    def has_permission(service_uid_editor,
                        service_uid_modify,
                        library_id):
         """
@@ -1331,7 +1370,8 @@ class PermissionView(BaseView):
         else:
             return False
 
-    def add_permission(self, service_uid, library_id, permission, value):
+    @staticmethod
+    def add_permission(service_uid, library_id, permission, value):
         """
         Adds a permission for a user to a specific library
         :param service_uid: the user ID within this microservice

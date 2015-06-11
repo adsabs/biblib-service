@@ -17,7 +17,8 @@ db = SQLAlchemy()
 
 
 class GUID(TypeDecorator):
-    """Platform-independent GUID type.
+    """
+    Platform-independent GUID type.
 
     Uses Postgresql's UUID type, otherwise uses
     CHAR(32), storing as stringified hex values.
@@ -31,15 +32,31 @@ class GUID(TypeDecorator):
     as Flask cannot serialise UUIDs correctly.
 
     """
+    # Refers to the class of type being decorated
     impl = CHAR
 
-    def load_dialect_impl(self, dialect):
+    @staticmethod
+    def load_dialect_impl(dialect):
+        """
+        Load the native type for the database type being used
+        :param dialect: database type being used
+
+        :return: native type of the database
+        """
         if dialect.name == 'postgresql':
             return dialect.type_descriptor(UUID())
         else:
             return dialect.type_descriptor(CHAR(32))
 
-    def process_bind_param(self, value, dialect):
+    @staticmethod
+    def process_bind_param(value, dialect):
+        """
+        Format the value for insertion in to the database
+        :param value: value of interest
+        :param dialect: database type
+
+        :return: value cast to type expected
+        """
         if value is None:
             return value
         elif dialect.name == 'postgresql':
@@ -51,16 +68,31 @@ class GUID(TypeDecorator):
                 # hexstring
                 return '{0:.32x}'.format(value)
 
-    def process_result_value(self, value, dialect):
+    @staticmethod
+    def process_result_value(value, dialect):
+        """
+        Format the value when it is removed from the database
+        :param value: value of interest
+        :param dialect: database type
+
+        :return: value cast to the type expected
+        """
         if value is None:
             return value
         else:
             return uuid.UUID(value)
 
-    def compare_against_backend(self, dialect, conn_type):
-        # return True if the types are different,
-        # False if not, or None to allow the default implementation
-        # to compare these types
+    @staticmethod
+    def compare_against_backend(dialect, conn_type):
+        """
+        Return True if the types are different,
+        False if not, or None to allow the default implementation
+        to compare these types
+        :param dialect: database type
+        :param conn_type: type of the field
+
+        :return: boolean
+        """
         if dialect.name == 'postgresql':
             return isinstance(conn_type, UUID)
         else:
@@ -71,9 +103,13 @@ class MutableList(Mutable, list):
     The PostgreSQL type ARRAY cannot be mutated once it is set. This hack is
     written by the author of SQLAlchemy as a solution. For further reading,
     see:
+
     https://groups.google.com/forum/#!topic/sqlalchemy/ZiDlGJkVTM0
+
     and
-    http://kirang.in/2014/08/09/creating-a-mutable-array-data-type-in-sqlalchemy
+
+    http://kirang.in/2014/08/09/
+    creating-a-mutable-array-data-type-in-sqlalchemy
     """
     def append(self, value):
         """
