@@ -14,12 +14,6 @@ LOG_PATH = '{home}/logs/'.format(home=LOG_PATH)
 if not os.path.isdir(LOG_PATH):
     os.mkdir(LOG_PATH)
 
-SAMPLE_APPLICATION_PARAM = {
-    'message': 'config params should be prefixed with the application name',
-    'reason': 'this will allow easier integration if this app is incorporated'
-              ' as a python module',
-}
-
 # Database for microservice
 try:
     # For working on a VM as user vagrant

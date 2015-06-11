@@ -78,6 +78,10 @@ class MockADSWSAPI(object):
         HTTPretty.disable()
 
 class MockSolrBigqueryService(MockADSWSAPI):
+    """
+    Thin wrapper around the MockADSWSAPI class specficically for the Solr
+    Bigquery end point.
+    """
 
     def __init__(self, **kwargs):
 
@@ -151,6 +155,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
 
         HTTPretty.reset()
         HTTPretty.disable()
+
 class MockEmailService(MockADSWSAPI):
 
     """
