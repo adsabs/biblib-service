@@ -266,6 +266,52 @@ class TestWebservices(TestCaseDatabase):
             self.assertEqual(response.json['error'],
                              WRONG_TYPE_LIST_ERROR['body'])
 
+    def test_document_view_post_types(self):
+        """
+        Tests that types raise errors if they are wrong
+
+        :return: no return
+        """
+       # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+
+        # Pass an action that is not a string
+        post_data = stub_library.document_view_post_data('add')
+        post_data['action'] = 1
+
+        # Action type check
+        url = url_for('documentview', library=library_id)
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+        # bibcode list check
+        post_data['action'] = 'add'
+        post_data['bibcode'] = 2
+        url = url_for('documentview', library=library_id)
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
     def test_add_document_to_library(self):
         """
         Test the /documents/<> end point with POST to add a document

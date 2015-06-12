@@ -35,8 +35,8 @@ NO_PERMISSION_ERROR = dict(
          'exist.',
     number=403
 )
-WRONG_TYPE_LIST_ERROR = dict(
-    body='You passed the wrong type. Expected a list.',
+WRONG_TYPE_ERROR = dict(
+    body='You passed the wrong type. See the API documentation:',
     number=400
 )
 API_MISSING_USER_EMAIL = dict(
@@ -52,6 +52,14 @@ USER_ID_KEYWORD = 'X-Adsws-Uid'
 DEFAULT_LIBRARY_NAME_PREFIX = 'Untitled Library'
 DEFAULT_LIBRARY_DESCRIPTION = 'My ADS library'
 
+def err(error_dictionary):
+    """
+    Formats the error response as wanted by the Flask app
+    :param error_dictionary: name of the error dictionary
+
+    :return: tuple of error message and error number
+    """
+    return {'error': error_dictionary['body']}, error_dictionary['number']
 
 class BaseView(Resource):
     """
@@ -546,8 +554,7 @@ class UserView(BaseView):
         try:
             user = self.helper_get_user_id()
         except KeyError:
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
+            return err(MISSING_USERNAME_ERROR)
 
         service_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
@@ -593,17 +600,9 @@ class UserView(BaseView):
 
         # Check that they pass a user id
         try:
-            user = int(request.headers[USER_ID_KEYWORD])
+            user = self.helper_get_user_id()
         except KeyError:
-            current_app.logger.error('No username passed')
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
-        except NoResultFound as error:
-            current_app.logger.error('Username does not exist: {0} [{1}]'
-                                     .format(request.headers[USER_ID_KEYWORD]),
-                                     error)
-            return {'error': API_MISSING_USER_EMAIL['body']},\
-                API_MISSING_USER_EMAIL['number']
+            return err(MISSING_USERNAME_ERROR)
 
         # Check if the user exists, if not, generate a user in the database
         current_app.logger.info('Checking if the user exists')
@@ -629,12 +628,10 @@ class UserView(BaseView):
                 self.create_library(service_uid=service_uid, library_data=data)
         except BackendIntegrityError as error:
             current_app.logger.error(error)
-            return {'error': DUPLICATE_LIBRARY_NAME_ERROR['body']}, \
-                DUPLICATE_LIBRARY_NAME_ERROR['number']
+            return err(DUPLICATE_LIBRARY_NAME_ERROR)
         except TypeError as error:
             current_app.logger.error(error)
-            return {'error': WRONG_TYPE_LIST_ERROR['body']}, \
-                WRONG_TYPE_LIST_ERROR['number']
+            return err(WRONG_TYPE_ERROR)
 
         return_data = {
             'name': library.name,
@@ -773,8 +770,7 @@ class LibraryView(BaseView):
             user = int(request.headers[USER_ID_KEYWORD])
         except KeyError:
             current_app.logger.error('No username passed')
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
+            return err(MISSING_USERNAME_ERROR)
 
         library = self.helper_slug_to_uuid(library)
 
@@ -807,8 +803,7 @@ class LibraryView(BaseView):
                 'Library missing or solr endpoint failed: {0}'
                 .format(error)
             )
-            return {'error': MISSING_LIBRARY_ERROR['body']}, \
-                MISSING_LIBRARY_ERROR['number']
+            return err(MISSING_LIBRARY_ERROR)
 
         # Skip anymore logic if the library is public
         if library.public:
@@ -830,8 +825,7 @@ class LibraryView(BaseView):
                                      'privileges to view the library: {1}'
                                      .format(user, library.id))
 
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
+            return err(NO_PERMISSION_ERROR)
 
         # If they do not have access, exit
         if not self.read_access(service_uid=service_uid,
@@ -840,8 +834,7 @@ class LibraryView(BaseView):
                 'User: {0} does not have access to library: {1}. DENIED'
                 .format(service_uid, library.id)
             )
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
+            return err(NO_PERMISSION_ERROR)
 
         # If they have access, let them obtain the requested content
         current_app.logger.info('User: {0} has access to library: {1}. '
@@ -873,12 +866,20 @@ class DocumentView(BaseView):
         :param document_data_expect: expected dictionary types
         :return:
         """
+        current_app.logger.info('Checking POST data types')
         for expect_data in document_data_expect:
+            if expect_data not in document_data.keys():
+                current_app.logger.warning('POST data does not contain: {0}'
+                                           .format(expect_data))
+                continue
+
             if not isinstance(document_data[expect_data],
                               document_data_expect[expect_data]):
                 raise TypeError(
-                    '{0} should be type: {1}'
-                    .format(expect_data, document_data_expect[expect_data])
+                    '{0} should be type {1} but is {2}'
+                    .format(expect_data,
+                            document_data_expect[expect_data],
+                            type(document_data[expect_data]))
                 )
 
     @classmethod
@@ -890,10 +891,6 @@ class DocumentView(BaseView):
 
         :return: number_added: number of documents successfully added
         """
-
-        document_data_expect = {'bibcode': list}
-        cls.type_check(document_data, document_data_expect)
-
         current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
                                 .format(document_data, library_id))
         # Find the specified library
@@ -921,9 +918,6 @@ class DocumentView(BaseView):
 
         :return: number_removed: number of documents successfully removed
         """
-
-        cls.type_check(document_data, {'bibcode': list})
-
         current_app.logger.info('Removing a document: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
         library = Library.query.filter(Library.id == library_id).one()
@@ -1093,8 +1087,7 @@ class DocumentView(BaseView):
         try:
             user_editing = self.helper_get_user_id()
         except KeyError:
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
+            return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
         library = self.helper_slug_to_uuid(library)
@@ -1105,10 +1098,17 @@ class DocumentView(BaseView):
         # Check the permissions of the user
         if not self.write_access(service_uid=user_editing_uid,
                                  library_id=library):
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
+            return err(NO_PERMISSION_ERROR)
 
         data = get_post_data(request)
+        data_allowed_types = dict(bibcode=list,
+                                  action=unicode)
+
+        try:
+            self.type_check(data, data_allowed_types)
+        except TypeError:
+            return err(WRONG_TYPE_ERROR)
+
         if data['action'] == 'add':
             current_app.logger.info('User requested to add a document')
 
@@ -1125,8 +1125,7 @@ class DocumentView(BaseView):
             except BackendIntegrityError as error:
                 current_app.logger.error('Duplicate bibcode being added: {0}'
                                          .format(error))
-                return {'error': DUPLICATE_DOCUMENT_NAME_ERROR['body']}, \
-                    DUPLICATE_DOCUMENT_NAME_ERROR['number']
+                return err(DUPLICATE_DOCUMENT_NAME_ERROR)
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')
@@ -1182,27 +1181,23 @@ class DocumentView(BaseView):
         try:
             user = self.helper_get_user_id()
         except KeyError:
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
+            return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
         library = self.helper_slug_to_uuid(library)
 
         if not self.helper_user_exists(user):
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
+            return err(NO_PERMISSION_ERROR)
 
         if not self.helper_library_exists(library):
-            return {'error': MISSING_LIBRARY_ERROR['body']}, \
-                MISSING_LIBRARY_ERROR['number']
+            return err(MISSING_LIBRARY_ERROR)
 
         user_updating_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
         if not self.update_access(service_uid=user_updating_uid,
                                   library_id=library):
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
+            return err(NO_PERMISSION_ERROR)
 
         library_data = get_post_data(request)
 
@@ -1218,8 +1213,7 @@ class DocumentView(BaseView):
                 self.library_name_exists(service_uid=user_updating_uid,
                                          library_name=library_data['name']):
 
-                return {'error': DUPLICATE_LIBRARY_NAME_ERROR['body']}, \
-                    DUPLICATE_LIBRARY_NAME_ERROR['number']
+                return err(DUPLICATE_DOCUMENT_NAME_ERROR)
 
         response = self.update_library(library_id=library,
                                        library_data=library_data)
@@ -1255,19 +1249,16 @@ class DocumentView(BaseView):
         try:
             user = self.helper_get_user_id()
         except KeyError:
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
+            return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
         library = self.helper_slug_to_uuid(library)
 
         if not self.helper_user_exists(user):
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
+            return err(NO_PERMISSION_ERROR)
 
         if not self.helper_library_exists(library):
-            return {'error': MISSING_LIBRARY_ERROR['body']}, \
-                MISSING_LIBRARY_ERROR['number']
+            return err(MISSING_LIBRARY_ERROR)
 
         user_deleting_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
@@ -1292,13 +1283,11 @@ class DocumentView(BaseView):
 
         except NoResultFound as error:
             current_app.logger.info('Failed to delete: {0}'.format(error))
-            return {'error': MISSING_LIBRARY_ERROR['body']}, \
-                MISSING_LIBRARY_ERROR['number']
+            return err(MISSING_LIBRARY_ERROR)
 
         except PermissionDeniedError as error:
             current_app.logger.info('Failed to delete: {0}'.format(error))
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
+            return err(NO_PERMISSION_ERROR)
 
         return {}, 200
 
@@ -1508,8 +1497,7 @@ class PermissionView(BaseView):
         try:
             user_editing = self.helper_get_user_id()
         except KeyError:
-            return {'error': MISSING_USERNAME_ERROR['body']}, \
-                MISSING_USERNAME_ERROR['number']
+            return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
         library = self.helper_slug_to_uuid(library)
@@ -1532,8 +1520,7 @@ class PermissionView(BaseView):
                                     .format(permission_data['email'],
                                             secondary_user))
         except NoResultFound:
-            return {'error': API_MISSING_USER_EMAIL['body']}, \
-                API_MISSING_USER_EMAIL['number']
+            return err(API_MISSING_USER_EMAIL)
 
         secondary_service_uid = \
             self.helper_absolute_uid_to_service_uid(
@@ -1551,8 +1538,7 @@ class PermissionView(BaseView):
                 'User: {0} does not have permissions to edit: {1}'
                 .format(user_editing_uid, library)
             )
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                NO_PERMISSION_ERROR['number']
+            return err(NO_PERMISSION_ERROR)
 
         try:
             self.add_permission(service_uid=secondary_service_uid,
@@ -1564,8 +1550,7 @@ class PermissionView(BaseView):
                                      'modify the value of: {1}'
                                      .format(user_editing_uid,
                                              permission_data['permission']))
-            return {'error': NO_PERMISSION_ERROR['body']}, \
-                    NO_PERMISSION_ERROR['number']
+            return err(NO_PERMISSION_ERROR)
 
         current_app.logger.info('...SUCCESS.')
         return {}, 200
