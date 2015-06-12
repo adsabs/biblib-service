@@ -14,7 +14,6 @@ PROJECT_HOME = os.path.abspath(
 sys.path.append(PROJECT_HOME)
 
 import unittest
-from views import DUPLICATE_DOCUMENT_NAME_ERROR
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from tests.base import TestCaseDatabase, MockSolrBigqueryService
@@ -77,10 +76,8 @@ class TestJobEpic(TestCaseDatabase):
             data=stub_library.document_view_post_data_json('add'),
             headers=user_mary.headers
         )
-        self.assertEqual(response.status_code,
-                         DUPLICATE_DOCUMENT_NAME_ERROR['number'])
-        self.assertEqual(response.json['error'],
-                         DUPLICATE_DOCUMENT_NAME_ERROR['body'])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['number_added'], 0)
 
 
 if __name__ == '__main__':

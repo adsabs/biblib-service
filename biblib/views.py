@@ -18,10 +18,6 @@ DUPLICATE_LIBRARY_NAME_ERROR = dict(
     body='Library name given already exists and must be unique.',
     number=409
 )
-DUPLICATE_DOCUMENT_NAME_ERROR = dict(
-    body='Document given already in the library.',
-    number=409
-)
 MISSING_LIBRARY_ERROR = dict(
     body='Library specified does not exist.',
     number=410
@@ -913,16 +909,15 @@ class DocumentView(BaseView):
             library.bibcode = _bibcodes
         else:
             start_length = len(library.bibcode)
-            matches = [_bibcode for _bibcode in _bibcodes
-                       if _bibcode in library.bibcode]
-
-            if matches:
-                raise BackendIntegrityError('Duplicate bibcodes passed')
+            _bibcodes = [_bibcode for _bibcode in _bibcodes
+                         if _bibcode not in library.bibcode]
 
             current_app.logger.debug('Non-Zero length array: {0}'
                                      .format(library.bibcode))
-            library.bibcode.extend(document_data['bibcode'])
+            if _bibcodes:
+                library.bibcode.extend(_bibcodes)
 
+        db.session.add(library)
         db.session.commit()
 
         current_app.logger.info(library.bibcode)
@@ -949,6 +944,8 @@ class DocumentView(BaseView):
         library = Library.query.filter(Library.id == library_id).one()
         start_length = len(library.bibcode)
         library.bibcode.shorten(document_data['bibcode'])
+
+        db.session.add(library)
         db.session.commit()
         current_app.logger.info('Removed document successfully: {0}'
                                 .format(library.bibcode))

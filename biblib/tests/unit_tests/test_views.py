@@ -1120,11 +1120,12 @@ class TestDocumentViews(TestCaseDatabase):
         )
         self.assertEqual(number_added, len(self.stub_library.bibcode))
 
-        with self.assertRaises(BackendIntegrityError):
-            self.document_view.add_document_to_library(
-                library_id=library_id,
-                document_data=self.stub_library.document_view_post_data('add')
-            )
+        # Shouldn't add the same document again
+        number_added = self.document_view.add_document_to_library(
+            library_id=library_id,
+            document_data=self.stub_library.document_view_post_data('add')
+        )
+        self.assertEqual(0, number_added)
 
     def test_user_can_remove_document_from_library(self):
         """
