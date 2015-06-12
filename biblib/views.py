@@ -718,13 +718,19 @@ class LibraryView(BaseView):
             'q': '*:*',
             'wt': 'json',
             'fl': 'bibcode',
+            'fq': '{!bitset}'
+        }
+
+        headers = {
+            'Content-Type': 'big-query/csv',
         }
         current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
-                                .format(params, bibcodes))
+                                .format(params, bibcodes.replace('\n', ',')))
         response = client().post(
             url=current_app.config['BIBLIB_SOLR_BIG_QUERY_URL'],
             params=params,
-            data=bibcodes
+            data=bibcodes,
+            headers=headers
         )
 
         return response
@@ -1117,7 +1123,9 @@ class DocumentView(BaseView):
                 self.add_document_to_library(library_id=library,
                                              document_data=data)
                 return {}, 200
-            except BackendIntegrityError:
+            except BackendIntegrityError as error:
+                current_app.logger.error('Duplicate bibcode being added: {0}'
+                                         .format(error))
                 return {'error': DUPLICATE_DOCUMENT_NAME_ERROR['body']}, \
                     DUPLICATE_DOCUMENT_NAME_ERROR['number']
 
