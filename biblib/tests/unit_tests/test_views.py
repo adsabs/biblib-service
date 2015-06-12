@@ -205,7 +205,7 @@ class TestUserViews(TestCaseDatabase):
             library_data=self.stub_library.user_view_post_data
         )
 
-        self.assertIsNone(library.bibcode)
+        self.assertEqual([], library.bibcode)
 
         # Check that the library was created with the correct permissions
         result = Permissions.query\

@@ -77,7 +77,30 @@ class TestModelTypes(TestCase):
 
         self.assertEqual([], mutable_list)
 
+    def test_upsert_of_mutable_list(self):
+        """
+        Checks that the custom upsert command works as expected
+
+        :return: no return
+        """
+
+        input_list_1 = [1, 2, 3]
+        input_list_2 = [2, 2, 3, 4, 4]
+        expected_output = [1, 2, 3, 4]
+
+        mutable_list = MutableList()
+        mutable_list.extend(input_list_1)
+        mutable_list.upsert(input_list_2)
+
+        self.assertEqual(mutable_list, expected_output)
+
+
     def test_coerce(self):
+        """
+        Checks the coerce for SQLAlchemy works correctly
+
+        :return: no return
+        """
 
         mutable_list = MutableList()
 

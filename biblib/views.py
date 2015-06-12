@@ -899,23 +899,8 @@ class DocumentView(BaseView):
         # Find the specified library
         library = Library.query.filter(Library.id == library_id).one()
 
-        # Ensure unique content
-        _bibcodes = list(set(document_data['bibcode']))
-
-        if not library.bibcode:
-            start_length = 0
-            current_app.logger.debug('Zero length array: {0}'
-                                     .format(library.bibcode))
-            library.bibcode = _bibcodes
-        else:
-            start_length = len(library.bibcode)
-            _bibcodes = [_bibcode for _bibcode in _bibcodes
-                         if _bibcode not in library.bibcode]
-
-            current_app.logger.debug('Non-Zero length array: {0}'
-                                     .format(library.bibcode))
-            if _bibcodes:
-                library.bibcode.extend(_bibcodes)
+        start_length = len(library.bibcode)
+        library.bibcode.upsert(document_data['bibcode'])
 
         db.session.add(library)
         db.session.commit()
