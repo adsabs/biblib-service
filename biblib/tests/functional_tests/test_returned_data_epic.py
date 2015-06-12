@@ -85,6 +85,8 @@ class TestReturnedDataEpic(TestCaseDatabase):
                 data=library.document_view_post_data_json('add'),
                 headers=user_dave.headers
             )
+            self.assertEqual(response.json['number_added'],
+                             len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
 
         # Dave looks in the library overview and sees that his library size
@@ -138,6 +140,8 @@ class TestReturnedDataEpic(TestCaseDatabase):
                 data=library.document_view_post_data_json('add'),
                 headers=user_mary.headers
             )
+            self.assertEqual(response.json['number_added'],
+                             len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
 
         # Dave sees that the number of bibcodes has increased and that the

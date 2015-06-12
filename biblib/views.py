@@ -892,7 +892,7 @@ class DocumentView(BaseView):
         :param library_id: the library id to update
         :param document_data: the meta data of the document
 
-        :return: no return
+        :return: number_added: number of documents successfully added
         """
 
         document_data_expect = {'bibcode': list}
@@ -907,10 +907,12 @@ class DocumentView(BaseView):
         _bibcodes = list(set(document_data['bibcode']))
 
         if not library.bibcode:
+            start_length = 0
             current_app.logger.debug('Zero length array: {0}'
                                      .format(library.bibcode))
             library.bibcode = _bibcodes
         else:
+            start_length = len(library.bibcode)
             matches = [_bibcode for _bibcode in _bibcodes
                        if _bibcode in library.bibcode]
 
@@ -925,6 +927,10 @@ class DocumentView(BaseView):
 
         current_app.logger.info(library.bibcode)
 
+        end_length = len(library.bibcode)
+
+        return end_length - start_length
+
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):
         """
@@ -933,7 +939,7 @@ class DocumentView(BaseView):
         :param library_id: the unique ID of the library
         :param document_data: the meta data of the document
 
-        :return: no return
+        :return: number_removed: number of documents successfully removed
         """
 
         cls.type_check(document_data, {'bibcode': list})
@@ -941,10 +947,14 @@ class DocumentView(BaseView):
         current_app.logger.info('Removing a document: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
         library = Library.query.filter(Library.id == library_id).one()
+        start_length = len(library.bibcode)
         library.bibcode.shorten(document_data['bibcode'])
         db.session.commit()
         current_app.logger.info('Removed document successfully: {0}'
                                 .format(library.bibcode))
+        end_length = len(library.bibcode)
+
+        return start_length - end_length
 
     @staticmethod
     def update_library(library_id, library_data):
@@ -1085,7 +1095,8 @@ class DocumentView(BaseView):
 
         Return data:
         -----------
-        No data
+        number_added: number of documents added (if 'add' is used)
+        number_removed: number of documents removed (if 'remove' is used)
 
         Permissions:
         -----------
@@ -1120,9 +1131,15 @@ class DocumentView(BaseView):
             current_app.logger.info('User requested to add a document')
 
             try:
-                self.add_document_to_library(library_id=library,
-                                             document_data=data)
-                return {}, 200
+                number_added = self.add_document_to_library(
+                    library_id=library,
+                    document_data=data
+                )
+                current_app.logger.info(
+                    'Successfully added {0} documents to {1} by {2}'
+                    .format(number_added, library, user_editing_uid)
+                )
+                return {'number_added': number_added}, 200
             except BackendIntegrityError as error:
                 current_app.logger.error('Duplicate bibcode being added: {0}'
                                          .format(error))
@@ -1131,11 +1148,18 @@ class DocumentView(BaseView):
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')
-            self.remove_documents_from_library(
+
+            number_removed = self.remove_documents_from_library(
                 library_id=library,
                 document_data=data
             )
-            return {}, 200
+
+            current_app.logger.info(
+                'Successfully removed {0} documents to {1} by {2}'
+                .format(number_removed, library, user_editing_uid)
+                )
+
+            return {'number_removed': number_removed}, 200
 
         else:
             current_app.logger.info('User requested a non-standard action')
