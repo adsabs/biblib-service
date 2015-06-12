@@ -294,11 +294,14 @@ class TestWebservices(TestCaseDatabase):
 
         # Add to the library
         url = url_for('documentview', library=library_id)
-        self.client.post(
+        response = self.client.post(
             url,
             data=stub_library.document_view_post_data_json('add'),
             headers=stub_user.headers
         )
+        self.assertEqual(response.json['number_added'],
+                         len(stub_library.bibcode))
+        self.assertEqual(response.status_code, 200)
 
         # Check the library was created and documents exist
         url = url_for('libraryview', library=library_id)
@@ -345,6 +348,8 @@ class TestWebservices(TestCaseDatabase):
             data=stub_library.document_view_post_data_json('add'),
             headers=stub_user.headers
         )
+        self.assertEqual(response.json['number_added'],
+                         len(stub_library.bibcode))
         self.assertEqual(response.status_code, 200)
 
         # Should not be able to add the same document
@@ -392,7 +397,9 @@ class TestWebservices(TestCaseDatabase):
             data=stub_library.document_view_post_data_json('add'),
             headers=stub_user.headers
         )
-        self.assertTrue(response.status, 200)
+        self.assertEqual(response.json['number_added'],
+                         len(stub_library.bibcode))
+        self.assertEqual(response.status_code, 200)
 
         # Delete the document
         url = url_for('documentview', library=library_id)
@@ -401,7 +408,9 @@ class TestWebservices(TestCaseDatabase):
             data=stub_library.document_view_post_data_json('remove'),
             headers=stub_user.headers
         )
-        self.assertTrue(response.status, 200)
+        self.assertEqual(response.json['number_removed'],
+                         len(stub_library.bibcode))
+        self.assertEqual(response.status_code, 200)
 
         # Check the library is empty
         url = url_for('libraryview', library=library_id)
@@ -854,6 +863,8 @@ class TestWebservices(TestCaseDatabase):
             data=stub_library.document_view_post_data_json('add'),
             headers=stub_user_1.headers
         )
+        self.assertEqual(response.json['number_added'],
+                                       len(stub_library.bibcode))
         self.assertEqual(response.status_code, 200)
 
     def test_anonymous_users_can_access_public_libraries(self):

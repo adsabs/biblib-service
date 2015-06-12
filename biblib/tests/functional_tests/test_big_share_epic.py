@@ -80,6 +80,8 @@ class TestDeletionEpic(TestCaseDatabase):
                 data=library.document_view_post_data_json('add'),
                 headers=user_dave.headers
             )
+            self.assertEqual(response.json['number_added'],
+                             len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
 
         # Check they all got added

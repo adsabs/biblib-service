@@ -72,6 +72,8 @@ class TestJobEpic(TestCaseDatabase):
             data=stub_library.document_view_post_data_json('add'),
             headers=user_mary.headers
         )
+        self.assertEqual(response.json['number_added'],
+                         len(stub_library.bibcode))
         self.assertEqual(response.status_code, 200, response)
 
         # Mary realises she added one that is not hers and goes back to her
@@ -82,6 +84,8 @@ class TestJobEpic(TestCaseDatabase):
             data=stub_library.document_view_post_data_json('remove'),
             headers=user_mary.headers
         )
+        self.assertEqual(response.json['number_removed'],
+                         len(stub_library.bibcode))
         self.assertEqual(response.status_code, 200, response)
 
         # Checks that there are no documents in the library

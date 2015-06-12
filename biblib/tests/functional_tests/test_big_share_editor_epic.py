@@ -64,6 +64,8 @@ class TestDeletionEpic(TestCaseDatabase):
                 data=library.document_view_post_data_json('add'),
                 headers=user_dave.headers
             )
+            self.assertEqual(response.json['number_added'],
+                 len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
 
             libraries_added.append(library)
@@ -123,6 +125,8 @@ class TestDeletionEpic(TestCaseDatabase):
                 data=libraries_added[i].document_view_post_data_json('remove'),
                 headers=user_mary.headers
             )
+            self.assertEqual(response.json['number_removed'],
+                             len(libraries_added[i].bibcode))
             self.assertEqual(response.status_code, 200, response)
 
             libraries_removed.append(libraries_added[i])
@@ -149,6 +153,8 @@ class TestDeletionEpic(TestCaseDatabase):
                 data=library.document_view_post_data_json('add'),
                 headers=user_mary.headers
             )
+            self.assertEqual(response.json['number_added'],
+                             len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
 
             libraries_added.append(library)

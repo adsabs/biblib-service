@@ -1059,10 +1059,11 @@ class TestDocumentViews(TestCaseDatabase):
         # Get stub data for the document
 
         # Add a document to the library
-        self.document_view.add_document_to_library(
+        number_added = self.document_view.add_document_to_library(
             library_id=library_id,
             document_data=self.stub_library.document_view_post_data('add')
         )
+        self.assertEqual(number_added, len(self.stub_library.bibcode))
 
         # Check that the document is in the library
         library = Library.query.filter(Library.id == library_id).all()
@@ -1070,10 +1071,11 @@ class TestDocumentViews(TestCaseDatabase):
             self.assertIn(self.stub_library.bibcode[0], _lib.bibcode)
 
         # Add a different document to the library
-        self.document_view.add_document_to_library(
+        number_added = self.document_view.add_document_to_library(
             library_id=library_id,
             document_data=self.stub_library_2.document_view_post_data('add')
         )
+        self.assertEqual(number_added, len(self.stub_library.bibcode))
 
         # Check that the document is in the library
         library = Library.query.filter(Library.id == library_id).all()
@@ -1112,10 +1114,11 @@ class TestDocumentViews(TestCaseDatabase):
         # Get stub data for the document
 
         # Add a document to the library
-        self.document_view.add_document_to_library(
+        number_added = self.document_view.add_document_to_library(
             library_id=library_id,
             document_data=self.stub_library.document_view_post_data('add')
         )
+        self.assertEqual(number_added, len(self.stub_library.bibcode))
 
         with self.assertRaises(BackendIntegrityError):
             self.document_view.add_document_to_library(
@@ -1152,10 +1155,11 @@ class TestDocumentViews(TestCaseDatabase):
         db.session.commit()
 
         # Remove the bibcode from the library
-        self.document_view.remove_documents_from_library(
+        number_removed = self.document_view.remove_documents_from_library(
             library_id=library.id,
             document_data=self.stub_library.document_view_post_data('remove')
         )
+        self.assertEqual(number_removed, len(self.stub_library.bibcode))
 
         # Check it worked
         library = Library.query.filter(Library.id == library.id).one()
