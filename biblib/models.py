@@ -154,6 +154,17 @@ class MutableList(Mutable, list):
         for item in value:
             self.remove(item)
 
+    def upsert(self, value):
+        """
+        Add values that do not exist in the current list
+        :param value:
+        :return:
+        """
+        value = list(set(value))
+        value = [item for item in value if item not in list(self)]
+
+        self.extend(value)
+
     @classmethod
     def coerce(cls, key, value):
         """
@@ -203,7 +214,7 @@ class Library(db.Model):
     name = db.Column(db.String(50))
     description = db.Column(db.String(50))
     public = db.Column(db.Boolean)
-    bibcode = db.Column(MutableList.as_mutable(ARRAY(db.String(50))))
+    bibcode = db.Column(MutableList.as_mutable(ARRAY(db.String(50))), default=[])
     date_created = db.Column(
         db.DateTime,
         nullable=False,

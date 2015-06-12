@@ -15,7 +15,7 @@ from flask import url_for
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, DEFAULT_LIBRARY_NAME_PREFIX, \
     DEFAULT_LIBRARY_DESCRIPTION, WRONG_TYPE_LIST_ERROR, \
-    DUPLICATE_DOCUMENT_NAME_ERROR, API_MISSING_USER_EMAIL
+    API_MISSING_USER_EMAIL
 from tests.stubdata.stub_data import LibraryShop, UserShop
 from tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase
@@ -359,10 +359,8 @@ class TestWebservices(TestCaseDatabase):
             data=stub_library.document_view_post_data_json('add'),
             headers=stub_user.headers
         )
-        self.assertEqual(response.status_code,
-                         DUPLICATE_DOCUMENT_NAME_ERROR['number'])
-        self.assertEqual(response.json['error'],
-                         DUPLICATE_DOCUMENT_NAME_ERROR['body'])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['number_added'], 0)
 
     def test_remove_document_from_library(self):
         """
