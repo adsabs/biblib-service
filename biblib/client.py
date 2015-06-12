@@ -21,5 +21,5 @@ class Client:
         self.token = config.get('BIBLIB_CLIENT_ADSWS_API_TOKEN')
         if self.token:
             self.session.headers.update(
-                {'Authorization': 'Bearer %s' % self.token}
+                {'Authorization': 'Bearer {0}'.format(self.token)}
             )
