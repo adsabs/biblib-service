@@ -11,7 +11,14 @@ from models import db, User, Library, Permissions
 from client import client
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from utils import get_post_data, BackendIntegrityError, PermissionDeniedError
+from utils import get_post_data, BackendIntegrityError, \
+    PermissionDeniedError, err
+
+# Constant definitions
+API_HELP = 'http://adsabs.github.io/help/api/'
+DEFAULT_LIBRARY_NAME_PREFIX = 'Untitled Library'
+DEFAULT_LIBRARY_DESCRIPTION = 'My ADS library'
+USER_ID_KEYWORD = 'X-Adsws-Uid'
 
 # Some user defined HTTP errors
 DUPLICATE_LIBRARY_NAME_ERROR = dict(
@@ -27,7 +34,8 @@ MISSING_DOCUMENT_ERROR = dict(
     number=410
 )
 MISSING_USERNAME_ERROR = dict(
-    body='You did not supply enough user details',
+    body='You did not supply enough user details. '
+         'See the API documentation: {0}'.format(API_HELP),
     number=400
 )
 NO_PERMISSION_ERROR = dict(
@@ -36,7 +44,8 @@ NO_PERMISSION_ERROR = dict(
     number=403
 )
 WRONG_TYPE_ERROR = dict(
-    body='You passed the wrong type. See the API documentation:',
+    body='You passed the wrong type. See the API documentation: {0}'
+         .format(API_HELP),
     number=400
 )
 API_MISSING_USER_EMAIL = dict(
@@ -48,18 +57,6 @@ API_MISSING_USER_UID = dict(
     number=404
 )
 
-USER_ID_KEYWORD = 'X-Adsws-Uid'
-DEFAULT_LIBRARY_NAME_PREFIX = 'Untitled Library'
-DEFAULT_LIBRARY_DESCRIPTION = 'My ADS library'
-
-def err(error_dictionary):
-    """
-    Formats the error response as wanted by the Flask app
-    :param error_dictionary: name of the error dictionary
-
-    :return: tuple of error message and error number
-    """
-    return {'error': error_dictionary['body']}, error_dictionary['number']
 
 class BaseView(Resource):
     """
@@ -239,7 +236,6 @@ class BaseView(Resource):
 
         :return: boolean, access (True), no access (False)
         """
-
         try:
             permissions = Permissions.query.filter(
                 Permissions.library_id == library_id,
@@ -622,7 +618,20 @@ class UserView(BaseView):
                                 .format(user, service_uid))
 
         # Create the library
-        data = get_post_data(request)
+        try:
+            data = get_post_data(
+                request,
+                types=dict(
+                    name=unicode,
+                    description=unicode,
+                    public=bool,
+                    bibcode=list
+                )
+            )
+        except TypeError as error:
+            current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
+                                     .format(request.data, error))
+            return err(WRONG_TYPE_ERROR)
         try:
             library = \
                 self.create_library(service_uid=service_uid, library_data=data)
@@ -858,30 +867,6 @@ class DocumentView(BaseView):
     scopes = []
     rate_limit = [1000, 60*60*24]
 
-    @staticmethod
-    def type_check(document_data, document_data_expect):
-        """
-        Check the dictionary has the expected types
-        :param document_data: input dictionary
-        :param document_data_expect: expected dictionary types
-        :return:
-        """
-        current_app.logger.info('Checking POST data types')
-        for expect_data in document_data_expect:
-            if expect_data not in document_data.keys():
-                current_app.logger.warning('POST data does not contain: {0}'
-                                           .format(expect_data))
-                continue
-
-            if not isinstance(document_data[expect_data],
-                              document_data_expect[expect_data]):
-                raise TypeError(
-                    '{0} should be type {1} but is {2}'
-                    .format(expect_data,
-                            document_data_expect[expect_data],
-                            type(document_data[expect_data]))
-                )
-
     @classmethod
     def add_document_to_library(cls, library_id, document_data):
         """
@@ -1100,46 +1085,38 @@ class DocumentView(BaseView):
                                  library_id=library):
             return err(NO_PERMISSION_ERROR)
 
-        data = get_post_data(request)
-        data_allowed_types = dict(bibcode=list,
-                                  action=unicode)
-
         try:
-            self.type_check(data, data_allowed_types)
-        except TypeError:
+            data = get_post_data(
+                request,
+                types=dict(bibcode=list, action=unicode)
+            )
+        except TypeError as error:
+            current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
+                                     .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
 
         if data['action'] == 'add':
             current_app.logger.info('User requested to add a document')
-
-            try:
-                number_added = self.add_document_to_library(
-                    library_id=library,
-                    document_data=data
-                )
-                current_app.logger.info(
-                    'Successfully added {0} documents to {1} by {2}'
-                    .format(number_added, library, user_editing_uid)
-                )
-                return {'number_added': number_added}, 200
-            except BackendIntegrityError as error:
-                current_app.logger.error('Duplicate bibcode being added: {0}'
-                                         .format(error))
-                return err(DUPLICATE_DOCUMENT_NAME_ERROR)
+            number_added = self.add_document_to_library(
+                library_id=library,
+                document_data=data
+            )
+            current_app.logger.info(
+                'Successfully added {0} documents to {1} by {2}'
+                .format(number_added, library, user_editing_uid)
+            )
+            return {'number_added': number_added}, 200
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')
-
             number_removed = self.remove_documents_from_library(
                 library_id=library,
                 document_data=data
             )
-
             current_app.logger.info(
                 'Successfully removed {0} documents to {1} by {2}'
                 .format(number_removed, library, user_editing_uid)
                 )
-
             return {'number_removed': number_removed}, 200
 
         else:
@@ -1199,7 +1176,19 @@ class DocumentView(BaseView):
                                   library_id=library):
             return err(NO_PERMISSION_ERROR)
 
-        library_data = get_post_data(request)
+        try:
+            library_data = get_post_data(
+                request,
+                types=dict(
+                    name=unicode,
+                    description=unicode,
+                    public=bool
+                )
+            )
+        except TypeError as error:
+            current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
+                                     .format(request.data, error))
+            return err(WRONG_TYPE_ERROR)
 
         # Remove content that is empty
         for key in library_data.keys():
@@ -1213,7 +1202,7 @@ class DocumentView(BaseView):
                 self.library_name_exists(service_uid=user_updating_uid,
                                          library_name=library_data['name']):
 
-                return err(DUPLICATE_DOCUMENT_NAME_ERROR)
+                return err(DUPLICATE_LIBRARY_NAME_ERROR)
 
         response = self.update_library(library_id=library,
                                        library_data=library_data)
@@ -1505,7 +1494,20 @@ class PermissionView(BaseView):
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
 
-        permission_data = get_post_data(request)
+        try:
+            permission_data = get_post_data(
+                request,
+                types=dict(
+                    email=unicode,
+                    permission=unicode,
+                    value=bool
+                )
+            )
+        except TypeError as error:
+            current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
+                                     .format(request.data, error))
+            return err(WRONG_TYPE_ERROR)
+
         current_app.logger.info('Requested permission changes for user {0}:'
                                 ' {1} for library {2}, by user: {3}'
                                 .format(permission_data['email'],

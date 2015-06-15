@@ -267,12 +267,13 @@ class LibraryShop(object):
         post_data = self.document_view_post_data(action)
         return json.dumps(post_data)
 
-    def document_view_put_data(self, name='', description='', public=''):
+    def document_view_put_data(self, name='', description='', public=False):
         """
         Expected data to be sent in a PUT request to the DocumentView
         end point, /documents/<>
         :param name: name of the library to change it to
         :param description: description to change it to
+        :param public: whether the library should be public
 
         :return: PUT data in dictionary format
         """
@@ -283,12 +284,14 @@ class LibraryShop(object):
         )
         return put_data
 
-    def document_view_put_data_json(self, name='', description='', public=''):
+    def document_view_put_data_json(
+            self, name='', description='', public=False):
         """
         Expected data to be sent in a PUT request to the DocumentView
         end point, /documents/<>
         :param name: name of the library to change it to
         :param description: description to change it to
+        :param public: whether the library should be public
 
         :return: PUT data in JSON format
         """
