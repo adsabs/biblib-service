@@ -94,7 +94,6 @@ class TestModelTypes(TestCase):
 
         self.assertEqual(mutable_list, expected_output)
 
-
     def test_coerce(self):
         """
         Checks the coerce for SQLAlchemy works correctly

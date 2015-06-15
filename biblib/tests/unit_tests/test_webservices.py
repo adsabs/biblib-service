@@ -14,7 +14,7 @@ import unittest
 from flask import url_for
 from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, DEFAULT_LIBRARY_NAME_PREFIX, \
-    DEFAULT_LIBRARY_DESCRIPTION, WRONG_TYPE_LIST_ERROR, \
+    DEFAULT_LIBRARY_DESCRIPTION, WRONG_TYPE_ERROR, \
     API_MISSING_USER_EMAIL
 from tests.stubdata.stub_data import LibraryShop, UserShop
 from tests.base import MockEmailService, MockSolrBigqueryService,\
@@ -262,9 +262,221 @@ class TestWebservices(TestCaseDatabase):
                 headers=stub_user.headers
             )
             self.assertEqual(response.status_code,
-                             WRONG_TYPE_LIST_ERROR['number'])
+                             WRONG_TYPE_ERROR['number'])
             self.assertEqual(response.json['error'],
-                             WRONG_TYPE_LIST_ERROR['body'])
+                             WRONG_TYPE_ERROR['body'])
+
+    def test_document_view_post_types(self):
+        """
+        Tests that types raise errors if they are wrong
+
+        :return: no return
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+
+        # Pass an action that is not a string
+        post_data = stub_library.document_view_post_data('add')
+        post_data['action'] = 1
+
+        # Action type check
+        url = url_for('documentview', library=library_id)
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+        # bibcode list check
+        post_data['action'] = 'add'
+        post_data['bibcode'] = 2
+        url = url_for('documentview', library=library_id)
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+    def test_permission_view_post_type(self):
+        """
+        Tests that the content passed to the PermissionView POST end point
+        has all the types checked.
+        :return:
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_user_permission = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+
+        post_data = stub_user_permission.permission_view_post_data(
+            permission='read',
+            value=True
+        )
+        post_data['permission'] = 2
+
+        url = url_for('permissionview', library=library_id)
+        with MockEmailService(stub_user_permission):
+            response = self.client.post(
+                url,
+                data=json.dumps(post_data),
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+        post_data['permission'] = 'read'
+        post_data['value'] = -1
+
+        url = url_for('permissionview', library=library_id)
+        with MockEmailService(stub_user_permission):
+            response = self.client.post(
+                url,
+                data=json.dumps(post_data),
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+    def test_user_view_post_types(self):
+        """
+        Tests that the content passed to the UserView POST end point
+        has all the types checked.
+        :return:
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        post_data = stub_library.user_view_post_data
+        post_data['name'] = 2
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+        post_data['name'] = 'test'
+        post_data['description'] = 2
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+        post_data['description'] = 'test'
+        post_data['public'] = -1
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+        post_data['public'] = True
+        post_data['bibcode'] = 111
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+    def test_document_view_put_types(self):
+        """
+        Tests that the content passed to the UserView POST end point
+        has all the types checked.
+
+        :return: no return
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+
+        put_data = stub_library.document_view_put_data()
+        put_data['name'] = 1
+
+        url = url_for('documentview', library=library_id)
+        response = self.client.put(
+            url,
+            data=json.dumps(put_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+        put_data = stub_library.document_view_put_data()
+        put_data['description'] = 1
+
+        url = url_for('documentview', library=library_id)
+        response = self.client.put(
+            url,
+            data=put_data,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+        put_data = stub_library.document_view_put_data()
+        put_data['public'] = -1
+
+        url = url_for('documentview', library=library_id)
+        response = self.client.put(
+            url,
+            data=put_data,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
 
     def test_add_document_to_library(self):
         """
