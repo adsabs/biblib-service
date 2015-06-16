@@ -1740,5 +1740,170 @@ class TestPermissionViews(TestCaseDatabase):
                 Permissions.user_id == user_random.id
             ).one()
 
+    def test_can_get_permissions_for_a_user(self):
+        """
+        Tests that the permissions of the user are returned
+        :return: no return
+        """
+
+        # Make a fake user and library
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=self.stub_library.bibcode)
+
+        permission = Permissions(owner=True)
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+
+        db.session.add_all([user, library, permission])
+        db.session.commit()
+
+        with MockEmailService(self.stub_user, end_type='uid'):
+            permissions = self.permission_view.get_permissions(
+                library_id=library.id
+            )
+
+        self.assertIsInstance(permissions, list)
+        self.assertIn(self.stub_user.email, permissions[0])
+        self.assertIn('owner', permissions[0][self.stub_user.email])
+
+    def test_cannot_get_permissions_for_non_user_and_owner(self):
+        """
+        Tests that the permissions of the user are not returned if the
+        requesting user is not an admin or owner
+
+        :return: no return
+        """
+
+        # Make a fake user and library
+        user_read = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_write = User(absolute_uid=self.stub_user_2.absolute_uid)
+        db.session.add_all([user_read, user_write])
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=self.stub_library.bibcode)
+
+        permission_read = Permissions(read=True)
+        permission_write = Permissions(write=True)
+        user_read.permissions.append(permission_read)
+        user_write.permissions.append(permission_write)
+
+        library.permissions.append(permission_read)
+        library.permissions.append(permission_write)
+
+        db.session.add_all([user_read, user_write, library, permission_read,
+                            permission_write])
+        db.session.commit()
+
+        for user in [user_read, user_write]:
+            allowed = self.permission_view.read_access(
+                service_uid=user.id,
+                library_id=library.id
+            )
+
+            self.assertFalse(allowed)
+
+    def test_can_get_permissions_for_user_and_owner(self):
+        """
+        Tests that the permissions of the user are returned if the requesting
+        user is an admin or owner
+
+        :return: no return
+        """
+
+        # Make a fake user and library
+        user_admin = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_owner = User(absolute_uid=self.stub_user_2.absolute_uid)
+        db.session.add_all([user_owner, user_admin])
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=self.stub_library.bibcode)
+
+        permission_owner = Permissions(owner=True)
+        permission_admin = Permissions(admin=True)
+        user_owner.permissions.append(permission_owner)
+        user_admin.permissions.append(permission_admin)
+
+        library.permissions.append(permission_owner)
+        library.permissions.append(permission_admin)
+
+        db.session.add_all([user_owner, user_admin, library, permission_owner,
+                            permission_admin])
+        db.session.commit()
+
+        for user in [user_admin, user_owner]:
+            allowed = self.permission_view.read_access(
+                service_uid=user.id,
+                library_id=library.id
+            )
+
+            self.assertTrue(allowed)
+
+    def test_permissions_returned_dont_include_other_libraries(self):
+        """
+        Makes sure the query being used does not return strange content
+
+        :return: no return
+        """
+        # Make a fake user and library
+        user_1 = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_2 = User(absolute_uid=self.stub_user_2.absolute_uid)
+        db.session.add_all([user_1, user_2])
+        db.session.commit()
+
+        # Ensure a library exists
+        library_1 = Library(name='MyLibrary',
+                            description='My library',
+                            public=True,
+                            bibcode=self.stub_library.bibcode)
+
+        library_2 = Library(name='MyLibrary',
+                            description='My library',
+                            public=True,
+                            bibcode=self.stub_library.bibcode)
+
+        permission_1 = Permissions(owner=True)
+        permission_2 = Permissions(admin=True)
+        user_1.permissions.append(permission_1)
+        user_2.permissions.append(permission_2)
+
+        library_1.permissions.append(permission_1)
+        library_2.permissions.append(permission_2)
+
+        db.session.add_all([user_1, user_2, library_1, library_2,
+                            permission_1, permission_2])
+        db.session.commit()
+
+        with MockEmailService(self.stub_user_1, end_type='uid'):
+            return_1 = self.permission_view.get_permissions(
+                library_id=library_1.id
+            )
+        with MockEmailService(self.stub_user_2, end_type='uid'):
+            return_2 = self.permission_view.get_permissions(
+                library_id=library_2.id
+            )
+
+        self.assertNotEqual(return_1, return_2)
+        self.assertTrue(len(return_1) == 1)
+        self.assertTrue(len(return_2) == 1)
+        self.assertIn(self.stub_user_1.email, return_1[0])
+        self.assertIn(self.stub_user_2.email, return_2[0])
+        self.assertEqual(['owner'], return_1[0][self.stub_user_1.email])
+        self.assertEqual(['admin'], return_2[0][self.stub_user_2.email])
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
