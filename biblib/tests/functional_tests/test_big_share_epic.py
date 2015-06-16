@@ -18,7 +18,7 @@ from views import NO_PERMISSION_ERROR
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from tests.base import MockEmailService, MockSolrBigqueryService,\
-    TestCaseDatabase
+    TestCaseDatabase, MockEndPoint
 
 
 class TestDeletionEpic(TestCaseDatabase):
@@ -118,8 +118,33 @@ class TestDeletionEpic(TestCaseDatabase):
             )
         self.assertEqual(response.status_code, 200)
 
-        # Mary writes back to say she can see his libraries and is happy but
-        # wants to add content herself
+        # Mary says she cannot see the libraries. Dave checks that Mary is in
+        # the list of permissions
+        with MockEndPoint([user_dave, user_mary]):
+            response = self.client.get(
+                url,
+                headers=user_dave.headers
+            )
+        self.assertIn(user_dave.email, response.json[0].keys())
+        self.assertIn(user_mary.email, response.json[1].keys())
+        self.assertEqual(['owner'], response.json[0][user_dave.email])
+        self.assertEqual(['read'], response.json[1][user_mary.email])
+
+        # Mary tries to check who has permissions too, but does not have
+        # permission given she only has 'read' rights.
+        with MockEndPoint([user_dave, user_mary]):
+            response = self.client.get(
+                url,
+                headers=user_mary.headers
+            )
+            self.assertEqual(response.status_code,
+                             NO_PERMISSION_ERROR['number'])
+            self.assertEqual(response.json['error'],
+                             NO_PERMISSION_ERROR['body'])
+
+        # Mary finally realises she has not logged in, and then writes back to
+        # say she can see his libraries and is happy but wants to add content
+        # herself
         url = url_for('libraryview', library=library_id_dave)
         with MockSolrBigqueryService():
             response = self.client.get(

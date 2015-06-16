@@ -51,7 +51,7 @@ def create_app(config_type='STAGING'):
 
     api.add_resource(PermissionView,
                      '/permissions/<string:library>',
-                     methods=['POST'])
+                     methods=['GET', 'POST'])
 
     return app
 

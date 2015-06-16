@@ -18,7 +18,7 @@ from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     API_MISSING_USER_EMAIL
 from tests.stubdata.stub_data import LibraryShop, UserShop
 from tests.base import MockEmailService, MockSolrBigqueryService,\
-    TestCaseDatabase
+    TestCaseDatabase, MockEndPoint
 
 class TestWebservices(TestCaseDatabase):
     """
@@ -1545,6 +1545,108 @@ class TestWebservices(TestCaseDatabase):
                              NO_PERMISSION_ERROR['number'])
             self.assertEqual(response.json['error'],
                              NO_PERMISSION_ERROR['body'])
+
+    def test_can_find_out_permissions_of_a_library_if_owner_or_admin(self):
+        """
+        Tests the permissions/<> GET end point to make sure the permissions
+        are returned. This should return if the permissions are of the user are
+        owner or admin.
+
+        :return: no return
+        """
+        # Stub data
+        user_owner = UserShop()
+        user_admin = UserShop()
+        stub_library = LibraryShop()
+
+        # Make a library with the owner user
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_owner.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+
+        # Give the user_admin 'admin' permissions
+        with MockEmailService(user_admin):
+            url = url_for('permissionview', library=library_id)
+            response = self.client.post(
+                url,
+                data=user_admin.permission_view_post_data_json('admin', True),
+                headers=user_owner.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        # Try and get the permissions with both of the users
+        with MockEndPoint([user_owner, user_admin]):
+            for stub_user in [user_owner, user_admin]:
+                response = self.client.get(
+                    url,
+                    headers=stub_user.headers
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(user_owner.email, response.json[0].keys())
+                self.assertIn(user_admin.email, response.json[1].keys())
+                self.assertEqual(['owner'], response.json[0][user_owner.email])
+                self.assertEqual(['admin'], response.json[1][user_admin.email])
+
+    def test_cannot_find_permissions_of_a_library_if_not_owner_or_admin(self):
+        """
+        Tests the permissions/<> GET end point to make sure the permissions
+        are not returned if the permissions of the user are not owner or admin.
+
+        :return: no return
+        """
+        # Stub data
+        user_read = UserShop()
+        user_write = UserShop()
+        user_owner = UserShop()
+        stub_library = LibraryShop()
+
+        # Make a library with the owner user
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_owner.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+
+        # Give the user_read and user_write 'read' and 'write' permissions
+        with MockEmailService(user_read):
+            url = url_for('permissionview', library=library_id)
+            response = self.client.post(
+                url,
+                data=user_read.permission_view_post_data_json('read', True),
+                headers=user_owner.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        with MockEmailService(user_write):
+            url = url_for('permissionview', library=library_id)
+            response = self.client.post(
+                url,
+                data=user_write.permission_view_post_data_json('write', True),
+                headers=user_owner.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        # Try and get the permissions with both of the users
+        user_list = [user_read, user_write]
+        with MockEndPoint([user_list[0], user_list[1], user_owner]):
+            for stub_user in user_list:
+                response = self.client.get(
+                    url,
+                    headers=stub_user.headers
+                )
+                self.assertEqual(response.status_code,
+                                 NO_PERMISSION_ERROR['number'])
+                self.assertEqual(response.json['error'],
+                                 NO_PERMISSION_ERROR['body'])
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

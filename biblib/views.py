@@ -746,7 +746,6 @@ class LibraryView(BaseView):
 
         :return: list of the users libraries with the relevant information
 
-
         Header:
         -------
         Must contain the API forwarded user ID of the user accessing the end
@@ -1293,6 +1292,9 @@ class PermissionView(BaseView):
     scopes = []
     rate_limit = [1000, 60*60*24]
 
+    # Some permissions for this View
+    read_permission = ['admin', 'owner']
+
     @staticmethod
     def has_permission(service_uid_editor,
                        service_uid_modify,
@@ -1426,7 +1428,141 @@ class PermissionView(BaseView):
 
         db.session.commit()
 
+    @staticmethod
+    def api_uid_email_lookup(user_info):
+        """
+        Queries the API service that converts uid to email or email to uid,
+        dependent upon the type passed by the user
+        :param user_info: <int> is userID, and <unicode>/<str> is email
+
+        :return: the API userID or API e-mail
+        """
+
+        if isinstance(user_info, int):
+
+            service = '{api}/{uid}'.format(
+                api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
+                uid=user_info
+            )
+            current_app.logger.info('Obtaining e-mail of user: {0} [API UID]'
+                                    .format(user_info))
+
+            response = client().get(
+                service
+            )
+
+            return response.json()['email']
+        else:
+            return None
+
+    @classmethod
+    def get_permissions(cls, library_id):
+        """
+        Looks up and returns the permissions for all of the users that have
+        any permissions.
+        :param library_id: the library ID to look up permissions
+
+        :return: list of dictionaries containing the user email and permission
+        """
+
+        # Find the permissions for the library
+        result = db.session.query(Permissions, User)\
+            .join(Permissions.user)\
+            .filter(Permissions.library_id == library_id)\
+            .all()
+
+        # Formulate the return content
+        permission_list = []
+
+        for permission, user in result:
+
+            # Convert the user id into
+            user = cls.api_uid_email_lookup(user_info=user.absolute_uid)
+
+            all_permissions = filter(
+                lambda key: permission.__dict__[key],
+                ['read', 'write', 'admin', 'owner']
+            )
+
+            permission_list.append(
+                {user: all_permissions}
+            )
+
+        return permission_list
+
+    @classmethod
+    def read_access(cls, service_uid, library_id):
+        """
+        Checks if the user has access to read the permissions on a given
+        library
+        :param service_uid: the user ID within this microservice
+        :param library_id: the library ID to look up permissions
+
+        :return: has access (True), does not have access (False)
+        """
+
+        for access_type in cls.read_permission:
+            if BaseView.helper_access_allowed(service_uid=service_uid,
+                                              library_id=library_id,
+                                              access_type=access_type):
+                return True
+
+        return False
+
     # Methods
+    def get(self, library):
+        """
+        HTTP GET request that returns the permissions for a given library
+        :param library: library ID
+
+        :return: list of permissions
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Return data:
+        ------------
+        JSON with a list containing dictionary elements
+        [{<user-email>: [<permission1>, ...., <permissionN>]},
+        ...., {<user-email>: [<permission>1, ...., <permissionN>]}]
+
+        Permissions:
+        -----------
+        The following type of user can access permission:
+          - owner
+          - admin
+        """
+        # Get the user requesting this from the header
+        try:
+            user_api = self.helper_get_user_id()
+        except KeyError:
+            return err(MISSING_USERNAME_ERROR)
+
+        # URL safe base64 string to UUID
+        library = self.helper_slug_to_uuid(library)
+
+        # Get the service ID from the API resolver
+        service_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user_api)
+
+        # Check permissions
+        if not self.read_access(service_uid=service_uid,
+                                library_id=library):
+            current_app.logger.error(
+                'User {0} has the wrong permissions to get the '
+                'permission list for library {1}'
+                .format(service_uid, library)
+            )
+            return err(NO_PERMISSION_ERROR)
+
+        # Get permissions
+        permissions = self.get_permissions(library_id=library)
+
+        # Return data
+        return permissions, 200
+
     def post(self, library):
         """
         HTTP POST request that modifies the permissions of a library
@@ -1473,15 +1609,6 @@ class PermissionView(BaseView):
         repository.
 
         """
-
-        # TODO: Need a helper function to check the user gave the right input
-        # TODO: Need a check that there is the correct content passed
-        # TODO: Need to handle when there is no e-mail for the user as they do
-        # not exist in the API
-        # TODO: Need a get endpoint to find out what permissions people have as
-        #     well
-        # TODO: input values should be type checked as well in a systematic way
-
         # Get the user requesting this from the header
         try:
             user_editing = self.helper_get_user_id()

@@ -2,6 +2,7 @@
 Common utilities used by the test classes
 """
 
+import re
 import app
 import json
 from flask import current_app
@@ -220,3 +221,82 @@ class TestCaseDatabase(TestCase):
         """
         db.session.remove()
         db.drop_all()
+
+class MockEndPoint(object):
+    """
+    Mock of the ADSWS API
+    """
+    def __init__(self, user_list):
+        """
+        Constructor
+        :param api_endpoint: name of the API end point
+        :param user_uid: unique API user ID to be returned
+        :return: no return
+        """
+
+        def request_callback(request, uri, headers):
+            """
+            :param request: HTTP request
+            :param uri: URI/URL to send the request
+            :param headers: header of the HTTP request
+            :return:
+            """
+
+            user_email = None
+            user_uid = None
+            try:
+                user_info = int(uri.split('/')[-1])
+
+                for user in user_list:
+                    if user.absolute_uid == user_info:
+                        user_email = user.email
+                        user_uid = user.absolute_uid
+                        break
+            except TypeError:
+                user_info = uri.split('/')[-1]
+
+                for user in user_list:
+                    if user.absolute_uid == user_info:
+                        user_email = user.email
+                        user_uid = user.absolute_uid
+                        break
+
+            resp_dict = {
+                'api-response': 'success',
+                'token': request.headers.get(
+                    'Authorization', 'No Authorization header passed!'
+                ),
+                'email': user_email,
+                'uid': user_uid,
+            }
+
+            return 200, headers, json.dumps(resp_dict)
+
+        HTTPretty.register_uri(
+            HTTPretty.GET,
+            re.compile('{0}/\w+'.format(
+                current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'])
+            ),
+            body=request_callback,
+            content_type='application/json'
+        )
+
+    def __enter__(self):
+        """
+        Defines the behaviour for __enter__
+        :return: no return
+        """
+
+        HTTPretty.enable()
+
+    def __exit__(self, etype, value, traceback):
+        """
+        Defines the behaviour for __exit__
+        :param etype: exit type
+        :param value: exit value
+        :param traceback: the traceback for the exit
+        :return: no return
+        """
+
+        HTTPretty.reset()
+        HTTPretty.disable()
