@@ -719,7 +719,7 @@ class LibraryView(BaseView):
         params = {
             'q': '*:*',
             'wt': 'json',
-            'fl': 'bibcode',
+            'fl': 'title,abstract,bibcode,author,aff,links_data,property,[citations],pub,pubdate',
             'fq': '{!bitset}'
         }
 
