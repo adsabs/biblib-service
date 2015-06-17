@@ -478,6 +478,42 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
         self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
 
+    def test_transfer_view_post_types(self):
+        """
+        Tests that the content passed to the UserView POST end point
+        has all the types checked.
+
+        :return: no return
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        library_id = response.json['id']
+        self.assertEqual(response.status_code, 200)
+
+        post_data = stub_user.transfer_view_post_data()
+        post_data['email'] = 1
+
+        # Transfer it to a non-existent user
+        with MockEmailService(stub_user):
+            url = url_for('transferview', library=library_id)
+            response = self.client.post(
+                url,
+                data=json.dumps(post_data),
+                headers=stub_user.headers
+            )
+
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
     def test_add_document_to_library(self):
         """
         Test the /documents/<> end point with POST to add a document
@@ -1647,6 +1683,167 @@ class TestWebservices(TestCaseDatabase):
                                  NO_PERMISSION_ERROR['number'])
                 self.assertEqual(response.json['error'],
                                  NO_PERMISSION_ERROR['body'])
+
+    def test_missing_user_id_raises_error(self):
+        """
+        Tests that a KeyError is raised if the header does not contain the
+        user id of the requesting user
+
+        :return: no return
+        """
+
+        get_end_points = ['userview', 'libraryview', 'permissionview']
+        post_end_points = ['userview', 'documentview', 'permissionview',
+                           'transferview']
+        put_end_points = ['documentview']
+        delete_end_points = ['documentview']
+
+        # GETs
+        for end_points in get_end_points:
+            url = url_for(end_points, library='1')
+            response = self.client.get(
+                url
+            )
+            self.assertEqual(response.status_code,
+                             MISSING_USERNAME_ERROR['number'])
+
+        # POSTs
+        for end_points in post_end_points:
+            url = url_for(end_points, library='1')
+            response = self.client.post(
+                url,
+                data="{}"
+            )
+            self.assertEqual(response.status_code,
+                             MISSING_USERNAME_ERROR['number'])
+
+        # PUTs
+        for end_points in put_end_points:
+            url = url_for(end_points, library='1')
+            response = self.client.post(
+                url,
+                data="{}"
+            )
+            self.assertEqual(response.status_code,
+                             MISSING_USERNAME_ERROR['number'])
+
+        # DELETEs
+        for end_points in delete_end_points:
+            url = url_for(end_points, library='1')
+            response = self.client.delete(
+                url
+            )
+            self.assertEqual(response.status_code,
+                             MISSING_USERNAME_ERROR['number'])
+
+    def test_can_transfer_a_library(self):
+        """
+        Tests that a user can transfer a library to another user.
+
+        :return: no return
+        """
+        user_owner = UserShop()
+        user_new_owner = UserShop()
+        stub_library = LibraryShop()
+
+        # Dave has a big library that he has maintained for many years
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_owner.headers
+        )
+        self.assertEqual(response.status_code, 200, response)
+        library_id_dave = response.json['id']
+
+        # Transfer it to a non-existent user
+        with MockEmailService(user_new_owner):
+            url = url_for('transferview', library=library_id_dave)
+            response = self.client.post(
+                url,
+                data=user_new_owner.transfer_view_post_data_json(),
+                headers=user_owner.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        # Check the permissions
+        with MockEndPoint([user_owner, user_new_owner]):
+            url = url_for('permissionview', library=library_id_dave)
+            response = self.client.get(
+                url,
+                headers=user_new_owner.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(len(response.json) == 1)
+        self.assertEqual(['owner'], response.json[0][user_new_owner.email])
+
+    def test_cannot_transfer_a_library_if_user_non_existent(self):
+        """
+        Tests that you cannot transfer a library if the other user does not
+        exist.
+
+        :return: no return
+        """
+        user_dave = UserShop()
+        user_random = UserShop(name='fail')
+        stub_library = LibraryShop()
+
+        # Dave has a big library that he has maintained for many years
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_dave.headers
+        )
+        self.assertEqual(response.status_code, 200, response)
+        library_id_dave = response.json['id']
+
+        # Transfer it to a non-existent user
+        with MockEmailService(user_random):
+            url = url_for('transferview', library=library_id_dave)
+            response = self.client.post(
+                url,
+                data=user_random.transfer_view_post_data_json(),
+                headers=user_dave.headers
+            )
+        self.assertEqual(response.status_code,
+                         API_MISSING_USER_EMAIL['number'])
+        self.assertEqual(response.json['error'],
+                         API_MISSING_USER_EMAIL['body'])
+
+    def test_cannot_transfer_a_library_if_not_owner(self):
+        """
+        Tests that you cannot transfer a library if the other user does not
+        exist.
+
+        :return: no return
+        """
+        user_owner = UserShop()
+        user_random = UserShop()
+        stub_library = LibraryShop()
+
+        # Dave has a big library that he has maintained for many years
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_owner.headers
+        )
+        self.assertEqual(response.status_code, 200, response)
+        library_id_dave = response.json['id']
+
+        # Transfer it to a non-existent user
+        with MockEmailService(user_random):
+            url = url_for('transferview', library=library_id_dave)
+            response = self.client.post(
+                url,
+                data=user_random.transfer_view_post_data_json(),
+                headers=user_random.headers
+            )
+        self.assertEqual(response.status_code,
+                         NO_PERMISSION_ERROR['number'])
+        self.assertEqual(response.json['error'],
+                         NO_PERMISSION_ERROR['body'])
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
