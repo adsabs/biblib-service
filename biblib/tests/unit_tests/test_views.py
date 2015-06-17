@@ -2021,6 +2021,56 @@ class TestTransferViews(TestCaseDatabase):
                 Permissions.library_id == stub_library.id
             ).one()
 
+    def test_can_transfer_a_library_for_a_reader(self):
+        """
+        Tests that you can transfer the ownership of a library
+
+        :return: no return
+        """
+        # Make a fake user and library
+        user_owner = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_new_owner = User(absolute_uid=self.stub_user_2.absolute_uid)
+
+        db.session.add_all([user_owner, user_new_owner])
+        db.session.commit()
+
+        # Ensure a library exists
+        stub_library = Library(name='MyLibrary',
+                               description='My library',
+                               public=True,
+                               bibcode=self.stub_library.bibcode)
+
+        permissions = Permissions(owner=True)
+        permissions_read = Permissions(read=True)
+        user_owner.permissions.append(permissions)
+        user_new_owner.permissions.append(permissions_read)
+        stub_library.permissions.append(permissions)
+        stub_library.permissions.append(permissions_read)
+
+        db.session.add_all([permissions, user_owner, stub_library,
+                            permissions_read, user_new_owner])
+        db.session.commit()
+
+        self.transfer_view.transfer_ownership(current_owner_uid=user_owner.id,
+                                              new_owner_uid=user_new_owner.id,
+                                              library_id=stub_library.id)
+
+        permission = Permissions.query.filter(
+            Permissions.user_id == user_new_owner.id
+        ).filter(
+            Permissions.library_id == stub_library.id
+        ).all()
+        self.assertTrue(len(permission) == 1)
+        self.assertTrue(permission[0].owner)
+        self.assertTrue(permission[0].read)
+
+        with self.assertRaises(NoResultFound):
+            Permissions.query.filter(
+                Permissions.user_id == user_owner.id
+            ).filter(
+                Permissions.library_id == stub_library.id
+            ).one()
+
     def test_transfer_query_when_mutliple_libraries(self):
         """
         Checks that the same logic works when there is more than one library
