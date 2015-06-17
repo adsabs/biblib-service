@@ -153,6 +153,24 @@ class UserShop(object):
         post_data = self.permission_view_post_data(permission, value)
         return json.dumps(post_data)
 
+    def transfer_view_post_data(self):
+        """
+        Expected data to be sent in a POST request to the TransferView.
+        :return: POST data in dictionary format
+        """
+        post_data = dict(
+            email=self.email
+        )
+        return post_data
+
+    def transfer_view_post_data_json(self):
+        """
+        Expected data to be sent in a POST request to the TransferView.
+        :return: POST data in JSON format
+        """
+        post_data = self.transfer_view_post_data()
+        return json.dumps(post_data)
+
 class LibraryShop(object):
     """
     A thin wrapper class that utilises the UserFactory to create extra stub

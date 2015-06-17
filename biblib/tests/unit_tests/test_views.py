@@ -14,7 +14,8 @@ import uuid
 from models import db, User, Library, Permissions, MutableList
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from views import UserView, LibraryView, DocumentView, PermissionView, BaseView
+from views import UserView, LibraryView, DocumentView, PermissionView, \
+    BaseView, TransferView
 from views import DEFAULT_LIBRARY_DESCRIPTION
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from utils import BackendIntegrityError, PermissionDeniedError
@@ -1904,6 +1905,216 @@ class TestPermissionViews(TestCaseDatabase):
         self.assertIn(self.stub_user_2.email, return_2[0])
         self.assertEqual(['owner'], return_1[0][self.stub_user_1.email])
         self.assertEqual(['admin'], return_2[0][self.stub_user_2.email])
+
+class TestTransferViews(TestCaseDatabase):
+    """
+    Base class to test the transferring of libraries between users.
+    """
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor of the class
+
+        :param args: to pass on to the super class
+        :param kwargs: to pass on to the super class
+
+        :return: no return
+        """
+
+        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        self.permission_view = PermissionView
+        self.transfer_view = TransferView
+
+        # Stub data
+        self.stub_user = self.stub_user_1 = UserShop()
+        self.stub_user_2 = UserShop()
+        self.stub_user_3 = UserShop()
+        self.stub_user_4 = UserShop()
+        self.stub_library = LibraryShop()
+
+    def test_cannot_transfer_ownership_if_not_owner(self):
+        """
+        Tests that if you do not have owner permissions then the user does
+        not have 'write' access to the transfer process
+
+        :return: no return
+        """
+
+        # Make a fake user and library
+        user_none = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_read = User(absolute_uid=self.stub_user_2.absolute_uid)
+        user_write = User(absolute_uid=self.stub_user_3.absolute_uid)
+        user_admin = User(absolute_uid=self.stub_user_4.absolute_uid)
+        db.session.add_all([user_none, user_read, user_write, user_admin])
+        db.session.commit()
+
+        # Ensure a library exists
+        stub_library = Library(name='MyLibrary',
+                               description='My library',
+                               public=True,
+                               bibcode=self.stub_library.bibcode)
+
+        permissions_read = Permissions(admin=True)
+        permissions_write = Permissions(write=True)
+        permissions_admin = Permissions(admin=True)
+
+        user_read.permissions.append(permissions_read)
+        user_write.permissions.append(permissions_write)
+        user_admin.permissions.append(permissions_admin)
+
+        stub_library.permissions.append(permissions_read)
+        stub_library.permissions.append(permissions_write)
+        stub_library.permissions.append(permissions_admin)
+
+        db.session.add_all([permissions_read, permissions_write,
+                            permissions_admin, user_read, user_write,
+                            user_admin, stub_library])
+        db.session.commit()
+
+        for stub_user in [user_none, user_read, user_write, user_admin]:
+            access = self.transfer_view.write_access(
+                service_uid=stub_user.id,
+                library_id=stub_library.id
+            )
+            self.assertFalse(access)
+
+    def test_can_transfer_a_library(self):
+        """
+        Tests that you can transfer the ownership of a library
+
+        :return: no return
+        """
+        # Make a fake user and library
+        user_owner = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_new_owner = User(absolute_uid=self.stub_user_2.absolute_uid)
+
+        db.session.add_all([user_owner, user_new_owner])
+        db.session.commit()
+
+        # Ensure a library exists
+        stub_library = Library(name='MyLibrary',
+                               description='My library',
+                               public=True,
+                               bibcode=self.stub_library.bibcode)
+
+        permissions = Permissions(owner=True)
+        user_owner.permissions.append(permissions)
+        stub_library.permissions.append(permissions)
+
+        db.session.add_all([permissions, user_owner, stub_library])
+        db.session.commit()
+
+        self.transfer_view.transfer_ownership(current_owner_uid=user_owner.id,
+                                              new_owner_uid=user_new_owner.id,
+                                              library_id=stub_library.id)
+
+        permission = Permissions.query.filter(
+            Permissions.user_id == user_new_owner.id
+        ).filter(
+            Permissions.library_id == stub_library.id
+        ).one()
+        self.assertTrue(permission.owner)
+
+        with self.assertRaises(NoResultFound):
+            Permissions.query.filter(
+                Permissions.user_id == user_owner.id
+            ).filter(
+                Permissions.library_id == stub_library.id
+            ).one()
+
+    def test_transfer_query_when_mutliple_libraries(self):
+        """
+        Checks that the same logic works when there is more than one library
+        within the database.
+
+        :return:
+        """
+        # Make a fake user and library
+        user_owner = User(absolute_uid=self.stub_user_1.absolute_uid)
+        user_random = User(absolute_uid=self.stub_user_2.absolute_uid)
+        user_new_owner = User(absolute_uid=self.stub_user_3.absolute_uid)
+        db.session.add_all([user_owner, user_new_owner, user_random])
+        db.session.commit()
+
+        # Ensure a library exists
+        stub_library_1 = Library(
+            name='MyLibrary',
+            description='My library',
+            public=True,
+            bibcode=self.stub_library.bibcode
+        )
+        stub_library_2 = Library(
+            name='MyLibrary',
+            description='My library',
+            public=True,
+            bibcode=self.stub_library.bibcode
+        )
+        db.session.add_all([
+            stub_library_1,
+            stub_library_2
+        ])
+        db.session.commit()
+
+        # Generate and add permissions
+        permission_owner = Permissions(
+            owner=True,
+            library_id=stub_library_1.id,
+            user_id=user_owner.id
+        )
+        permission_random_library_1 = Permissions(
+            read=True,
+            library_id=stub_library_1.id,
+            user_id=user_random.id
+        )
+        permission_random_library_2 = Permissions(
+            owner=True,
+            library_id=stub_library_2.id,
+            user_id=user_random.id
+        )
+        db.session.add_all([
+            permission_owner,
+            permission_random_library_1,
+            permission_random_library_2
+        ])
+        db.session.commit()
+
+        # Transfer the ownership of library 1
+        self.transfer_view.transfer_ownership(current_owner_uid=user_owner.id,
+                                              new_owner_uid=user_new_owner.id,
+                                              library_id=stub_library_1.id)
+
+        # Check that the permissions changed properly
+        # New user owner has owner permissions
+        permission = Permissions.query.filter(
+            Permissions.user_id == user_new_owner.id
+        ).filter(
+            Permissions.library_id == stub_library_1.id
+        ).one()
+        self.assertTrue(permission.owner)
+
+        # Old owner no longer has permissions
+        with self.assertRaises(NoResultFound):
+            Permissions.query.filter(
+                Permissions.user_id == user_owner.id
+            ).filter(
+                Permissions.library_id == stub_library_1.id
+            ).one()
+
+        # Check the random user did not change
+        # Random owns library 2
+        permission = Permissions.query.filter(
+            Permissions.user_id == user_random.id
+        ).filter(
+            Permissions.library_id == stub_library_2.id
+        ).one()
+        self.assertTrue(permission.owner)
+
+        # Random reads library 1
+        permission = Permissions.query.filter(
+            Permissions.user_id == user_random.id
+        ).filter(
+            Permissions.library_id == stub_library_1.id
+        ).one()
+        self.assertTrue(permission.read)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
