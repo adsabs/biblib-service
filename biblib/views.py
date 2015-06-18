@@ -720,6 +720,7 @@ class LibraryView(BaseView):
             'q': '*:*',
             'wt': 'json',
             'fl': 'title,abstract,bibcode,author,aff,links_data,property,[citations],pub,pubdate',
+            'rows': "1000", 
             'fq': '{!bitset}'
         }
 
