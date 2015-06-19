@@ -16,7 +16,7 @@ from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
     MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, DEFAULT_LIBRARY_NAME_PREFIX, \
     DEFAULT_LIBRARY_DESCRIPTION, WRONG_TYPE_ERROR, \
     API_MISSING_USER_EMAIL
-from tests.stubdata.stub_data import LibraryShop, UserShop
+from tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint
 
@@ -238,6 +238,57 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('documents', response.json)
         self.assertIn('solr', response.json)
+
+    def test_update_library_with_solr_data(self):
+        """
+        Test the /libraries/<> such that the library bibcodes are updated if
+        the solr data returns a new canonical bibcode.
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop(want_bibcode=True)
+
+        # Make the library
+        post_data = stub_library.user_view_post_data
+        canonical_biblist = fake_biblist(10)
+        non_canonical_biblist = canonical_biblist[:]
+
+        non_canonical_biblist[1] = 'arXiV' + non_canonical_biblist[1]
+        non_canonical_biblist[5] = 'arXiV' + non_canonical_biblist[5]
+
+        post_data['bibcode'] = non_canonical_biblist
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+
+        # Check the library exists in the database
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService(canonical_bibcode=canonical_biblist):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('documents', response.json)
+        self.assertIn('solr', response.json)
+
+        # Check that the solr docs updated the library docs
+        solr_docs = response.json['solr']['response']['docs']
+        lib_docs = response.json['documents']
+
+        for doc in solr_docs:
+            self.assertIn(doc['bibcode'], lib_docs)
+            self.assertIn(doc['bibcode'], canonical_biblist)
 
     def test_create_library_resource_and_add_bibcodes_of_wrong_type(self):
         """

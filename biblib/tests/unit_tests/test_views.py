@@ -833,6 +833,66 @@ class TestLibraryViews(TestCaseDatabase):
             )
         self.assertIn('responseHeader', response_library.json())
 
+    def test_that_solr_updates_canonical_bibcodes(self):
+        """
+        Tests that a comparison between the solr data and the stored data is
+        carried out. Mismatching documents are then updated appropriately.
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        original_bibcodes = ['test1', 'test2', 'arXivtest3', 'test4']
+        canonical_bibcodes = ['test1', 'test2', 'test3', 'test4']
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=original_bibcodes)
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        # Retrieve the bibcodes using the web services
+        with MockSolrBigqueryService(canonical_bibcode=canonical_bibcodes):
+            response_library = self.library_view.solr_big_query(
+                bibcodes=library.bibcode
+            )
+        self.assertIn('responseHeader', response_library.json())
+
+        # Now check solr updates the records correctly
+        solr_bibcodes = \
+            [i['bibcode'] for i in
+             response_library.json()['response']['docs']]
+        self.library_view.solr_update_library(library=library,
+                                              solr_bibcodes=solr_bibcodes)
+
+        library = Library.query.filter(Library.id == library.id).one()
+        self.assertNotEqual(library.bibcode, original_bibcodes)
+        self.assertEqual(library.bibcode, canonical_bibcodes)
+
+    @unittest.skip('Not implemented')
+    def test_no_updates_if_solr_response_strange(self):
+        """
+        Tests that the solr data is used to update the database if the response
+        is normal.
+
+        :return: no return
+        """
+        self.fail()
+
     def test_user_without_permission_cannot_access_private_library(self):
         """
         Tests that the user requesting to see the contents of a library has
