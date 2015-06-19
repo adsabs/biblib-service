@@ -56,6 +56,11 @@ API_MISSING_USER_UID = dict(
     body='User does not exist in the API database',
     number=404
 )
+SOLR_RESPONSE_MISMATCH_ERROR = dict(
+    body='Solr response does not contain the same number of bibcodes as the '
+         'request.',
+    number=404
+)
 
 
 class BaseView(Resource):
@@ -714,13 +719,14 @@ class LibraryView(BaseView):
         :return: solr bigquery end point response
         """
 
-        bibcodes = 'bibcode\n' + '\n'.join(bibcodes)
+        bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
 
         params = {
             'q': '*:*',
             'wt': 'json',
-            'fl': 'title,abstract,bibcode,author,aff,links_data,property,[citations],pub,pubdate',
-            'rows': "1000", 
+            'fl': 'title,abstract,bibcode,author,aff,links_data,'
+                  'property,[citations],pub,pubdate',
+            'rows': '1000',
             'fq': '{!bitset}'
         }
 
@@ -728,15 +734,47 @@ class LibraryView(BaseView):
             'Content-Type': 'big-query/csv',
         }
         current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
-                                .format(params, bibcodes.replace('\n', ',')))
+                                .format(params,
+                                        bibcodes_string.replace('\n', ',')))
         response = client().post(
             url=current_app.config['BIBLIB_SOLR_BIG_QUERY_URL'],
             params=params,
-            data=bibcodes,
+            data=bibcodes_string,
             headers=headers
         )
 
         return response
+
+    @staticmethod
+    def solr_update_library(library, solr_bibcodes):
+        """
+        Updates the library based on the solr canonical bibcodes response
+        :param library: library to update
+        :param solr_bibcodes: solr bigquery response
+
+        :return: no return
+        """
+
+        update = False
+        new_bibcode = []
+
+        for i in range(len(library.bibcode)):
+            if library.bibcode[i] != solr_bibcodes[i]:
+                current_app.logger.info('Updating bibcode: {0} to {1}'
+                                        .format(
+                                            library.bibcode[i],
+                                            solr_bibcodes[i]
+                                        )
+                )
+                new_bibcode.append(solr_bibcodes[i])
+                update = True
+            else:
+                new_bibcode.append(library.bibcode[i])
+
+        if update:
+            library.bibcode = new_bibcode
+            db.session.add(library)
+            db.session.commit()
 
     # Methods
     def get(self, library):
@@ -806,6 +844,17 @@ class LibraryView(BaseView):
                 documents=documents,
                 solr=solr
             )
+
+            # Now check if we can update the library database based on the
+            # returned canonical bibcodes
+            if not solr.get('response') \
+                    or len(solr['response']['docs']) != len(library.bibcode):
+                return err(SOLR_RESPONSE_MISMATCH_ERROR)
+
+            # Update bibcodes based on solr
+            solr_bibcodes = \
+                [i['bibcode'] for i in solr['response']['docs']]
+            self.solr_update_library(library=library, solr=solr)
 
         except Exception as error:
             current_app.logger.warning(
