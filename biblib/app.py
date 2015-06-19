@@ -3,7 +3,8 @@ Application
 """
 
 import logging.config
-from views import UserView, LibraryView, DocumentView, PermissionView
+from views import UserView, LibraryView, DocumentView, PermissionView, \
+    TransferView
 from models import db
 
 from flask import Flask
@@ -52,6 +53,10 @@ def create_app(config_type='STAGING'):
     api.add_resource(PermissionView,
                      '/permissions/<string:library>',
                      methods=['GET', 'POST'])
+
+    api.add_resource(TransferView,
+                     '/transfer/<string:library>',
+                     methods=['POST'])
 
     return app
 
