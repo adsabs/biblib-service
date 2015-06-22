@@ -41,6 +41,11 @@ def err(error_dictionary):
     """
     return {'error': error_dictionary['body']}, error_dictionary['number']
 
+def uniquify(seq):
+    seen = set()
+    seen_add = seen.add
+    return [ x for x in seq if not (x in seen or seen_add(x))]
+
 class BackendIntegrityError(Exception):
     """
     Custom exception that is raised when there are application errors similar

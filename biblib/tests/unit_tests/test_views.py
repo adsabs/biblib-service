@@ -891,6 +891,8 @@ class TestLibraryViews(TestCaseDatabase):
 
         :return: no return
         """
+
+
         self.fail()
 
     def test_user_without_permission_cannot_access_private_library(self):
