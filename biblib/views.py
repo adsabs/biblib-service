@@ -12,7 +12,7 @@ from client import client
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from utils import get_post_data, BackendIntegrityError, \
-    PermissionDeniedError, err
+    PermissionDeniedError, err, uniquify
 
 # Constant definitions
 API_HELP = 'http://adsabs.github.io/help/api/'
@@ -387,7 +387,7 @@ class UserView(BaseView):
             if _bibcode and isinstance(_bibcode, list):
 
                 # Ensure unique content
-                _bibcode = list(set(_bibcode))
+                _bibcode = uniquify(_bibcode)
                 current_app.logger.info('User supplied bibcodes: {0}'
                                         .format(_bibcode))
                 library.bibcode = _bibcode
@@ -830,31 +830,34 @@ class LibraryView(BaseView):
             library = self.get_documents_from_library(library_id=library)
             # pay attention to any functions that try to mutate the list
             # this will alter expected returns later
-            documents = library.bibcode
 
             try:
-                solr = self.solr_big_query(bibcodes=documents).json()
+                solr = self.solr_big_query(bibcodes=library.bibcode).json()
             except Exception as error:
                 current_app.logger.warning('Could not parse solr data: {0}'
                                            .format(error))
                 solr = {'error': 'Could not parse solr data'}
 
-            # Make the response dictionary
-            response = dict(
-                documents=documents,
-                solr=solr
-            )
-
             # Now check if we can update the library database based on the
             # returned canonical bibcodes
             if not solr.get('response') \
                     or len(solr['response']['docs']) != len(library.bibcode):
+                current_app.logger.warning('Problem with solr response: {0}'
+                                           .format(solr))
                 return err(SOLR_RESPONSE_MISMATCH_ERROR)
 
             # Update bibcodes based on solr
             solr_bibcodes = \
                 [i['bibcode'] for i in solr['response']['docs']]
-            self.solr_update_library(library=library, solr=solr)
+
+            self.solr_update_library(library=library,
+                                     solr_bibcodes=solr_bibcodes)
+
+            # Make the response dictionary
+            response = dict(
+                documents=library.bibcode,
+                solr=solr
+            )
 
         except Exception as error:
             current_app.logger.warning(
@@ -936,7 +939,10 @@ class DocumentView(BaseView):
         db.session.add(library)
         db.session.commit()
 
-        current_app.logger.info(library.bibcode)
+        current_app.logger.info('Added: {0} is now {1}'.format(
+            document_data['bibcode'],
+            library.bibcode)
+        )
 
         end_length = len(library.bibcode)
 

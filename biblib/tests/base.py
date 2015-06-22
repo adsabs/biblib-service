@@ -110,7 +110,8 @@ class MockSolrBigqueryService(MockADSWSAPI):
                     bibcode = self.kwargs.get('canonical_bibcode')[i]
                     docs.append({'bibcode': bibcode})
             else:
-                docs = [{'bibcode': 'bibcode'}]
+                docs = [{'bibcode': 'bibcode'} for i
+                        in range(self.kwargs.get('number_of_bibcodes', 1))]
             resp = {
                 'responseHeader': {
                     'status': 0,

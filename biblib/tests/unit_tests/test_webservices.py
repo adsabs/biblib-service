@@ -192,7 +192,7 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library exists in the database
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(canonical_bibcode=stub_library.bibcode):
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -254,8 +254,8 @@ class TestWebservices(TestCaseDatabase):
         canonical_biblist = fake_biblist(10)
         non_canonical_biblist = canonical_biblist[:]
 
-        non_canonical_biblist[1] = 'arXiV' + non_canonical_biblist[1]
-        non_canonical_biblist[5] = 'arXiV' + non_canonical_biblist[5]
+        non_canonical_biblist[1] = 'arXiv' + non_canonical_biblist[1]
+        non_canonical_biblist[5] = 'arXiv' + non_canonical_biblist[5]
 
         post_data['bibcode'] = non_canonical_biblist
 
@@ -604,7 +604,7 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library was created and documents exist
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(canonical_bibcode=stub_library.bibcode):
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -711,7 +711,7 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library is empty
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(number_of_bibcodes=0):
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -857,12 +857,14 @@ class TestWebservices(TestCaseDatabase):
         # Request from user 2 to see the library should be refused if user 2
         # does not have the permissions
         # Check the library is empty
+        print stub_library.user_view_post_data_json
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(number_of_bibcodes=0):
             response = self.client.get(
                 url,
                 headers=stub_user_2.headers
             )
+        print response.json
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
@@ -917,7 +919,7 @@ class TestWebservices(TestCaseDatabase):
 
         # The user can now access the content of the library
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(number_of_bibcodes=0):
             response = self.client.get(
                 url,
                 headers=stub_user_2.headers
@@ -1193,7 +1195,7 @@ class TestWebservices(TestCaseDatabase):
         # Request from user 2
         # Given it is public, should be able to view it
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(number_of_bibcodes=0):
             response = self.client.get(
                 url,
                 headers=stub_user_2.headers
