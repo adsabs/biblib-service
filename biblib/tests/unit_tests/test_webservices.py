@@ -857,14 +857,12 @@ class TestWebservices(TestCaseDatabase):
         # Request from user 2 to see the library should be refused if user 2
         # does not have the permissions
         # Check the library is empty
-        print stub_library.user_view_post_data_json
         url = url_for('libraryview', library=library_id)
         with MockSolrBigqueryService(number_of_bibcodes=0):
             response = self.client.get(
                 url,
                 headers=stub_user_2.headers
             )
-        print response.json
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 

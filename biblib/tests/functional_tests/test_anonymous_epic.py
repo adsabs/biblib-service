@@ -63,7 +63,7 @@ class TestAnonymousEpic(TestCaseDatabase):
 
         # Anonymous user tries to access the private library. But cannot.
         url = url_for('libraryview', library=library_id_private)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(number_of_bibcodes=0):
             response = self.client.get(
                 url,
                 headers=user_anonymous.headers
@@ -73,7 +73,7 @@ class TestAnonymousEpic(TestCaseDatabase):
 
         # Anonymous user tries to access the public library. And can.
         url = url_for('libraryview', library=library_id_public)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(number_of_bibcodes=0):
             response = self.client.get(
                 url,
                 headers=user_anonymous.headers

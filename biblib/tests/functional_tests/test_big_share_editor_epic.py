@@ -65,14 +65,15 @@ class TestDeletionEpic(TestCaseDatabase):
                 headers=user_dave.headers
             )
             self.assertEqual(response.json['number_added'],
-                 len(library.bibcode))
+                             len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
 
             libraries_added.append(library)
 
         # Checks they are all in the library
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
+        with MockSolrBigqueryService(canonical_bibcode=canonical_bibcode):
             response = self.client.get(
                 url,
                 headers=user_dave.headers
@@ -104,8 +105,9 @@ class TestDeletionEpic(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
 
         # Mary looks at the library
+        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(canonical_bibcode=canonical_bibcode):
             response = self.client.get(
                 url,
                 headers=user_mary.headers
@@ -133,8 +135,9 @@ class TestDeletionEpic(TestCaseDatabase):
             libraries_added.remove(libraries_added[i])
 
         # She checks that they got removed
+        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(canonical_bibcode=canonical_bibcode):
             response = self.client.get(
                 url,
                 headers=user_mary.headers
@@ -158,10 +161,11 @@ class TestDeletionEpic(TestCaseDatabase):
             self.assertEqual(response.status_code, 200, response)
 
             libraries_added.append(library)
+            canonical_bibcode.extend(library.bibcode)
 
         # She checks that they got added
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService(canonical_bibcode=canonical_bibcode):
             response = self.client.get(
                 url,
                 headers=user_mary.headers
