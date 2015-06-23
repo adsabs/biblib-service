@@ -938,18 +938,19 @@ class LibraryView(BaseView):
 
             # Now check if we can update the library database based on the
             # returned canonical bibcodes
-            if not solr.get('response') \
-                    or len(solr['response']['docs']) != len(library.bibcode):
+            if solr.get('response') \
+                    and len(solr['response']['docs']) == len(library.bibcode):
+                # Update bibcodes based on solr
+                solr_bibcodes = \
+                    [i['bibcode'] for i in solr['response']['docs']]
+
+                self.solr_update_library(library=library,
+                                         solr_bibcodes=solr_bibcodes)
+            else:
+                solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
                 current_app.logger.warning('Problem with solr response: {0}'
                                            .format(solr))
-                return err(SOLR_RESPONSE_MISMATCH_ERROR)
 
-            # Update bibcodes based on solr
-            solr_bibcodes = \
-                [i['bibcode'] for i in solr['response']['docs']]
-
-            self.solr_update_library(library=library,
-                                     solr_bibcodes=solr_bibcodes)
             # Make the response dictionary
             response = dict(
                 documents=library.bibcode,

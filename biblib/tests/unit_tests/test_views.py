@@ -883,18 +883,6 @@ class TestLibraryViews(TestCaseDatabase):
         self.assertNotEqual(library.bibcode, original_bibcodes)
         self.assertEqual(library.bibcode, canonical_bibcodes)
 
-    @unittest.skip('Not implemented')
-    def test_no_updates_if_solr_response_strange(self):
-        """
-        Tests that the solr data is used to update the database if the response
-        is normal.
-
-        :return: no return
-        """
-
-
-        self.fail()
-
     def test_user_without_permission_cannot_access_private_library(self):
         """
         Tests that the user requesting to see the contents of a library has
