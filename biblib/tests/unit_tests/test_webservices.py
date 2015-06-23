@@ -274,7 +274,9 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library exists in the database
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService(canonical_bibcode=canonical_biblist):
+        with MockSolrBigqueryService(
+                canonical_bibcode=canonical_biblist) as BQ, \
+                MockEndPoint([stub_user]) as EP:
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -326,7 +328,9 @@ class TestWebservices(TestCaseDatabase):
         # Check the library exists in the database
         canonical_biblist.pop()
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService(canonical_bibcode=canonical_biblist):
+        with MockSolrBigqueryService(
+                canonical_bibcode=canonical_biblist) as BQ, \
+                MockEndPoint([stub_user]) as EP:
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -977,7 +981,7 @@ class TestWebservices(TestCaseDatabase):
 
         # The user can now access the content of the library
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService(number_of_bibcodes) as BQ, \
+        with MockSolrBigqueryService(number_of_bibcodes=0) as BQ, \
                 MockEndPoint([stub_user_1, stub_user_2]) as ES:
             response = self.client.get(
                 url,
