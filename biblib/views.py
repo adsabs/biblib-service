@@ -837,10 +837,21 @@ class LibraryView(BaseView):
         -----------
         documents:    <list>   Currently, a list containing the bibcodes.
         solr:         <dict>   The response from the solr bigquery end point
+        metadata:     <dict>   contains the following:
 
-        Note. in the future this will be modified to include all the content
-        of the library.
-
+          name:                 <string>  Name of the library
+          id:                   <string>  ID of the library
+          description:          <string>  Description of the library
+          num_documents:        <int>     Number of documents in the library
+          date_created:         <string>  ISO date library was created
+          date_last_modified:   <string>  ISO date library was last modified
+          permission:           <sting>   Permission type, can be: 'read',
+                                          'write', 'admin', or 'owner'
+          public:               <boolean> True means it is public
+          num_users:            <int>     Number of users with permissions to
+                                          this library
+          owner:                <string>  Identifier of the user who created
+                                          the library
         Permissions:
         -----------
         The following type of user can read a library:

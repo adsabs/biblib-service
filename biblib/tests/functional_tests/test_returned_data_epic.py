@@ -196,7 +196,7 @@ class TestReturnedDataEpic(TestCaseDatabase):
                                   date_last_modified_2,
                                   delta=timedelta(seconds=1))
 
-    def test_returned_data_user_view_epic(self):
+    def test_returned_data_library_view_epic(self):
         """
         Carries out the epic 'Returned Data', for the LibraryView GET end point
         that should return content similar to the UserView GET end point. This
