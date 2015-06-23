@@ -503,6 +503,7 @@ class UserView(BaseView):
                 num_users=num_users,
                 owner=owner
             )
+
             output_libraries.append(payload)
 
         return output_libraries
@@ -673,8 +674,8 @@ class LibraryView(BaseView):
     scopes = []
     rate_limit = [1000, 60*60*24]
 
-    @staticmethod
-    def get_documents_from_library(library_id):
+    @classmethod
+    def get_documents_from_library(cls, library_id, service_uid):
         """
         Retrieve all the documents that are within the library specified
         :param library_id: the unique ID of the library
@@ -682,8 +683,84 @@ class LibraryView(BaseView):
         :return: bibcodes
         """
 
+        # Get the library
         library = Library.query.filter(Library.id == library_id).one()
-        return library
+
+        # Get the owner of the library
+        result = db.session.query(Permissions, User)\
+            .join(Permissions.user)\
+            .filter(Permissions.library_id == library_id)\
+            .filter(Permissions.owner == True)\
+            .one()
+        owner_permissions, owner = result
+
+        service = '{api}/{uid}'.format(
+            api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
+            uid=owner.absolute_uid
+        )
+        current_app.logger.info('Obtaining email of user: {0} [API UID]'
+                                .format(owner.absolute_uid))
+        response = client().get(
+            service
+        )
+
+        # For this library get all the people who have permissions
+        users = Permissions.query.filter(
+            Permissions.library_id == library.id
+        ).all()
+
+        if response.status_code != 200:
+            current_app.logger.error('Could not find user in the API'
+                                     'database: {0}.'.format(service))
+            owner = 'Not available'
+        else:
+            owner = response.json()['email'].split('@')[0]
+
+        # User requesting to see the content
+        if service_uid:
+            try:
+                permission = Permissions.query.filter(
+                    Permissions.user_id == service_uid
+                ).filter(
+                    Permissions.library_id == library_id
+                ).one()
+
+                if permission.owner:
+                    main_permission = 'owner'
+                elif permission.admin:
+                    main_permission = 'admin'
+                elif permission.write:
+                    main_permission = 'write'
+                elif permission.read:
+                    main_permission = 'read'
+                else:
+                    main_permission = 'none'
+            except:
+                main_permission = 'none'
+        else:
+            main_permission = 'none'
+
+        if main_permission == 'owner' or main_permission == 'admin':
+            num_users = len(users)
+        elif library.public:
+            num_users = len(users)
+        else:
+            num_users = 0
+
+        metadata = dict(
+            name=library.name,
+            id='{0}'.format(cls.helper_uuid_to_slug(library.id)),
+            description=library.description,
+            num_documents=len(library.bibcode),
+            date_created=library.date_created.isoformat(),
+            date_last_modified=library.date_last_modified.isoformat(),
+            permission=main_permission,
+            public=library.public,
+            num_users=num_users,
+            owner=owner
+        )
+
+        return library, metadata
 
     @classmethod
     def read_access(cls, service_uid, library_id):
@@ -760,10 +837,21 @@ class LibraryView(BaseView):
         -----------
         documents:    <list>   Currently, a list containing the bibcodes.
         solr:         <dict>   The response from the solr bigquery end point
+        metadata:     <dict>   contains the following:
 
-        Note. in the future this will be modified to include all the content
-        of the library.
-
+          name:                 <string>  Name of the library
+          id:                   <string>  ID of the library
+          description:          <string>  Description of the library
+          num_documents:        <int>     Number of documents in the library
+          date_created:         <string>  ISO date library was created
+          date_last_modified:   <string>  ISO date library was last modified
+          permission:           <sting>   Permission type, can be: 'read',
+                                          'write', 'admin', or 'owner'
+          public:               <boolean> True means it is public
+          num_users:            <int>     Number of users with permissions to
+                                          this library
+          owner:                <string>  Identifier of the user who created
+                                          the library
         Permissions:
         -----------
         The following type of user can read a library:
@@ -786,10 +874,20 @@ class LibraryView(BaseView):
         current_app.logger.info('User: {0} requested library: {1}'
                                 .format(user, library))
 
+        user_exists = self.helper_user_exists(absolute_uid=user)
+        if user_exists:
+            service_uid = \
+                self.helper_absolute_uid_to_service_uid(absolute_uid=user)
+        else:
+            service_uid = None
+
         # If the library is public, allow access
         try:
             # Try to load the dictionary and obtain the solr content
-            library = self.get_documents_from_library(library_id=library)
+            library, metadata = self.get_documents_from_library(
+                library_id=library,
+                service_uid=service_uid
+            )
             # pay attention to any functions that try to mutate the list
             # this will alter expected returns later
             documents = library.bibcode
@@ -804,7 +902,8 @@ class LibraryView(BaseView):
             # Make the response dictionary
             response = dict(
                 documents=documents,
-                solr=solr
+                solr=solr,
+                metadata=metadata
             )
 
         except Exception as error:

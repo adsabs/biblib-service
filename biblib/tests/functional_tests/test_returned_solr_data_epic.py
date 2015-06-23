@@ -18,7 +18,7 @@ import unittest
 from datetime import datetime, timedelta
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import MockSolrBigqueryService, TestCaseDatabase
+from tests.base import MockSolrBigqueryService, TestCaseDatabase, MockEndPoint
 
 
 class TestReturnedSolrDataEpic(TestCaseDatabase):
@@ -54,7 +54,7 @@ class TestReturnedSolrDataEpic(TestCaseDatabase):
         # Dave clicks the library to open it and sees that the content is
         # filled with the same information found on the normal search pages.
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, MockEndPoint([user_dave]) as EP:
             response = self.client.get(
                 url,
                 headers=user_dave.headers
@@ -66,7 +66,8 @@ class TestReturnedSolrDataEpic(TestCaseDatabase):
         # The solr microservice goes down, I expect we should not rely on the
         # content to display something semi-nice in the mean time. So even
         # if it fails, we should get a 200 response
-        with MockSolrBigqueryService(status=500):
+        with MockSolrBigqueryService(status=500) as BQ, \
+                MockEndPoint([user_dave]) as EP:
             response = self.client.get(
                 url,
                 headers=user_dave.headers

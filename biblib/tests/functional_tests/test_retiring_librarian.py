@@ -70,7 +70,7 @@ class TestRetiringLibrarianEpic(TestCaseDatabase):
 
         # Check they all got added
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, MockEndPoint([user_dave]) as EP:
             response = self.client.get(
                 url,
                 headers=user_dave.headers

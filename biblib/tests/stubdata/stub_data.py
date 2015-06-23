@@ -330,3 +330,16 @@ class LibraryShop(object):
                           'date_created', 'date_last_modified', 'permission',
                           'public', 'num_users', 'owner']
         return expected_types
+
+    @staticmethod
+    def library_view_get_response():
+        """
+        Expected return data from the user view GET end point
+
+        :return: GET data in dictionary format
+        """
+
+        expected_types = ['name', 'description', 'id', 'num_documents',
+                          'date_created', 'date_last_modified', 'permission',
+                          'public', 'num_users', 'owner']
+        return expected_types

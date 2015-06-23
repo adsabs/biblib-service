@@ -704,7 +704,8 @@ class TestLibraryViews(TestCaseDatabase):
                           bibcode=self.stub_library.bibcode)
 
         # Give the user and library permissions
-        permission = Permissions(read=True,
+        permission = Permissions(owner=True,
+                                 read=True,
                                  write=True)
 
         # Commit the stub data
@@ -714,10 +715,87 @@ class TestLibraryViews(TestCaseDatabase):
         db.session.commit()
 
         # Retrieve the bibcodes using the web services
-        response_library = self.library_view.get_documents_from_library(
-            library_id=library.id
-        )
+        response_library, meta_data = \
+            self.library_view.get_documents_from_library(
+                library_id=library.id,
+                service_uid=user.id
+            )
         self.assertEqual(library.bibcode, response_library.bibcode)
+
+    def test_user_retrieves_correct_library_content(self):
+        """
+        Test that the contents returned from the library_view contains all the
+        information that we want
+
+        :return: no return
+        """
+        # Stub data
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=self.stub_library.bibcode)
+
+        # Give the user and library permissions
+        permission = Permissions(owner=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        with MockEmailService(self.stub_user, end_type='uid'):
+            library, metadata = self.library_view.get_documents_from_library(
+                library_id=library.id,
+                service_uid=user.id
+            )
+
+        for key in self.stub_library.library_view_get_response():
+            self.assertIn(key, metadata)
+
+    def test_user_retrieves_correct_library_content_if_not_owner(self):
+        """
+        Test that the contents returned from the library_view contains all the
+        information that we want
+
+        :return: no return
+        """
+        # Stub data
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        user_random = User(absolute_uid=self.stub_user_2.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=False,
+                          bibcode=self.stub_library.bibcode)
+
+        # Give the user and library permissions
+        permission = Permissions(owner=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user, user_random])
+        db.session.commit()
+
+        with MockEmailService(self.stub_user, end_type='uid'):
+            library, metadata = self.library_view.get_documents_from_library(
+                library_id=library.id,
+                service_uid=user_random.id
+            )
+
+        for key in self.stub_library.library_view_get_response():
+            self.assertIn(key, metadata)
+
+        self.assertEqual(0, metadata['num_users'])
 
     def test_that_solr_data_is_returned(self):
         """

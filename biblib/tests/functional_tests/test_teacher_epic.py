@@ -19,7 +19,7 @@ from views import NO_PERMISSION_ERROR
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from tests.base import MockEmailService, MockSolrBigqueryService, \
-    TestCaseDatabase
+    TestCaseDatabase, MockEndPoint
 
 
 class TestDeletionEpic(TestCaseDatabase):
@@ -58,7 +58,10 @@ class TestDeletionEpic(TestCaseDatabase):
         for user in [user_student_1, user_student_2]:
             # The students check they can see the content
             url = url_for('libraryview', library=library_id_teacher)
-            with MockSolrBigqueryService():
+            with MockSolrBigqueryService() as BQ, \
+                    MockEndPoint([
+                        user_teacher, user_student_1, user_student_2
+                    ]) as EP:
                 response = self.client.get(
                     url,
                     headers=user.headers
@@ -86,7 +89,10 @@ class TestDeletionEpic(TestCaseDatabase):
 
             # The students check they can see the content
             url = url_for('libraryview', library=library_id_teacher)
-            with MockSolrBigqueryService():
+            with MockSolrBigqueryService() as BQ, \
+                    MockEndPoint([
+                        user_teacher, user_student_1, user_student_2
+                    ]) as EP:
                 response = self.client.get(
                     url,
                     headers=user.headers
@@ -100,14 +106,18 @@ class TestDeletionEpic(TestCaseDatabase):
         with MockEmailService(user_student_2):
             response = self.client.post(
                 url,
-                data=user_student_2.permission_view_post_data_json('read', False),
+                data=user_student_2.permission_view_post_data_json('read',
+                                                                   False),
                 headers=user_teacher.headers
             )
         self.assertEqual(response.status_code, 200)
 
         # Student 2 cannot see the content
         url = url_for('libraryview', library=library_id_teacher)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([
+                    user_teacher, user_student_1, user_student_2
+                ]) as EP:
             response = self.client.get(
                 url,
                 headers=user_student_2.headers
@@ -117,7 +127,10 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Student 1 can see the content still
         url = url_for('libraryview', library=library_id_teacher)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([
+                    user_teacher, user_student_1, user_student_2
+                ]) as EP:
             response = self.client.get(
                 url,
                 headers=user_student_1.headers

@@ -86,7 +86,7 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Check they all got added
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, MockEndPoint([user_dave]) as EP:
             response = self.client.get(
                 url,
                 headers=user_dave.headers
@@ -97,7 +97,8 @@ class TestDeletionEpic(TestCaseDatabase):
         # she cannot access the library.
         # Dave selects her e-mail address
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([user_dave, user_mary]) as EP:
             response = self.client.get(
                 url,
                 headers=user_mary.headers
@@ -146,7 +147,8 @@ class TestDeletionEpic(TestCaseDatabase):
         # say she can see his libraries and is happy but wants to add content
         # herself
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([user_dave, user_mary]) as EP:
             response = self.client.get(
                 url,
                 headers=user_mary.headers
@@ -179,7 +181,8 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Mary realises she can no longer read content
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([user_dave, user_mary]) as EP:
             response = self.client.get(
                 url,
                 headers=user_mary.headers
