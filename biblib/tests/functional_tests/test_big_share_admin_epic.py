@@ -147,7 +147,6 @@ class TestDeletionEpic(TestCaseDatabase):
         # She checks that they got removed
         canonical_bibcode = [i.bibcode[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
-
         with MockSolrBigqueryService(
                 canonical_bibcode=canonical_bibcode) as BQ, \
                 MockEndPoint([user_student, user_dave]) as EP:

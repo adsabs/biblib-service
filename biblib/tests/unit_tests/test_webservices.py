@@ -192,6 +192,7 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library exists in the database
         url = url_for('libraryview', library=library_id)
+
         with MockSolrBigqueryService(
                 canonical_bibcode=stub_library.bibcode) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
@@ -331,6 +332,109 @@ class TestWebservices(TestCaseDatabase):
         with MockSolrBigqueryService(
                 canonical_bibcode=canonical_biblist) as BQ, \
                 MockEndPoint([stub_user]) as EP:
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('documents', response.json)
+        self.assertIn('solr', response.json)
+        self.assertEqual(SOLR_RESPONSE_MISMATCH_ERROR['body'],
+                         response.json['solr'])
+
+        # Check that the solr docs did not change the docs
+        lib_docs = response.json['documents']
+
+        self.assertEqual(lib_docs, non_canonical_biblist)
+        self.assertNotEqual(lib_docs, canonical_biblist)
+
+    def test_update_library_with_solr_data(self):
+        """
+        Test the /libraries/<> such that the library bibcodes are updated if
+        the solr data returns a new canonical bibcode.
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop(want_bibcode=True)
+
+        # Make the library
+        post_data = stub_library.user_view_post_data
+        canonical_biblist = fake_biblist(10)
+        non_canonical_biblist = canonical_biblist[:]
+
+        non_canonical_biblist[1] = 'arXiv' + non_canonical_biblist[1]
+        non_canonical_biblist[5] = 'arXiv' + non_canonical_biblist[5]
+
+        post_data['bibcode'] = non_canonical_biblist
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+
+        # Check the library exists in the database
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService(canonical_bibcode=canonical_biblist):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('documents', response.json)
+        self.assertIn('solr', response.json)
+
+        # Check that the solr docs updated the library docs
+        solr_docs = response.json['solr']['response']['docs']
+        lib_docs = response.json['documents']
+
+        for doc in solr_docs:
+            self.assertIn(doc['bibcode'], lib_docs)
+            self.assertIn(doc['bibcode'], canonical_biblist)
+
+    def test_solr_does_not_update_if_weird_response(self):
+        """
+        Test the /libraries/<> such that the library bibcodes are not updated if
+        the solr data returns a differently sized bibcode
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop(want_bibcode=True)
+
+        # Make the library
+        post_data = stub_library.user_view_post_data
+        canonical_biblist = fake_biblist(10)
+        non_canonical_biblist = canonical_biblist[:]
+
+        non_canonical_biblist[1] = 'arXiv' + non_canonical_biblist[1]
+        non_canonical_biblist[5] = 'arXiv' + non_canonical_biblist[5]
+
+        post_data['bibcode'] = non_canonical_biblist
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+
+        # Check the library exists in the database
+        canonical_biblist.pop()
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService(canonical_bibcode=canonical_biblist):
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -921,6 +1025,7 @@ class TestWebservices(TestCaseDatabase):
         # does not have the permissions
         # Check the library is empty
         url = url_for('libraryview', library=library_id)
+
         with MockSolrBigqueryService(number_of_bibcodes=0) as BQ, \
                 MockEmailService(stub_user_1, end_type='uid') as ES:
             response = self.client.get(

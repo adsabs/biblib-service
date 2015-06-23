@@ -59,7 +59,6 @@ class TestJobEpic(TestCaseDatabase):
 
         # She then asks a friend to check the link, and it works fine.
         url = url_for('libraryview', library=library_id)
-
         with MockSolrBigqueryService(
                 canonical_bibcode=stub_library.bibcode) as BQ, \
                 MockEndPoint([user_mary]) as EP:
