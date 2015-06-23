@@ -16,7 +16,7 @@ sys.path.append(PROJECT_HOME)
 import unittest
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import TestCaseDatabase, MockSolrBigqueryService
+from tests.base import TestCaseDatabase, MockSolrBigqueryService, MockEndPoint
 
 class TestJobEpic(TestCaseDatabase):
     """
@@ -59,7 +59,7 @@ class TestJobEpic(TestCaseDatabase):
 
         # She then asks a friend to check the link, and it works fine.
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, MockEndPoint([user_mary]) as EP:
             response = self.client.get(
                 url,
                 headers=user_random.headers

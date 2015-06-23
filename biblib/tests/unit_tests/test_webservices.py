@@ -192,7 +192,8 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library exists in the database
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -228,7 +229,8 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library exists in the database
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -553,7 +555,8 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library was created and documents exist
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -660,7 +663,8 @@ class TestWebservices(TestCaseDatabase):
 
         # Check the library is empty
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -752,7 +756,8 @@ class TestWebservices(TestCaseDatabase):
 
         # Check there is no document content
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
                 headers=stub_user.headers
@@ -807,7 +812,8 @@ class TestWebservices(TestCaseDatabase):
         # does not have the permissions
         # Check the library is empty
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEmailService(stub_user_1, end_type='uid') as ES:
             response = self.client.get(
                 url,
                 headers=stub_user_2.headers
@@ -866,7 +872,8 @@ class TestWebservices(TestCaseDatabase):
 
         # The user can now access the content of the library
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([stub_user_1, stub_user_2]) as ES:
             response = self.client.get(
                 url,
                 headers=stub_user_2.headers
@@ -1142,7 +1149,8 @@ class TestWebservices(TestCaseDatabase):
         # Request from user 2
         # Given it is public, should be able to view it
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService():
+        with MockEndPoint([stub_user_1, stub_user_2]) as ES,\
+                MockSolrBigqueryService() as BQ:
             response = self.client.get(
                 url,
                 headers=stub_user_2.headers

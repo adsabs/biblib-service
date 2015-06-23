@@ -17,7 +17,7 @@ import unittest
 from views import USER_ID_KEYWORD, NO_PERMISSION_ERROR
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import TestCaseDatabase, MockSolrBigqueryService
+from tests.base import TestCaseDatabase, MockSolrBigqueryService, MockEndPoint
 
 class TestAnonymousEpic(TestCaseDatabase):
     """
@@ -63,7 +63,8 @@ class TestAnonymousEpic(TestCaseDatabase):
 
         # Anonymous user tries to access the private library. But cannot.
         url = url_for('libraryview', library=library_id_private)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([user_dave, user_anonymous]) as EP:
             response = self.client.get(
                 url,
                 headers=user_anonymous.headers
@@ -73,7 +74,8 @@ class TestAnonymousEpic(TestCaseDatabase):
 
         # Anonymous user tries to access the public library. And can.
         url = url_for('libraryview', library=library_id_public)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([user_dave, user_anonymous]) as EP:
             response = self.client.get(
                 url,
                 headers=user_anonymous.headers

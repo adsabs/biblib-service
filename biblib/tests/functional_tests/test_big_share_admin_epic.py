@@ -18,7 +18,7 @@ from views import USER_ID_KEYWORD, NO_PERMISSION_ERROR
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop, fake_biblist
 from tests.base import MockEmailService, MockSolrBigqueryService,\
-    TestCaseDatabase
+    TestCaseDatabase, MockEndPoint
 
 
 class TestDeletionEpic(TestCaseDatabase):
@@ -75,7 +75,7 @@ class TestDeletionEpic(TestCaseDatabase):
             self.assertEqual(response.status_code, 200, response)
 
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, MockEndPoint([user_dave]) as EP:
             response = self.client.get(
                 url,
                 headers=user_dave.headers
@@ -143,7 +143,8 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # She checks that they got removed
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([user_student, user_dave]) as EP:
             response = self.client.get(
                 url,
                 headers=user_student.headers
@@ -169,7 +170,8 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # She checks that they got added
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService():
+        with MockSolrBigqueryService() as BQ, \
+                MockEndPoint([user_dave, user_student]) as EP:
             response = self.client.get(
                 url,
                 headers=user_student.headers
