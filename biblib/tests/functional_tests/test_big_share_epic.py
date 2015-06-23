@@ -26,7 +26,7 @@ class TestDeletionEpic(TestCaseDatabase):
     Base class used to test the Big Share Epic
     """
 
-    def test_job_big_share(self):
+    def test_big_share(self):
         """
         Carries out the epic 'Big Share', where a user wants to share one of
         their big libraries they have created
@@ -86,7 +86,9 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Check they all got added
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService() as BQ, MockEndPoint([user_dave]) as EP:
+        with MockSolrBigqueryService(
+                number_of_bibcodes=number_of_documents) as BQ, \
+                MockEndPoint([user_dave]) as EP:
             response = self.client.get(
                 url,
                 headers=user_dave.headers
@@ -97,7 +99,8 @@ class TestDeletionEpic(TestCaseDatabase):
         # she cannot access the library.
         # Dave selects her e-mail address
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService() as BQ, \
+        with MockSolrBigqueryService(
+                number_of_bibcodes=number_of_documents) as BQ, \
                 MockEndPoint([user_dave, user_mary]) as EP:
             response = self.client.get(
                 url,
@@ -147,7 +150,8 @@ class TestDeletionEpic(TestCaseDatabase):
         # say she can see his libraries and is happy but wants to add content
         # herself
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService() as BQ, \
+        with MockSolrBigqueryService(
+                number_of_bibcodes=number_of_documents) as BQ, \
                 MockEndPoint([user_dave, user_mary]) as EP:
             response = self.client.get(
                 url,
@@ -181,7 +185,8 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Mary realises she can no longer read content
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService() as BQ, \
+        with MockSolrBigqueryService(
+                number_of_bibcodes=number_of_documents) as BQ, \
                 MockEndPoint([user_dave, user_mary]) as EP:
             response = self.client.get(
                 url,

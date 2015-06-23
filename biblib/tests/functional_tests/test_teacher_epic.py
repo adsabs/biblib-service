@@ -58,7 +58,7 @@ class TestDeletionEpic(TestCaseDatabase):
         for user in [user_student_1, user_student_2]:
             # The students check they can see the content
             url = url_for('libraryview', library=library_id_teacher)
-            with MockSolrBigqueryService() as BQ, \
+            with MockSolrBigqueryService(number_of_bibcodes=0) as BQ, \
                     MockEndPoint([
                         user_teacher, user_student_1, user_student_2
                     ]) as EP:
@@ -89,7 +89,7 @@ class TestDeletionEpic(TestCaseDatabase):
 
             # The students check they can see the content
             url = url_for('libraryview', library=library_id_teacher)
-            with MockSolrBigqueryService() as BQ, \
+            with MockSolrBigqueryService(number_of_bibcodes=0) as BQ, \
                     MockEndPoint([
                         user_teacher, user_student_1, user_student_2
                     ]) as EP:
@@ -114,7 +114,7 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Student 2 cannot see the content
         url = url_for('libraryview', library=library_id_teacher)
-        with MockSolrBigqueryService() as BQ, \
+        with MockSolrBigqueryService(number_of_bibcodes=0) as BQ, \
                 MockEndPoint([
                     user_teacher, user_student_1, user_student_2
                 ]) as EP:
@@ -127,7 +127,7 @@ class TestDeletionEpic(TestCaseDatabase):
 
         # Student 1 can see the content still
         url = url_for('libraryview', library=library_id_teacher)
-        with MockSolrBigqueryService() as BQ, \
+        with MockSolrBigqueryService(number_of_bibcodes=0) as BQ, \
                 MockEndPoint([
                     user_teacher, user_student_1, user_student_2
                 ]) as EP:

@@ -65,14 +65,18 @@ class TestDeletionEpic(TestCaseDatabase):
                 headers=user_dave.headers
             )
             self.assertEqual(response.json['number_added'],
-                 len(library.bibcode))
+                             len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
 
             libraries_added.append(library)
 
         # Checks they are all in the library
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService() as BQ, MockEndPoint([user_dave]) as EP:
+
+        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
+        with MockSolrBigqueryService(
+                canonical_bibcode=canonical_bibcode) as BQ, \
+                MockEndPoint([user_dave]) as EP:
             response = self.client.get(
                 url,
                 headers=user_dave.headers
@@ -104,8 +108,10 @@ class TestDeletionEpic(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
 
         # Mary looks at the library
+        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService() as BQ, \
+        with MockSolrBigqueryService(
+                canonical_bibcode=canonical_bibcode) as BQ, \
                 MockEndPoint([user_dave, user_dave]) as EP:
             response = self.client.get(
                 url,
@@ -134,8 +140,11 @@ class TestDeletionEpic(TestCaseDatabase):
             libraries_added.remove(libraries_added[i])
 
         # She checks that they got removed
+        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService() as BQ, \
+
+        with MockSolrBigqueryService(
+                canonical_bibcode=canonical_bibcode) as BQ, \
                 MockEndPoint([user_dave, user_mary]) as EP:
             response = self.client.get(
                 url,
@@ -160,10 +169,11 @@ class TestDeletionEpic(TestCaseDatabase):
             self.assertEqual(response.status_code, 200, response)
 
             libraries_added.append(library)
+            canonical_bibcode.extend(library.bibcode)
 
         # She checks that they got added
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService() as BQ, \
+        with MockSolrBigqueryService(canonical_bibcode=canonical_bibcode) as BQ, \
                 MockEndPoint([user_dave, user_mary]) as EP:
             response = self.client.get(
                 url,

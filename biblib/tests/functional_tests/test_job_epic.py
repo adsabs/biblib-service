@@ -96,7 +96,6 @@ class TestJobEpic(TestCaseDatabase):
                 url,
                 headers=user_mary.headers
             )
-        print response.json
         self.assertTrue(len(response.json['documents']) == 0, response.json)
 
         # Happy with her library, she copies the link to the library and
