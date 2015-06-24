@@ -51,6 +51,23 @@ class TestModelTypes(TestCase):
         mutable_list.extend(expected_list)
         self.assertEqual(expected_list, mutable_list)
 
+    def test_remove_when_item_does_not_exist(self):
+        """
+        Tests that remove behaves like the list remove when an item that
+        does not exist, does not raise a KeyError
+
+        :return: no return
+        """
+        test_list = [1, 2, 3]
+        mutable_list = MutableList()
+        mutable_list.extend(test_list)
+
+        self.assertEqual(test_list, mutable_list)
+
+        mutable_list.remove(4)
+
+        self.assertEqual(test_list, mutable_list)
+
     def test_remove_of_mutable_list(self):
         """
         Checks that the remove method of the mutable list behaves as expected

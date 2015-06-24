@@ -26,7 +26,7 @@ class TestReturnedSolrDataEpic(TestCaseDatabase):
     Base class used to test the Returned Solr Data Epic
     """
 
-    def test_returned_data_user_view_epic(self):
+    def test_returned_data_solr(self):
         """
         Carries out the epic 'Returned Solr Data', for the LibraryView GET
         end point

@@ -1648,6 +1648,73 @@ class TestPermissionViews(TestCaseDatabase):
         self.assertFalse(permission.write)
         self.assertFalse(permission.owner)
 
+    def test_that_permissions_are_removed_if_the_user_has_none_left(self):
+        """
+        Tests that if a permission is removed and all the values are False, then
+        the permission for that person and library is removed.
+
+        :return: no return
+        """
+
+        # Make a fake user and library
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=self.stub_library.bibcode)
+
+        db.session.add_all([user, library])
+        db.session.commit()
+
+        # Add the permission
+        self.permission_view.add_permission(service_uid=user.id,
+                                            library_id=library.id,
+                                            permission='read',
+                                            value=True)
+        self.permission_view.add_permission(service_uid=user.id,
+                                            library_id=library.id,
+                                            permission='write',
+                                            value=True)
+        # Check the permission was added
+        permission = Permissions.query.filter(
+            Permissions.user_id == user.id,
+            Permissions.library_id == library.id
+        ).one()
+        self.assertTrue(permission.read)
+        self.assertTrue(permission.write)
+
+        # Remove the permission
+        self.permission_view.add_permission(service_uid=user.id,
+                                            library_id=library.id,
+                                            permission='write',
+                                            value=False)
+
+        # Check the permission was removed
+        permission = Permissions.query.filter(
+            Permissions.user_id == user.id,
+            Permissions.library_id == library.id
+        ).one()
+        self.assertTrue(permission.read)
+        self.assertFalse(permission.write)
+
+        # Remove the permission
+        self.permission_view.add_permission(service_uid=user.id,
+                                            library_id=library.id,
+                                            permission='read',
+                                            value=False)
+
+        # Check the permission is not available
+        with self.assertRaises(NoResultFound):
+            Permissions.query.filter(
+                Permissions.user_id == user.id,
+                Permissions.library_id == library.id
+            ).one()
+
     def test_a_user_without_permissions_cannot_modify_permissions(self):
         """
         Tests that a user that does not have admin permissions, cannot modify

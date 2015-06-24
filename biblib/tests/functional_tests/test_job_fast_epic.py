@@ -1,7 +1,7 @@
 """
 Functional test
 
-Job Epic
+Fast Job Epic
 
 Storyboard is defined within the comments of the program itself
 """
@@ -18,7 +18,7 @@ from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from tests.base import TestCaseDatabase, MockSolrBigqueryService, MockEndPoint
 
-class TestJobEpic(TestCaseDatabase):
+class TestFastJobEpic(TestCaseDatabase):
     """
     Base class used to test the Job Epic
     """

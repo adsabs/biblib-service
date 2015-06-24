@@ -22,7 +22,7 @@ from tests.base import MockEmailService, MockSolrBigqueryService, \
     TestCaseDatabase, MockEndPoint
 
 
-class TestDeletionEpic(TestCaseDatabase):
+class TestTeacherEpic(TestCaseDatabase):
     """
     Base class used to test the Teacher Epic
     """

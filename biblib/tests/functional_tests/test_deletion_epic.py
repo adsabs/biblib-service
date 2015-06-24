@@ -24,7 +24,7 @@ class TestDeletionEpic(TestCaseDatabase):
     Base class used to test the Deletion Epic
     """
 
-    def test_job_epic(self):
+    def test_deletion_epic(self):
         """
         Carries out the epic 'Deletion', where a user wants to delete their
         libraries that they have created
