@@ -823,7 +823,7 @@ class LibraryView(BaseView):
         return response
 
     @staticmethod
-    def solr_update_library(library, solr_bibcodes):
+    def solr_update_library(library, solr_docs):
         """
         Updates the library based on the solr canonical bibcodes response
         :param library: library to update
@@ -832,23 +832,41 @@ class LibraryView(BaseView):
         :return: no return
         """
 
+        # Definitions
         update = False
+        canonical_bibcodes = []
+        alternate_bibcodes = {}
         new_bibcode = []
 
-        for i in range(len(library.bibcode)):
-            if library.bibcode[i] != solr_bibcodes[i]:
-                current_app.logger.info('Updating bibcode: {0} to {1}'
-                                        .format(
-                                            library.bibcode[i],
-                                            solr_bibcodes[i]
-                                        )
+        # Extract the canonical bibcodes and create a hashmap for the
+        # alternate bibcodes
+        for doc in solr_docs:
+            canonical_bibcodes.append(doc['bibcode'])
+            if doc.get('alternate_bibcode'):
+                alternate_bibcodes.update(
+                    {i: doc['bibcode'] for i in doc['alternate_bibcode']}
                 )
-                new_bibcode.append(solr_bibcodes[i])
+
+        for bibcode in library.bibcode:
+
+            # Skip if its already canonical
+            if bibcode in canonical_bibcodes:
+                new_bibcode.append(bibcode)
+                continue
+
+            # Update if its an alternate
+            if bibcode in alternate_bibcodes.keys():
                 update = True
-            else:
-                new_bibcode.append(library.bibcode[i])
+
+                # Only add the bibcode if it is not there
+                if alternate_bibcodes[bibcode] not in new_bibcode:
+                    new_bibcode.append(alternate_bibcodes[bibcode])
 
         if update:
+            # Ensure the content is unique again
+            # new_bibcode = uniquify(new_bibcode)
+
+            # Update the database
             library.bibcode = new_bibcode
             db.session.add(library)
             db.session.commit()
@@ -938,15 +956,13 @@ class LibraryView(BaseView):
 
             # Now check if we can update the library database based on the
             # returned canonical bibcodes
-            if solr.get('response') \
-                    and len(solr['response']['docs']) == len(library.bibcode):
-                # Update bibcodes based on solr
-                solr_bibcodes = \
-                    [i['bibcode'] for i in solr['response']['docs']]
-
+            if solr.get('response'):
+                # Update bibcodes based on solrs response
                 self.solr_update_library(library=library,
-                                         solr_bibcodes=solr_bibcodes)
+                                         solr_docs=solr['response']['docs'])
             else:
+                # Some problem occurred, we will just ignore it, but will
+                # definitely log it.
                 solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
                 current_app.logger.warning('Problem with solr response: {0}'
                                            .format(solr))
@@ -1011,8 +1027,6 @@ class DocumentView(BaseView):
     library as this method should be scoped.
     """
     # TODO: adding tags using PUT for RESTful endpoint?
-    # TODO: normalise input and check the content delivered. Can be placed in
-    # its own function
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
@@ -1438,7 +1452,6 @@ class PermissionView(BaseView):
     """
     # TODO: Users that do not have an account, cannot be added to permissions
     # TODO:   - send invitation?
-    # TODO: pass user and permissions as lists
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
@@ -1838,11 +1851,8 @@ class PermissionView(BaseView):
 
 class TransferView(BaseView):
     """
-    End point to manipulate the permissions between a user and a library
+    End point to transfer a the ownership of a library
     """
-    # TODO: Users that do not have an account, cannot be added to permissions
-    # TODO:   - send invitation?
-    # TODO: pass user and permissions as lists
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
