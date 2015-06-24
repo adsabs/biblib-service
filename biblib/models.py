@@ -6,6 +6,7 @@ to be passed to the app creator within the Flask blueprint.
 """
 
 import uuid
+from utils import uniquify
 from datetime import datetime
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
@@ -160,7 +161,7 @@ class MutableList(Mutable, list):
         :param value:
         :return:
         """
-        value = list(set(value))
+        value = uniquify(value)
         value = [item for item in value if item not in list(self)]
 
         self.extend(value)

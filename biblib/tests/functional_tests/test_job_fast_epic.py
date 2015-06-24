@@ -23,9 +23,9 @@ class TestJobEpic(TestCaseDatabase):
     Base class used to test the Job Epic
     """
 
-    def test_job_epic(self):
+    def test_fast_job_epic(self):
         """
-        Carries out the epic 'Job', where a user wants to add their articles to
+        Carries out the epic 'Fast Job', where a user wants to add their articles to
         their private libraries so that they can send it on to a prospective
         employer
 
@@ -59,7 +59,9 @@ class TestJobEpic(TestCaseDatabase):
 
         # She then asks a friend to check the link, and it works fine.
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService() as BQ, MockEndPoint([user_mary]) as EP:
+        with MockSolrBigqueryService(
+                canonical_bibcode=stub_library.bibcode) as BQ, \
+                MockEndPoint([user_mary]) as EP:
             response = self.client.get(
                 url,
                 headers=user_random.headers

@@ -104,6 +104,14 @@ class MockSolrBigqueryService(MockADSWSAPI):
             :return:
             """
 
+            if self.kwargs.get('solr_docs'):
+                docs = self.kwargs['solr_docs']
+                # for i in range(len(self.kwargs.get('canonical_bibcode'))):
+                #     bibcode = self.kwargs.get('canonical_bibcode')[i]
+                #     docs.append({'bibcode': bibcode})
+            else:
+                docs = [{'bibcode': 'bibcode'} for i
+                        in range(self.kwargs.get('number_of_bibcodes', 1))]
             resp = {
                 'responseHeader': {
                     'status': 0,
@@ -117,13 +125,12 @@ class MockSolrBigqueryService(MockADSWSAPI):
                 'response': {
                     'numFound': 1,
                     'start': 0,
-                    'docs': [
-                        {
-                            'bibcode': 'bibcode'
-                        }
-                    ]
+                    'docs': docs
                 }
             }
+
+            if self.kwargs.get('fail', False):
+                resp.pop('response')
 
             resp = json.dumps(resp)
 

@@ -12,7 +12,7 @@ from client import client
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from utils import get_post_data, BackendIntegrityError, \
-    PermissionDeniedError, err
+    PermissionDeniedError, err, uniquify
 
 # Constant definitions
 API_HELP = 'http://adsabs.github.io/help/api/'
@@ -54,6 +54,11 @@ API_MISSING_USER_EMAIL = dict(
 )
 API_MISSING_USER_UID = dict(
     body='User does not exist in the API database',
+    number=404
+)
+SOLR_RESPONSE_MISMATCH_ERROR = dict(
+    body='Solr response does not contain the same number of bibcodes as the '
+         'request.',
     number=404
 )
 
@@ -325,8 +330,6 @@ class UserView(BaseView):
     End point to create a library for a given user
     """
 
-    # TODO: must give the library name/missing input function saves time
-
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
     rate_limit = [1000, 60*60*24]
@@ -382,7 +385,7 @@ class UserView(BaseView):
             if _bibcode and isinstance(_bibcode, list):
 
                 # Ensure unique content
-                _bibcode = list(set(_bibcode))
+                _bibcode = uniquify(_bibcode)
                 current_app.logger.info('User supplied bibcodes: {0}'
                                         .format(_bibcode))
                 library.bibcode = _bibcode
@@ -664,12 +667,6 @@ class LibraryView(BaseView):
     The GET requests are separate from the POST, DELETE requests as this class
     must be scopeless, whereas the others will have scope.
     """
-
-    # TODO: need to ignore the anon user. Currently scopeless
-    # TODO: document already exists (only add a bibcode once)
-    # TODO: adding tags using PUT for RESTful endpoint?
-    # TODO: public/private behaviour
-
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
     rate_limit = [1000, 60*60*24]
@@ -791,13 +788,14 @@ class LibraryView(BaseView):
         :return: solr bigquery end point response
         """
 
-        bibcodes = 'bibcode\n' + '\n'.join(bibcodes)
+        bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
 
         params = {
             'q': '*:*',
             'wt': 'json',
-            'fl': 'title,abstract,bibcode,author,aff,links_data,property,[citations],pub,pubdate',
-            'rows': "1000", 
+            'fl': 'title,abstract,bibcode,author,aff,links_data,'
+                  'property,[citations],pub,pubdate',
+            'rows': '1000',
             'fq': '{!bitset}'
         }
 
@@ -805,15 +803,65 @@ class LibraryView(BaseView):
             'Content-Type': 'big-query/csv',
         }
         current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
-                                .format(params, bibcodes.replace('\n', ',')))
+                                .format(params,
+                                        bibcodes_string.replace('\n', ',')))
         response = client().post(
             url=current_app.config['BIBLIB_SOLR_BIG_QUERY_URL'],
             params=params,
-            data=bibcodes,
+            data=bibcodes_string,
             headers=headers
         )
 
         return response
+
+    @staticmethod
+    def solr_update_library(library, solr_docs):
+        """
+        Updates the library based on the solr canonical bibcodes response
+        :param library: library to update
+        :param solr_bibcodes: solr bigquery response
+
+        :return: no return
+        """
+
+        # Definitions
+        update = False
+        canonical_bibcodes = []
+        alternate_bibcodes = {}
+        new_bibcode = []
+
+        # Extract the canonical bibcodes and create a hashmap for the
+        # alternate bibcodes
+        for doc in solr_docs:
+            canonical_bibcodes.append(doc['bibcode'])
+            if doc.get('alternate_bibcode'):
+                alternate_bibcodes.update(
+                    {i: doc['bibcode'] for i in doc['alternate_bibcode']}
+                )
+
+        for bibcode in library.bibcode:
+
+            # Skip if its already canonical
+            if bibcode in canonical_bibcodes:
+                new_bibcode.append(bibcode)
+                continue
+
+            # Update if its an alternate
+            if bibcode in alternate_bibcodes.keys():
+                update = True
+
+                # Only add the bibcode if it is not there
+                if alternate_bibcodes[bibcode] not in new_bibcode:
+                    new_bibcode.append(alternate_bibcodes[bibcode])
+
+        if update:
+            # Ensure the content is unique again
+            # new_bibcode = uniquify(new_bibcode)
+
+            # Update the database
+            library.bibcode = new_bibcode
+            db.session.add(library)
+            db.session.commit()
 
     # Methods
     def get(self, library):
@@ -860,9 +908,6 @@ class LibraryView(BaseView):
           - write
           - read
         """
-
-        # TODO: Needs authentification still
-
         try:
             user = int(request.headers[USER_ID_KEYWORD])
         except KeyError:
@@ -890,18 +935,30 @@ class LibraryView(BaseView):
             )
             # pay attention to any functions that try to mutate the list
             # this will alter expected returns later
-            documents = library.bibcode
 
             try:
-                solr = self.solr_big_query(bibcodes=documents).json()
+                solr = self.solr_big_query(bibcodes=library.bibcode).json()
             except Exception as error:
                 current_app.logger.warning('Could not parse solr data: {0}'
                                            .format(error))
                 solr = {'error': 'Could not parse solr data'}
 
+            # Now check if we can update the library database based on the
+            # returned canonical bibcodes
+            if solr.get('response'):
+                # Update bibcodes based on solrs response
+                self.solr_update_library(library=library,
+                                         solr_docs=solr['response']['docs'])
+            else:
+                # Some problem occurred, we will just ignore it, but will
+                # definitely log it.
+                solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
+                current_app.logger.warning('Problem with solr response: {0}'
+                                           .format(solr))
+
             # Make the response dictionary
             response = dict(
-                documents=documents,
+                documents=library.bibcode,
                 solr=solr,
                 metadata=metadata
             )
@@ -959,8 +1016,6 @@ class DocumentView(BaseView):
     library as this method should be scoped.
     """
     # TODO: adding tags using PUT for RESTful endpoint?
-    # TODO: normalise input and check the content delivered. Can be placed in
-    # its own function
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
@@ -986,7 +1041,10 @@ class DocumentView(BaseView):
         db.session.add(library)
         db.session.commit()
 
-        current_app.logger.info(library.bibcode)
+        current_app.logger.info('Added: {0} is now {1}'.format(
+            document_data['bibcode'],
+            library.bibcode)
+        )
 
         end_length = len(library.bibcode)
 
@@ -1383,7 +1441,6 @@ class PermissionView(BaseView):
     """
     # TODO: Users that do not have an account, cannot be added to permissions
     # TODO:   - send invitation?
-    # TODO: pass user and permissions as lists
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
@@ -1783,11 +1840,8 @@ class PermissionView(BaseView):
 
 class TransferView(BaseView):
     """
-    End point to manipulate the permissions between a user and a library
+    End point to transfer a the ownership of a library
     """
-    # TODO: Users that do not have an account, cannot be added to permissions
-    # TODO:   - send invitation?
-    # TODO: pass user and permissions as lists
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []

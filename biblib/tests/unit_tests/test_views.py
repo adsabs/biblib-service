@@ -833,6 +833,116 @@ class TestLibraryViews(TestCaseDatabase):
             )
         self.assertIn('responseHeader', response_library.json())
 
+    def test_that_solr_updates_canonical_bibcodes(self):
+        """
+        Tests that a comparison between the solr data and the stored data is
+        carried out. Mismatching documents are then updated appropriately.
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        original_bibcodes = ['test1', 'test2', 'arXivtest3', 'test4']
+        canonical_bibcodes = ['test1', 'test2', 'test3', 'test4']
+        solr_docs = [
+            {'bibcode': 'test1'},
+            {'bibcode': 'test2'},
+            {'bibcode': 'test3', 'alternate_bibcode': ['arXivtest3']},
+            {'bibcode': 'test4'}
+        ]
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=original_bibcodes)
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        # Retrieve the bibcodes using the web services
+        with MockSolrBigqueryService(solr_docs=solr_docs):
+            response_library = self.library_view.solr_big_query(
+                bibcodes=library.bibcode
+            ).json()
+        self.assertIn('responseHeader', response_library)
+
+        # Now check solr updates the records correctly
+        solr_docs = response_library['response']['docs']
+        self.library_view.solr_update_library(library=library,
+                                              solr_docs=solr_docs)
+
+        library = Library.query.filter(Library.id == library.id).one()
+        self.assertNotEqual(library.bibcode, original_bibcodes)
+        self.assertEqual(library.bibcode, canonical_bibcodes)
+
+    def test_that_solr_updates_canonical_bibcodes_with_multi_alternates(self):
+        """
+        Tests that a comparison between the solr data and the stored data is
+        carried out. Mismatching documents are then updated appropriately.
+        This specifically considers the case when fewer documents are returned
+        as there exists two alternates.
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        original_bibcodes = ['test1', 'test2', 'arXivtest3', 'conftest3']
+        canonical_bibcodes = ['test1', 'test2', 'test3']
+        solr_docs = [
+            {'bibcode': 'test1'},
+            {'bibcode': 'test2'},
+            {'bibcode': 'test3', 'alternate_bibcode': ['arXivtest3',
+                                                       'conftest3']},
+        ]
+
+        # Ensure a library exists
+        library = Library(name='MyLibrary',
+                          description='My library',
+                          public=True,
+                          bibcode=original_bibcodes)
+
+        # Give the user and library permissions
+        permission = Permissions(read=True,
+                                 write=True)
+
+        # Commit the stub data
+        user.permissions.append(permission)
+        library.permissions.append(permission)
+        db.session.add_all([library, permission, user])
+        db.session.commit()
+
+        # Retrieve the bibcodes using the web services
+        with MockSolrBigqueryService(solr_docs=solr_docs):
+            response_library = self.library_view.solr_big_query(
+                bibcodes=library.bibcode
+            ).json()
+        self.assertIn('responseHeader', response_library)
+
+        # Now check solr updates the records correctly
+        solr_docs = response_library['response']['docs']
+        self.library_view.solr_update_library(library=library,
+                                              solr_docs=solr_docs)
+
+        library = Library.query.filter(Library.id == library.id).one()
+        self.assertNotEqual(library.bibcode, original_bibcodes)
+        self.assertEqual(library.bibcode, canonical_bibcodes)
+
     def test_user_without_permission_cannot_access_private_library(self):
         """
         Tests that the user requesting to see the contents of a library has

@@ -41,6 +41,23 @@ def err(error_dictionary):
     """
     return {'error': error_dictionary['body']}, error_dictionary['number']
 
+def uniquify(input_list):
+    """
+    Finds the unique values in a list. This keeps the order of the list, as
+    opposed to the standard list(set()) method.
+
+    Adopted from: http://stackoverflow.com/
+    questions/
+    480214/
+    how-do-you-remove-duplicates-from-a-list-in-python-whilst-preserving-order
+    :param input_list: list that can contain duplicates
+
+    :return: same ordered list without duplications
+    """
+    seen = set()
+    seen_add = seen.add
+    return [item for item in input_list if not (item in seen or seen_add(item))]
+
 class BackendIntegrityError(Exception):
     """
     Custom exception that is raised when there are application errors similar

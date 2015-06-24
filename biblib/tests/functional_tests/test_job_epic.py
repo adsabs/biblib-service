@@ -90,7 +90,8 @@ class TestJobEpic(TestCaseDatabase):
 
         # Checks that there are no documents in the library
         url = url_for('libraryview', library=library_id)
-        with MockSolrBigqueryService() as BQ, MockEndPoint([user_mary]) as EP:
+        with MockSolrBigqueryService(number_of_bibcodes=0) as BQ, \
+                MockEndPoint([user_mary]) as EP:
             response = self.client.get(
                 url,
                 headers=user_mary.headers
@@ -101,7 +102,7 @@ class TestJobEpic(TestCaseDatabase):
         # e-mails it to the prospective employer.
 
         # She then asks a friend to check the link, and it works fine.
-        with MockSolrBigqueryService() as BQ, \
+        with MockSolrBigqueryService(number_of_bibcodes=0) as BQ, \
                 MockEndPoint([user_mary, user_random]) as EP:
             response = self.client.get(
                 url,
