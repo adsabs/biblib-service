@@ -21,7 +21,7 @@ from tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint
 
 
-class TestDeletionEpic(TestCaseDatabase):
+class TestBigShareEditorEpic(TestCaseDatabase):
     """
     Base class used to test the Big Share Editor Epic
     """

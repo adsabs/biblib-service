@@ -1552,7 +1552,23 @@ class PermissionView(BaseView):
             )
 
             setattr(new_permission, permission, value)
-            db.session.add(new_permission)
+
+            # Check if all permissions are False, then remove completely
+            if not (new_permission.read |
+                    new_permission.write |
+                    new_permission.admin |
+                    new_permission.owner):
+
+                current_app.logger.info('Deleting permissions for {0} and '
+                                        'library {1} as all permissions are '
+                                        'False. {2}'
+                                        .format(service_uid,
+                                                library_id,
+                                                new_permission))
+
+                db.session.delete(new_permission)
+            else:
+                db.session.add(new_permission)
 
         except NoResultFound:
             # If no permissions set yet for user and library

@@ -1,7 +1,7 @@
 """
 Functional test
 
-Deletion Epic
+Big Share Epic
 
 Storyboard is defined within the comments of the program itself
 """
@@ -21,7 +21,7 @@ from tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint
 
 
-class TestDeletionEpic(TestCaseDatabase):
+class TestBigShareEpic(TestCaseDatabase):
     """
     Base class used to test the Big Share Epic
     """

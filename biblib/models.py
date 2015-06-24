@@ -125,14 +125,19 @@ class MutableList(Mutable, list):
 
     def remove(self, value):
         """
-        Define a remove action
+        Define a remove action.
+        Passes if the value does not exist within the list.
+
         :param value: value to be removed
 
         :return: no return
         """
 
-        list.remove(self, value)
-        self.changed()
+        try:
+            list.remove(self, value)
+            self.changed()
+        except ValueError:
+            pass
 
     def extend(self, value):
         """
