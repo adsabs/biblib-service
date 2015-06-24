@@ -330,8 +330,6 @@ class UserView(BaseView):
     End point to create a library for a given user
     """
 
-    # TODO: must give the library name/missing input function saves time
-
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
     rate_limit = [1000, 60*60*24]
@@ -669,12 +667,6 @@ class LibraryView(BaseView):
     The GET requests are separate from the POST, DELETE requests as this class
     must be scopeless, whereas the others will have scope.
     """
-
-    # TODO: need to ignore the anon user. Currently scopeless
-    # TODO: document already exists (only add a bibcode once)
-    # TODO: adding tags using PUT for RESTful endpoint?
-    # TODO: public/private behaviour
-
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
     rate_limit = [1000, 60*60*24]
@@ -916,9 +908,6 @@ class LibraryView(BaseView):
           - write
           - read
         """
-
-        # TODO: Needs authentification still
-
         try:
             user = int(request.headers[USER_ID_KEYWORD])
         except KeyError:
