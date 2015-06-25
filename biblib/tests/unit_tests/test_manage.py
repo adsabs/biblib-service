@@ -210,6 +210,7 @@ class TestManagePy(unittest.TestCase):
             sql_session.close()
             session.close()
             db.metadata.drop_all(bind=engine)
+            os.remove(BIBLIB_ADSWS_API_DB_URI.replace('sqlite:///', ''))
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

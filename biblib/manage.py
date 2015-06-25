@@ -102,6 +102,7 @@ manager = Manager(app)
 manager.add_command('db', MigrateCommand)
 manager.add_command('createdb', CreateDatabase())
 manager.add_command('destroydb', DestroyDatabase())
+manager.add_command('syncdb', DeleteStaleUsers())
 
 if __name__ == '__main__':
     manager.run()
