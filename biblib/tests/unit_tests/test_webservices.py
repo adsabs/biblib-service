@@ -315,12 +315,26 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('documents', response.json)
         self.assertIn('solr', response.json)
+        self.assertIn('metadata', response.json)
+        self.assertIn('updates', response.json)
 
         # Check that the solr docs updated the library docs
         lib_docs = response.json['documents']
 
         self.assertEqual(canonical_biblist, lib_docs)
         self.assertNotEqual(original_bibcodes, lib_docs)
+
+        # Check the data returned is correct on what files were updated and why
+        updates = response.json['updates']
+        self.assertEqual(updates['num_updated'], 3)
+        self.assertEqual(updates['duplicates_removed'], 1)
+        update_list = updates['update_list']
+        self.assertEqual(update_list[0]['arXiv1976.....LWW......L'],
+                         '1976.....LWW......L')
+        self.assertEqual(update_list[1]['arXiv2010.....KPK......K'],
+                         '2010.....KPK......K')
+        self.assertEqual(update_list[2]['arXiv2014.....KTC......K'],
+                         '2010.....KPK......K')
 
     def test_solr_does_not_update_if_weird_response(self):
         """
