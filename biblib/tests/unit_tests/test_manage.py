@@ -14,9 +14,9 @@ import unittest
 from manage import CreateDatabase, DestroyDatabase, DeleteStaleUsers
 from models import User, Library, Permissions, db
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.exc import NoResultFound
-
+from test_config import BIBLIB_ADSWS_API_DB_URI
 
 class TestManagePy(unittest.TestCase):
     """
@@ -74,10 +74,21 @@ class TestManagePy(unittest.TestCase):
         :return: no return
         """
 
-        # Setup the tables
-        engine = create_engine(test_config.SQLALCHEMY_BINDS['libraries'])
+        # Setup an SQLite table for mocking the API response
+        engine = create_engine(BIBLIB_ADSWS_API_DB_URI)
+        sql_session_maker = scoped_session(sessionmaker(bind=engine))
+        sql_session = sql_session_maker()
 
-        session_factory = sessionmaker(bind=engine)
+        # We do not add user 1 to the API database
+        sql_session.execute('create table users (id integer, random integer);')
+        sql_session.execute('insert into users (id, random) values (2, 7);')
+        sql_session.commit()
+
+        # Setup the tables for the biblib service
+        engine = create_engine(test_config.SQLALCHEMY_BINDS['libraries'])
+        db.metadata.create_all(bind=engine)
+
+        session_factory = scoped_session(sessionmaker(bind=engine))
         session = session_factory()
 
         try:
@@ -119,7 +130,7 @@ class TestManagePy(unittest.TestCase):
             )
             permission_user_2_library_2 = Permissions(
                 owner=True,
-                library_id=library_1.id,
+                library_id=library_2.id,
                 user_id=user_2.id
             )
 
@@ -128,6 +139,13 @@ class TestManagePy(unittest.TestCase):
                 permission_user_2_library_1, permission_user_2_library_2
             ])
             session.commit()
+
+            # Retain some IDs for when they are deleted
+            user_1_id = user_1.id
+            user_2_id = user_2.id
+            user_1_absolute_uid = user_1.absolute_uid
+            library_1_id = library_1.id
+            library_2_id = library_2.id
 
             # Now run the stale deletion
             DeleteStaleUsers.run()
@@ -142,25 +160,21 @@ class TestManagePy(unittest.TestCase):
             self.assertIsInstance(_user_2, User)
 
             _library_2 = session.query(Library)\
-                .filter(Library.id == library_2.id)\
+                .filter(Library.id == library_2_id)\
                 .one()
             self.assertIsInstance(_library_2, Library)
 
-            _permission_user_2_library_1 = session.query(Permissions)\
-                .filter(Permissions.library_id == library_1.id)\
-                .filter(Permissions.user_id == user_1.id)\
+            _permission_user_2_library_2 = session.query(Permissions)\
+                .filter(Permissions.library_id == library_2_id)\
+                .filter(Permissions.user_id == user_2_id)\
                 .one()
-            self.assertIsInstance(_permission_user_2_library_1, Permissions)
+            self.assertIsInstance(_permission_user_2_library_2, Permissions)
 
-            # Temporarily skip
-            try:
-                with self.assertRaises(NoResultFound):
-                    session.query(Permissions)\
-                        .filter(Permissions.library_id == library_1.id)\
-                        .filter(Permissions.user_id == user_1.id)\
-                        .one()
-            except:
-                pass
+            with self.assertRaises(NoResultFound):
+                session.query(Permissions)\
+                    .filter(Permissions.library_id == library_1_id)\
+                    .filter(Permissions.user_id == user_2_id)\
+                    .one()
 
             # User 1
             # 1. the user should not exist
@@ -169,40 +183,33 @@ class TestManagePy(unittest.TestCase):
             # 4. the permissions for library 2 for user 1 should not exist
             with self.assertRaises(NoResultFound):
                 session.query(User)\
-                    .filter(User.absolute_uid == user_1.absolute_uid).one()
+                    .filter(User.absolute_uid == user_1_absolute_uid).one()
 
             with self.assertRaises(NoResultFound):
                 session.query(Library)\
-                    .filter(Library.id == library_1.id)\
+                    .filter(Library.id == library_1_id)\
                     .one()
 
             with self.assertRaises(NoResultFound):
                 session.query(Permissions)\
-                    .filter(Permissions.library_id == library_1.id)\
-                    .filter(Permissions.user_id == user_1.id)\
+                    .filter(Permissions.library_id == library_1_id)\
+                    .filter(Permissions.user_id == user_1_id)\
                     .one()
 
             with self.assertRaises(NoResultFound):
                 session.query(Permissions)\
-                    .filter(Permissions.library_id == library_2.id)\
-                    .filter(Permissions.user_id == user_1.id)\
+                    .filter(Permissions.library_id == library_2_id)\
+                    .filter(Permissions.user_id == user_1_id)\
                     .one()
 
         except Exception:
             raise
         finally:
             # Destroy the tables
+            sql_session.execute('drop table users;')
+            sql_session.close()
             session.close()
             db.metadata.drop_all(bind=engine)
-
-#
-# class TestManagePyFlask(flask_testing.TestCase):
-#     """
-#     Class for testing the behaviour of the custom manage scripts. This uses
-#     flask for easy access to the database connection.
-#     """
-#
-
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -57,18 +57,17 @@ class DeleteStaleUsers(Command):
         with create_app(config_type='TEST').app_context():
 
             # Obtain the list of API users
-            engine = create_engine(
+            api_engine = create_engine(
                 current_app.config['BIBLIB_ADSWS_API_DB_URI']
             )
-            session_maker = scoped_session(sessionmaker(bind=engine))
-            session = session_maker()
+            api_session_maker = scoped_session(sessionmaker(bind=api_engine))
+            api_session = api_session_maker()
 
             postgres_search_text = 'SELECT id FROM users;'
-            result = session.execute(postgres_search_text).fetchall()
-            for r in result:
-                print r
+            result = api_session.execute(postgres_search_text).fetchall()
+            list_of_api_users = [int(r[0]) for r in result]
 
-            session.close()
+            api_session.close()
 
             # Loop through every use in the service database
             removal_list = []
