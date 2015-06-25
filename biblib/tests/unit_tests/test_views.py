@@ -880,8 +880,15 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Now check solr updates the records correctly
         solr_docs = response_library['response']['docs']
-        self.library_view.solr_update_library(library=library,
-                                              solr_docs=solr_docs)
+        updates = self.library_view.solr_update_library(library=library,
+                                                        solr_docs=solr_docs)
+
+        # Check the data returned is correct on what files were updated and why
+        self.assertEqual(updates['num_updated'], 1)
+        self.assertEqual(updates['duplicates_removed'], 0)
+        update_list = updates['update_list']
+        self.assertEqual(update_list[0]['arXivtest3'],
+                         'test3')
 
         library = Library.query.filter(Library.id == library.id).one()
         self.assertNotEqual(library.bibcode, original_bibcodes)
@@ -936,8 +943,16 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Now check solr updates the records correctly
         solr_docs = response_library['response']['docs']
-        self.library_view.solr_update_library(library=library,
-                                              solr_docs=solr_docs)
+        updates = self.library_view.solr_update_library(library=library,
+                                                        solr_docs=solr_docs)
+
+        self.assertEqual(updates['num_updated'], 2)
+        self.assertEqual(updates['duplicates_removed'], 1)
+        update_list = updates['update_list']
+        self.assertEqual(update_list[0]['arXivtest3'],
+                         'test3')
+        self.assertEqual(update_list[1]['conftest3'],
+                         'test3')
 
         library = Library.query.filter(Library.id == library.id).one()
         self.assertNotEqual(library.bibcode, original_bibcodes)

@@ -819,9 +819,12 @@ class LibraryView(BaseView):
         """
         Updates the library based on the solr canonical bibcodes response
         :param library: library to update
-        :param solr_bibcodes: solr bigquery response
+        :param solr_docs: solr docs from the bigquery response
 
-        :return: no return
+        :return: dictionary with details of files modified
+                 num_updated: number of documents modified
+                 duplicates_removed: number of files removed for duplication
+                 update_list: list of changed bibcodes {'before': 'after'}
         """
 
         # Definitions
@@ -829,6 +832,11 @@ class LibraryView(BaseView):
         canonical_bibcodes = []
         alternate_bibcodes = {}
         new_bibcode = []
+
+        # Constants for the return dictionary
+        num_updated = 0
+        duplicates_removed = 0
+        update_list = []
 
         # Extract the canonical bibcodes and create a hashmap for the
         # alternate bibcodes
@@ -849,19 +857,28 @@ class LibraryView(BaseView):
             # Update if its an alternate
             if bibcode in alternate_bibcodes.keys():
                 update = True
+                num_updated += 1
+                update_list.append({bibcode: alternate_bibcodes[bibcode]})
 
                 # Only add the bibcode if it is not there
                 if alternate_bibcodes[bibcode] not in new_bibcode:
                     new_bibcode.append(alternate_bibcodes[bibcode])
+                else:
+                    duplicates_removed += 1
 
         if update:
-            # Ensure the content is unique again
-            # new_bibcode = uniquify(new_bibcode)
-
             # Update the database
             library.bibcode = new_bibcode
             db.session.add(library)
             db.session.commit()
+
+        updates = dict(
+            num_updated=num_updated,
+            duplicates_removed=duplicates_removed,
+            update_list=update_list
+        )
+
+        return updates
 
     # Methods
     def get(self, library):
@@ -900,6 +917,19 @@ class LibraryView(BaseView):
                                           this library
           owner:                <string>  Identifier of the user who created
                                           the library
+
+        updates:      <dict>   contains the following
+
+          num_updated:          <int>     Number of documents modified based on
+                                          the response from solr
+          duplicates_removed:   <int>     Number of files removed for because
+                                          they are duplications
+          update_list:          <list>[<dict>]
+                                          List of dictionaries such that a
+                                          single element described the original
+                                          bibcode (key) and the updated bibcode
+                                          now being stored (item)
+
         Permissions:
         -----------
         The following type of user can read a library:
@@ -947,20 +977,24 @@ class LibraryView(BaseView):
             # returned canonical bibcodes
             if solr.get('response'):
                 # Update bibcodes based on solrs response
-                self.solr_update_library(library=library,
-                                         solr_docs=solr['response']['docs'])
+                updates = self.solr_update_library(
+                    library=library,
+                    solr_docs=solr['response']['docs']
+                )
             else:
                 # Some problem occurred, we will just ignore it, but will
                 # definitely log it.
                 solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
                 current_app.logger.warning('Problem with solr response: {0}'
                                            .format(solr))
+                updates = {}
 
             # Make the response dictionary
             response = dict(
                 documents=library.bibcode,
                 solr=solr,
-                metadata=metadata
+                metadata=metadata,
+                updates=updates
             )
 
         except Exception as error:
