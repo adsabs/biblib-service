@@ -148,7 +148,7 @@ class TestManagePy(unittest.TestCase):
             library_2_id = library_2.id
 
             # Now run the stale deletion
-            DeleteStaleUsers.run()
+            DeleteStaleUsers().run(config_type='TEST')
 
             # Check the state of users, libraries and permissions
             # User 2
