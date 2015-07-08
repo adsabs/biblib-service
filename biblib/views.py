@@ -922,7 +922,7 @@ class LibraryView(BaseView):
 
           num_updated:          <int>     Number of documents modified based on
                                           the response from solr
-          duplicates_removed:   <int>     Number of files removed for because
+          duplicates_removed:   <int>     Number of files removed because
                                           they are duplications
           update_list:          <list>[<dict>]
                                           List of dictionaries such that a

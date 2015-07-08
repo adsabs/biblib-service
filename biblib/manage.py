@@ -3,13 +3,12 @@ Alembic migration management file
 """
 
 from flask import current_app
-from flask.ext.script import Manager, Command
+from flask.ext.script import Manager, Command, Option
 from flask.ext.migrate import Migrate, MigrateCommand
 from models import db, User, Permissions, Library
 from app import create_app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
-from app import load_config
 
 class CreateDatabase(Command):
     """
@@ -24,7 +23,6 @@ class CreateDatabase(Command):
         with create_app(config_type='TEST').app_context():
             db.create_all()
             db.session.commit()
-
 
 class DestroyDatabase(Command):
     """
@@ -47,14 +45,34 @@ class DeleteStaleUsers(Command):
     also takes care of the associated permissions and libraries depending on
     the cascade that has been implemented.
     """
-    @staticmethod
-    def run():
+
+    def __init__(self, default_config_type='TEST'):
+        """
+        Constructor
+        :param default_config_type: Default configuration type to use
+        """
+        self.default_config_type = default_config_type
+
+    def get_options(self):
+        """
+        Sets the options that can be passed from the manage.py script
+        after invoking the run time operation.
+
+        :return: list of allowed options
+        """
+        return [
+            Option('--config_type',
+                   '-c',
+                   dest='config_type',
+                   default=self.default_config_type)
+        ]
+
+    def run(self, config_type):
         """
         Carries out the deletion of the stale content
-
-        :return: no return
+        :param config_type: Configuration type to use
         """
-        with create_app(config_type='TEST').app_context():
+        with create_app(config_type).app_context():
 
             # Obtain the list of API users
             api_engine = create_engine(
