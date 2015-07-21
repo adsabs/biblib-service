@@ -1272,7 +1272,7 @@ class TestDocumentViews(TestCaseDatabase):
         # Check that the document is in the library
         library = Library.query.filter(Library.id == library_id).all()
         for _lib in library:
-            self.assertIn(self.stub_library.bibcode[0], _lib.bibcode)
+            self.assertIn(self.stub_library.bibcode.keys()[0], _lib.bibcode)
 
         # Add a different document to the library
         number_added = self.document_view.add_document_to_library(
@@ -1284,7 +1284,7 @@ class TestDocumentViews(TestCaseDatabase):
         # Check that the document is in the library
         library = Library.query.filter(Library.id == library_id).all()
         for _lib in library:
-            self.assertIn(self.stub_library_2.bibcode[0], _lib.bibcode)
+            self.assertIn(self.stub_library_2.bibcode.keys()[0], _lib.bibcode)
 
     def test_user_cannot_duplicate_same_document_in_library(self):
         """

@@ -13,6 +13,69 @@ import app
 import unittest
 from models import db, User, Library, Permissions, MutableList
 from flask.ext.testing import TestCase
+from tests.base import TestCaseDatabase
+
+class TestLibraryModel(TestCaseDatabase):
+    """
+    Class for testing the methods usable by the Library model
+    """
+
+    def create_app(self):
+        """
+        Create the wsgi application
+
+        :return: application instance
+        """
+        app_ = app.create_app(config_type='TEST')
+        return app_
+
+    def test_get_bibcodes_from_model(self):
+        """
+        Checks that the get_bibcodes method works as expected
+        """
+        lib = Library(bibcode={'1': {}, '2': {}, '3': {}})
+        db.session.add(lib)
+        db.session.commit()
+
+        self.assertEqual(set(lib.get_bibcodes()), set(['1', '2', '3']))
+
+    def test_adding_bibcodes_to_library(self):
+        """
+        Checks that the custom add/upsert command works as expected
+        """
+        # Make fake library
+        bibcodes_list_1 = {'1': {}, '2': {}, '3': {}}
+        bibcodes_list_2 = ['2', '2', '3', '4', '4']
+        expected_bibcode_output = ['1', '2', '3', '4']
+
+        lib = Library(bibcode=bibcodes_list_1)
+        db.session.add(lib)
+        db.session.commit()
+
+        lib.add_bibcodes(bibcodes_list_2)
+        db.session.add(lib)
+        db.session.commit()
+
+        self.assertEqual(
+            set(lib.get_bibcodes()),
+            set(expected_bibcode_output)
+        )
+
+    def test_removing_bibcodes_from_library(self):
+
+        # Stub data
+        bibcodes_list_1 = {'1': {}, '2': {}, '3': {}}
+        expected_list = ['2', '3']
+
+        lib = Library(bibcode=bibcodes_list_1)
+        db.session.add(lib)
+        db.session.commit()
+
+        lib.remove_bibcodes(['1'])
+        db.session.add(lib)
+        db.session.commit()
+
+        self.assertEqual(set(lib.get_bibcodes()), set(expected_list))
 
 class TestModelTypes(TestCase):
     """

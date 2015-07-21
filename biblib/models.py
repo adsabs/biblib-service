@@ -9,7 +9,7 @@ import uuid
 from utils import uniquify
 from datetime import datetime
 from flask.ext.sqlalchemy import SQLAlchemy
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID, JSON
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.types import TypeDecorator, CHAR, String
 
@@ -98,6 +98,60 @@ class GUID(TypeDecorator):
             return isinstance(conn_type, UUID)
         else:
             return isinstance(conn_type, String)
+
+class MutableDict(Mutable, dict):
+    """
+    By default, SQLAlchemy only tracks changes of the value itself, which works
+    "as expected" for simple values, such as ints and strings, but not dicts.
+    http://stackoverflow.com/questions/25300447/
+    using-list-on-postgresql-json-type-with-sqlalchemy
+    """
+
+    @classmethod
+    def coerce(cls, key, value):
+        """
+        Convert plain dictionaries to MutableDict.
+        """
+        if not isinstance(value, MutableDict):
+            if isinstance(value, dict):
+                return MutableDict(value)
+
+            # this call will raise ValueError
+            return Mutable.coerce(key, value)
+        else:
+            return value
+
+    def __setitem__(self, key, value):
+        """
+        Detect dictionary set events and emit change events.
+        """
+        dict.__setitem__(self, key, value)
+        self.changed()
+
+    def __delitem__(self, key):
+        """
+        Detect dictionary del events and emit change events.
+        """
+        dict.__delitem__(self, key)
+        self.changed()
+
+    def setdefault(self, key, value):
+        """
+        Detect dictionary setdefault events and emit change events
+        """
+        dict.setdefault(self, key, value)
+        self.changed()
+
+    def pop(self, key, default):
+        """
+        Detect dictionary pop events and emit change events
+        :param key: key to pop
+        :param default: default if key does not exist
+
+        :return: the item under the given key
+        """
+        dict.pop(self, key, default)
+        self.changed()
 
 class MutableList(Mutable, list):
     """
@@ -220,7 +274,9 @@ class Library(db.Model):
     name = db.Column(db.String(50))
     description = db.Column(db.String(50))
     public = db.Column(db.Boolean)
-    bibcode = db.Column(MutableList.as_mutable(ARRAY(db.String(50))), default=[])
+    # bibcode = db.Column(MutableList.as_mutable(ARRAY(db.String(50))), default=[])
+    default_bibcode = {}
+    bibcode = db.Column(MutableDict.as_mutable(JSON), default=default_bibcode)
     date_created = db.Column(
         db.DateTime,
         nullable=False,
@@ -246,6 +302,37 @@ class Library(db.Model):
                     self.public,
                     self.bibcode)
 
+    def get_bibcodes(self):
+        """
+        Returns the bibcodes of the library
+        """
+        return self.bibcode.keys()
+
+    def add_bibcodes(self, bibcodes):
+        """
+        Adds a bibcode to the bibcode field, checking if it exists or not. This
+        is essentially an upsert action. We only want to add a bibcode if it
+        does not exist already.
+
+        Given the way in which bibcodes are stored may change, it seems simpler
+        to keep the method of adding/removing in a small wrapper so that only
+        one location needs to be modified (or YAGNI?).
+
+        :param bibcodes: list of bibcodes
+        """
+        [self.bibcode.setdefault(item, {}) for item in bibcodes]
+
+    def remove_bibcodes(self, bibcodes):
+        """
+        Removes a bibcode(s) from the bibcode field.
+
+        Given the way in which bibcodes are stored may change, it seems simpler
+        to keep the method of adding/removing in a small wrapper so that only
+        one location needs to be modified (or YAGNI?).
+
+        :param bibcodes: list of bibcodes
+        """
+        [self.bibcode.pop(key, None) for key in bibcodes]
 
 class Permissions(db.Model):
     """

@@ -79,7 +79,9 @@ class LibraryFactory(factory.Factory):
     public = False
     read = False
     write = False
-    bibcode = factory.LazyAttribute(lambda x: fake_biblist(nb_codes=1))
+    bibcode = factory.LazyAttribute(
+        lambda x: {k: {} for k in fake_biblist(nb_codes=1)}
+    )
 
 
 class UserShop(object):

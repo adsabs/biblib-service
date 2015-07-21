@@ -1070,7 +1070,8 @@ class DocumentView(BaseView):
         library = Library.query.filter(Library.id == library_id).one()
 
         start_length = len(library.bibcode)
-        library.bibcode.upsert(document_data['bibcode'])
+
+        library.add_bibcodes(document_data['bibcode'])
 
         db.session.add(library)
         db.session.commit()
@@ -1098,7 +1099,8 @@ class DocumentView(BaseView):
                                 '{1}'.format(document_data, library_id))
         library = Library.query.filter(Library.id == library_id).one()
         start_length = len(library.bibcode)
-        library.bibcode.shorten(document_data['bibcode'])
+
+        library.remove_bibcodes(document_data['bibcode'])
 
         db.session.add(library)
         db.session.commit()
