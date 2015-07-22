@@ -1,13 +1,14 @@
 language: python
 python:
  - "2.7"
+before_install:
+  - /etc/init.d/postgresql stop
+  - /etc/init.d/postgresql start 9.3
 install:
  - pip install -r requirements.txt
 addons:
  - postgresql: "9.3"
 before_script:
- - psql -c "SELECT version();" -U postgres
- - pip freeze
  - psql -c 'create database testdb;' -U postgres
 script:
  - bash biblib/tests/run_tests.sh
