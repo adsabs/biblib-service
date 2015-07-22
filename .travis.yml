@@ -6,6 +6,7 @@ install:
 addons:
  - postgresql: "9.4"
 before_script:
+ - pip freeze
  - psql -c 'create database testdb;' -U postgres
 script:
  - bash biblib/tests/run_tests.sh
