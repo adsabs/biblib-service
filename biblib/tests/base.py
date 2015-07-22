@@ -219,6 +219,8 @@ class TestCaseDatabase(TestCase):
 
         :return: no return
         """
+        current_app.logger.info('Setting up db on: {0}'
+                                .format(current_app.config['SQLALCHEMY_BINDS']))
         db.create_all()
 
     def tearDown(self):
