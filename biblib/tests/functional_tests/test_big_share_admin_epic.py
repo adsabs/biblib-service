@@ -26,7 +26,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
     Base class used to test the Big Share Admin Epic
     """
 
-    def test_job_big_share_admin(self):
+    def test_big_share_admin(self):
         """
         Carries out the epic 'Big Share Admin', where a user creates a library
         and wants one other user to have admin permissions, i.e., add and
@@ -74,7 +74,8 @@ class TestBigShareAdminEpic(TestCaseDatabase):
                              len(stub_library.bibcode))
             self.assertEqual(response.status_code, 200, response)
 
-        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
+        canonical_bibcode = \
+            [i.get_bibcodes()[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
         with MockSolrBigqueryService(
                 canonical_bibcode=canonical_bibcode) as BQ, \
@@ -145,7 +146,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
             libraries_added.remove(libraries_added[i])
 
         # She checks that they got removed
-        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
+        canonical_bibcode = [i.get_bibcodes()[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
         with MockSolrBigqueryService(
                 canonical_bibcode=canonical_bibcode) as BQ, \
@@ -174,7 +175,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
             libraries_added.append(library)
 
         # She checks that they got added
-        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
+        canonical_bibcode = [i.get_bibcodes()[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
         with MockSolrBigqueryService(
                 canonical_bibcode=canonical_bibcode) as BQ, \

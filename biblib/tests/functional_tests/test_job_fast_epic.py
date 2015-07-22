@@ -18,12 +18,12 @@ from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from tests.base import TestCaseDatabase, MockSolrBigqueryService, MockEndPoint
 
-class TestFastJobEpic(TestCaseDatabase):
+class TestJobFastEpic(TestCaseDatabase):
     """
-    Base class used to test the Job Epic
+    Base class used to test the Job Fast Epic
     """
 
-    def test_fast_job_epic(self):
+    def test_job_fast_epic(self):
         """
         Carries out the epic 'Fast Job', where a user wants to add their articles to
         their private libraries so that they can send it on to a prospective
@@ -42,7 +42,7 @@ class TestFastJobEpic(TestCaseDatabase):
         user_random = UserShop()
         stub_library = LibraryShop(want_bibcode=True, public=True)
 
-        self.assertIs(list, type(stub_library.bibcode))
+        self.assertIs(list, type(stub_library.get_bibcodes()))
         self.assertIs(list, type(stub_library.user_view_post_data['bibcode']))
 
         # Make the library and make it public to be viewed by employers
