@@ -654,7 +654,7 @@ class UserView(BaseView):
 
         # If they added bibcodes include in the response
         if hasattr(library, 'bibcode') and library.bibcode:
-            return_data['bibcode'] = library.bibcode
+            return_data['bibcode'] = library.get_bibcodes()
 
         return return_data, 200
 
@@ -992,7 +992,7 @@ class LibraryView(BaseView):
 
             # Make the response dictionary
             response = dict(
-                documents=library.bibcode,
+                documents=library.get_bibcodes(),
                 solr=solr,
                 metadata=metadata,
                 updates=updates

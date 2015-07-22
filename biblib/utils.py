@@ -71,6 +71,19 @@ def assert_unsorted_equal(s, t):
     """
     return Counter(s) == Counter(t)
 
+def get_item(list_of_dictionaries, key):
+    """
+    Given a list of dictionaries, it returns the first dictionary that
+    contains the given key, and the item for that key.
+    :param list_of_dictionaries: list(dict())
+    :param key: key of dictionary wanted
+
+    :return: contents of list(dict[key])
+    """
+    return next(
+        item[key]for item in list_of_dictionaries if key in item.keys()
+    )
+
 class BackendIntegrityError(Exception):
     """
     Custom exception that is raised when there are application errors similar

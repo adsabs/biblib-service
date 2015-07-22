@@ -18,7 +18,7 @@ from views import UserView, LibraryView, DocumentView, PermissionView, \
     BaseView, TransferView
 from views import DEFAULT_LIBRARY_DESCRIPTION
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from utils import BackendIntegrityError, PermissionDeniedError
+from utils import BackendIntegrityError, PermissionDeniedError, get_item
 from tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
 
@@ -955,13 +955,11 @@ class TestLibraryViews(TestCaseDatabase):
         update_list = updates['update_list']
 
         self.assertEqual(
-            next(item['arXivtest3']
-                 for item in update_list if 'arXivtest3' in item.keys()),
+            get_item(update_list, 'arXivtest3'),
             'test3'
         )
         self.assertEqual(
-            next(item['conftest3']
-                 for item in update_list if 'conftest3' in item.keys()),
+            get_item(update_list, 'conftest3'),
             'test3'
         )
 
