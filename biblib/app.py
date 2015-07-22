@@ -77,7 +77,7 @@ def load_config(app, config_type):
         PRODUCTION='config.py'
     )
 
-    app.config.from_pyfile(config_dictionary['PRODUCTION'])
+    app.config.from_pyfile(config_dictionary[config_type])
 
     if config_type in config_dictionary.keys():
         try:
