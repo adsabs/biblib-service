@@ -9,14 +9,13 @@ PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
 
-import test_config
+import config
 import unittest
 from manage import CreateDatabase, DestroyDatabase, DeleteStaleUsers
 from models import User, Library, Permissions, db
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.exc import NoResultFound
-from test_config import BIBLIB_ADSWS_API_DB_URI
 
 class TestManagePy(unittest.TestCase):
     """
@@ -33,7 +32,7 @@ class TestManagePy(unittest.TestCase):
 
         # Setup the tables
         CreateDatabase.run()
-        engine = create_engine(test_config.SQLALCHEMY_BINDS['libraries'])
+        engine = create_engine(config.SQLALCHEMY_BINDS['libraries'])
         connection = engine.connect()
 
         for model in [User, Library, Permissions]:
@@ -52,7 +51,7 @@ class TestManagePy(unittest.TestCase):
         """
 
         # Setup the tables
-        engine = create_engine(test_config.SQLALCHEMY_BINDS['libraries'])
+        engine = create_engine(config.SQLALCHEMY_BINDS['libraries'])
         connection = engine.connect()
         db.metadata.create_all(bind=engine)
 
@@ -75,7 +74,7 @@ class TestManagePy(unittest.TestCase):
         """
 
         # Setup an SQLite table for mocking the API response
-        engine = create_engine(BIBLIB_ADSWS_API_DB_URI)
+        engine = create_engine(config.BIBLIB_ADSWS_API_DB_URI)
         sql_session_maker = scoped_session(sessionmaker(bind=engine))
         sql_session = sql_session_maker()
 
@@ -85,7 +84,7 @@ class TestManagePy(unittest.TestCase):
         sql_session.commit()
 
         # Setup the tables for the biblib service
-        engine = create_engine(test_config.SQLALCHEMY_BINDS['libraries'])
+        engine = create_engine(config.SQLALCHEMY_BINDS['libraries'])
         db.metadata.create_all(bind=engine)
 
         session_factory = scoped_session(sessionmaker(bind=engine))
@@ -148,7 +147,7 @@ class TestManagePy(unittest.TestCase):
             library_2_id = library_2.id
 
             # Now run the stale deletion
-            DeleteStaleUsers().run(config_type='TEST')
+            DeleteStaleUsers().run()
 
             # Check the state of users, libraries and permissions
             # User 2
@@ -210,7 +209,7 @@ class TestManagePy(unittest.TestCase):
             sql_session.close()
             session.close()
             db.metadata.drop_all(bind=engine)
-            os.remove(BIBLIB_ADSWS_API_DB_URI.replace('sqlite:///', ''))
+            os.remove(config.BIBLIB_ADSWS_API_DB_URI.replace('sqlite:///', ''))
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

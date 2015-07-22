@@ -388,7 +388,7 @@ class UserView(BaseView):
                 _bibcode = uniquify(_bibcode)
                 current_app.logger.info('User supplied bibcodes: {0}'
                                         .format(_bibcode))
-                library.bibcode = _bibcode
+                library.add_bibcodes(_bibcode)
             elif _bibcode:
                 current_app.logger.error('Bibcode supplied not a list: {0}'
                                          .format(_bibcode))
@@ -654,7 +654,7 @@ class UserView(BaseView):
 
         # If they added bibcodes include in the response
         if hasattr(library, 'bibcode') and library.bibcode:
-            return_data['bibcode'] = library.bibcode
+            return_data['bibcode'] = library.get_bibcodes()
 
         return return_data, 200
 
@@ -831,7 +831,7 @@ class LibraryView(BaseView):
         update = False
         canonical_bibcodes = []
         alternate_bibcodes = {}
-        new_bibcode = []
+        new_bibcode = {}
 
         # Constants for the return dictionary
         num_updated = 0
@@ -851,7 +851,7 @@ class LibraryView(BaseView):
 
             # Skip if its already canonical
             if bibcode in canonical_bibcodes:
-                new_bibcode.append(bibcode)
+                new_bibcode[bibcode] = library.bibcode[bibcode]
                 continue
 
             # Update if its an alternate
@@ -862,7 +862,8 @@ class LibraryView(BaseView):
 
                 # Only add the bibcode if it is not there
                 if alternate_bibcodes[bibcode] not in new_bibcode:
-                    new_bibcode.append(alternate_bibcodes[bibcode])
+                    new_bibcode[alternate_bibcodes[bibcode]] = \
+                        library.bibcode[bibcode]
                 else:
                     duplicates_removed += 1
 
@@ -991,7 +992,7 @@ class LibraryView(BaseView):
 
             # Make the response dictionary
             response = dict(
-                documents=library.bibcode,
+                documents=library.get_bibcodes(),
                 solr=solr,
                 metadata=metadata,
                 updates=updates
@@ -1070,7 +1071,8 @@ class DocumentView(BaseView):
         library = Library.query.filter(Library.id == library_id).one()
 
         start_length = len(library.bibcode)
-        library.bibcode.upsert(document_data['bibcode'])
+
+        library.add_bibcodes(document_data['bibcode'])
 
         db.session.add(library)
         db.session.commit()
@@ -1098,7 +1100,8 @@ class DocumentView(BaseView):
                                 '{1}'.format(document_data, library_id))
         library = Library.query.filter(Library.id == library_id).one()
         start_length = len(library.bibcode)
-        library.bibcode.shorten(document_data['bibcode'])
+
+        library.remove_bibcodes(document_data['bibcode'])
 
         db.session.add(library)
         db.session.commit()

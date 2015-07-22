@@ -1,1 +1,1 @@
-* 1 * * * /usr/bin/python /biblib/biblib/manage.py syncdb --config_type CONSUL >> /tmp/biblib_delete_stale_users.log
+* 1 * * * /usr/bin/python /biblib/biblib/manage.py syncdb >> /tmp/biblib_delete_stale_users.log

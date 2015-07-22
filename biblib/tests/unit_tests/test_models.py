@@ -11,123 +11,90 @@ sys.path.append(PROJECT_HOME)
 
 import app
 import unittest
-from models import db, User, Library, Permissions, MutableList
+from models import db, User, Library, Permissions, MutableDict
 from flask.ext.testing import TestCase
+from tests.base import TestCaseDatabase
 
-class TestModelTypes(TestCase):
+class TestLibraryModel(TestCaseDatabase):
     """
-    Class for testing the behaviour of the custom types created in the models
-    of the database
+    Class for testing the methods usable by the Library model
     """
-
-    def create_app(self):
+    def test_get_bibcodes_from_model(self):
         """
-        Create the wsgi application
-
-        :return: application instance
+        Checks that the get_bibcodes method works as expected
         """
-        app_ = app.create_app(config_type='TEST')
-        return app_
+        lib = Library(bibcode={'1': {}, '2': {}, '3': {}})
+        db.session.add(lib)
+        db.session.commit()
 
-    def test_append_of_mutable_list(self):
+        self.assertUnsortedEqual(lib.get_bibcodes(), ['1', '2', '3'])
+
+    def test_adding_bibcodes_to_library(self):
         """
-        Checks that the append method of the mutable list behaves as expected
-
-        :return: no return
+        Checks that the custom add/upsert command works as expected
         """
-        expected_list = [1]
-        mutable_list = MutableList()
-        mutable_list.append(expected_list[0])
-        self.assertEqual(expected_list, mutable_list)
+        # Make fake library
+        bibcodes_list_1 = {'1': {}, '2': {}, '3': {}}
+        bibcodes_list_2 = ['2', '2', '3', '4', '4']
+        expected_bibcode_output = ['1', '2', '3', '4']
 
-    def test_extend_of_mutable_list(self):
+        lib = Library(bibcode=bibcodes_list_1)
+        db.session.add(lib)
+        db.session.commit()
+
+        lib.add_bibcodes(bibcodes_list_2)
+        db.session.add(lib)
+        db.session.commit()
+
+        self.assertUnsortedEqual(lib.get_bibcodes(), expected_bibcode_output)
+
+    def test_adding_bibcode_if_not_commited_to_library(self):
         """
-        Checks that the extend method of the mutable list behaves as expected
-
-        :return: no return
+        Checks that bibcodes are add correctly if the library has not been
+        commited to the db yet.
         """
-        expected_list = [1]
-        mutable_list = MutableList()
-        mutable_list.extend(expected_list)
-        self.assertEqual(expected_list, mutable_list)
+        bibcodes_list = ['1', '2', '3', '4']
 
-    def test_remove_when_item_does_not_exist(self):
+        lib = Library()
+        lib.add_bibcodes(bibcodes_list)
+        db.session.add(lib)
+        db.session.commit()
+
+        self.assertEqual(lib.bibcode, {k: {} for k in bibcodes_list})
+        self.assertUnsortedEqual(lib.get_bibcodes(), bibcodes_list)
+
+    def test_removing_bibcodes_from_library(self):
         """
-        Tests that remove behaves like the list remove when an item that
-        does not exist, does not raise a KeyError
-
-        :return: no return
+        Checks that bibcodes get removed from a library correctly
         """
-        test_list = [1, 2, 3]
-        mutable_list = MutableList()
-        mutable_list.extend(test_list)
+        # Stub data
+        bibcodes_list_1 = {'1': {}, '2': {}, '3': {}}
+        expected_list = ['2', '3']
 
-        self.assertEqual(test_list, mutable_list)
+        lib = Library(bibcode=bibcodes_list_1)
+        db.session.add(lib)
+        db.session.commit()
 
-        mutable_list.remove(4)
+        lib.remove_bibcodes(['1'])
+        db.session.add(lib)
+        db.session.commit()
 
-        self.assertEqual(test_list, mutable_list)
-
-    def test_remove_of_mutable_list(self):
-        """
-        Checks that the remove method of the mutable list behaves as expected
-
-        :return: no return
-        """
-        expected_list = [1]
-        mutable_list = MutableList()
-        mutable_list.append(expected_list[0])
-        mutable_list.remove(expected_list[0])
-
-        self.assertEqual([], mutable_list)
-
-    def test_shorten_of_mutable_list(self):
-        """
-        Checks that the remove method of the mutable list behaves as expected
-
-        :return: no return
-        """
-        expected_list = [1]
-        mutable_list = MutableList()
-        mutable_list.extend(expected_list)
-        mutable_list.shorten(expected_list)
-
-        self.assertEqual([], mutable_list)
-
-    def test_upsert_of_mutable_list(self):
-        """
-        Checks that the custom upsert command works as expected
-
-        :return: no return
-        """
-
-        input_list_1 = [1, 2, 3]
-        input_list_2 = [2, 2, 3, 4, 4]
-        expected_output = [1, 2, 3, 4]
-
-        mutable_list = MutableList()
-        mutable_list.extend(input_list_1)
-        mutable_list.upsert(input_list_2)
-
-        self.assertEqual(mutable_list, expected_output)
+        self.assertUnsortedEqual(lib.get_bibcodes(), expected_list)
 
     def test_coerce(self):
         """
         Checks the coerce for SQLAlchemy works correctly
-
-        :return: no return
         """
-
-        mutable_list = MutableList()
+        mutable_dict = MutableDict()
 
         with self.assertRaises(ValueError):
-            mutable_list.coerce('key', 2)
+            mutable_dict.coerce('key', 2)
 
-        new_type = mutable_list.coerce('key', [2])
-        self.assertIsInstance(new_type, MutableList)
+        new_type = mutable_dict.coerce('key', {'key': 'value'})
+        self.assertIsInstance(new_type, MutableDict)
 
-        same_list = mutable_list.coerce('key', mutable_list)
-        self.assertEqual(same_list, mutable_list)
+        same_list = mutable_dict.coerce('key', mutable_dict)
+        self.assertEqual(same_list, mutable_dict)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

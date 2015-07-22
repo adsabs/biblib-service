@@ -26,7 +26,7 @@ class TestBigShareEditorEpic(TestCaseDatabase):
     Base class used to test the Big Share Editor Epic
     """
 
-    def test_job_big_share_editor(self):
+    def test_big_share_editor(self):
         """
         Carries out the epic 'Big Share Editor', where a user creates a library
         and wants one other use to have editing permissions, i.e., add and
@@ -72,7 +72,7 @@ class TestBigShareEditorEpic(TestCaseDatabase):
 
         # Checks they are all in the library
         url = url_for('libraryview', library=library_id_dave)
-        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
+        canonical_bibcode = [i.get_bibcodes()[0] for i in libraries_added]
         with MockSolrBigqueryService(
                 canonical_bibcode=canonical_bibcode) as BQ, \
                 MockEndPoint([user_dave]) as EP:
@@ -107,7 +107,7 @@ class TestBigShareEditorEpic(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
 
         # Mary looks at the library
-        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
+        canonical_bibcode = [i.get_bibcodes()[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
         with MockSolrBigqueryService(
                 canonical_bibcode=canonical_bibcode) as BQ, \
@@ -139,7 +139,7 @@ class TestBigShareEditorEpic(TestCaseDatabase):
             libraries_added.remove(libraries_added[i])
 
         # She checks that they got removed
-        canonical_bibcode = [i.bibcode[0] for i in libraries_added]
+        canonical_bibcode = [i.get_bibcodes()[0] for i in libraries_added]
         url = url_for('libraryview', library=library_id_dave)
         with MockSolrBigqueryService(
                 canonical_bibcode=canonical_bibcode) as BQ, \
@@ -167,12 +167,12 @@ class TestBigShareEditorEpic(TestCaseDatabase):
             self.assertEqual(response.status_code, 200, response)
 
             libraries_added.append(library)
-            canonical_bibcode.extend(library.bibcode)
+            canonical_bibcode.extend(library.get_bibcodes())
 
         # She checks that they got added
         url = url_for('libraryview', library=library_id_dave)
-        with MockSolrBigqueryService(canonical_bibcode=canonical_bibcode) as BQ, \
-                MockEndPoint([user_dave, user_mary]) as EP:
+        with MockSolrBigqueryService(canonical_bibcode=canonical_bibcode) \
+                as BQ, MockEndPoint([user_dave, user_mary]) as EP:
             response = self.client.get(
                 url,
                 headers=user_mary.headers

@@ -19,6 +19,7 @@ from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
 from tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint
+from utils import get_item
 
 class TestWebservices(TestCaseDatabase):
     """
@@ -321,20 +322,27 @@ class TestWebservices(TestCaseDatabase):
         # Check that the solr docs updated the library docs
         lib_docs = response.json['documents']
 
-        self.assertEqual(canonical_biblist, lib_docs)
-        self.assertNotEqual(original_bibcodes, lib_docs)
+        self.assertUnsortedEqual(canonical_biblist, lib_docs)
+        self.assertUnsortedNotEqual(original_bibcodes, lib_docs)
 
         # Check the data returned is correct on what files were updated and why
         updates = response.json['updates']
         self.assertEqual(updates['num_updated'], 3)
         self.assertEqual(updates['duplicates_removed'], 1)
         update_list = updates['update_list']
-        self.assertEqual(update_list[0]['arXiv1976.....LWW......L'],
-                         '1976.....LWW......L')
-        self.assertEqual(update_list[1]['arXiv2010.....KPK......K'],
-                         '2010.....KPK......K')
-        self.assertEqual(update_list[2]['arXiv2014.....KTC......K'],
-                         '2010.....KPK......K')
+
+        self.assertEqual(
+            get_item(update_list, 'arXiv1976.....LWW......L'),
+            '1976.....LWW......L'
+        )
+        self.assertEqual(
+            get_item(update_list, 'arXiv2010.....KPK......K'),
+            '2010.....KPK......K'
+        )
+        self.assertEqual(
+            get_item(update_list, 'arXiv2014.....KTC......K'),
+            '2010.....KPK......K'
+        )
 
     def test_solr_does_not_update_if_weird_response(self):
         """
@@ -385,9 +393,8 @@ class TestWebservices(TestCaseDatabase):
 
         # Check that the solr docs did not change the docs
         lib_docs = response.json['documents']
-
-        self.assertEqual(lib_docs, non_canonical_biblist)
-        self.assertNotEqual(lib_docs, canonical_biblist)
+        self.assertUnsortedEqual(lib_docs, non_canonical_biblist)
+        self.assertUnsortedNotEqual(lib_docs, canonical_biblist)
 
     def test_create_library_resource_and_add_bibcodes_of_wrong_type(self):
         """
@@ -714,7 +721,8 @@ class TestWebservices(TestCaseDatabase):
             )
 
         self.assertEqual(response.status_code, 200, response)
-        self.assertEqual(stub_library.bibcode, response.json['documents'])
+        self.assertEqual(stub_library.get_bibcodes(),
+                         response.json['documents'])
 
     def test_cannot_add_duplicate_documents_to_library(self):
         """

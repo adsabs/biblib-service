@@ -79,7 +79,9 @@ class LibraryFactory(factory.Factory):
     public = False
     read = False
     write = False
-    bibcode = factory.LazyAttribute(lambda x: fake_biblist(nb_codes=1))
+    bibcode = factory.LazyAttribute(
+        lambda x: {k: {} for k in fake_biblist(nb_codes=1)}
+    )
 
 
 class UserShop(object):
@@ -239,6 +241,14 @@ class LibraryShop(object):
 
         self.create_user_view_post_data()
 
+    def get_bibcodes(self):
+        """
+        Thin wrapper to get the bibcodes. This allows a similar replication of
+        how the models treat libraries.
+        :return: list of bibcodes
+        """
+        return self.bibcode.keys()
+
     def create_user_view_post_data(self):
         """
         Expected data to be sent in a POST request to the UserView,
@@ -253,7 +263,7 @@ class LibraryShop(object):
         )
 
         if self.want_bibcode:
-            post_data['bibcode'] = self.bibcode
+            post_data['bibcode'] = self.get_bibcodes()
 
         json_data = json.dumps(post_data)
 
@@ -269,7 +279,7 @@ class LibraryShop(object):
         :return: POST data in dictionary format
         """
         post_data = dict(
-            bibcode=self.bibcode,
+            bibcode=self.get_bibcodes(),
             action=action
         )
         return post_data

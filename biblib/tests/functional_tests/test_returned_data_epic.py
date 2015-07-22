@@ -268,7 +268,7 @@ class TestReturnedDataEpic(TestCaseDatabase):
                              len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
 
-            documents.append(library.bibcode[0])
+            documents.append(library.get_bibcodes()[0])
 
         # Dave looks in the library overview and sees that his library size
         # has increased
@@ -324,7 +324,7 @@ class TestReturnedDataEpic(TestCaseDatabase):
             self.assertEqual(response.json['number_added'],
                              len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
-            documents.append(library.bibcode[0])
+            documents.append(library.get_bibcodes()[0])
 
         # Dave sees that the number of bibcodes has increased and that the
         # last modified date has changed, but the created date has not

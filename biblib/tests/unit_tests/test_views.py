@@ -11,16 +11,17 @@ sys.path.append(PROJECT_HOME)
 
 import unittest
 import uuid
-from models import db, User, Library, Permissions, MutableList
+from models import db, User, Library, Permissions, MutableDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from views import UserView, LibraryView, DocumentView, PermissionView, \
     BaseView, TransferView
 from views import DEFAULT_LIBRARY_DESCRIPTION
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from utils import BackendIntegrityError, PermissionDeniedError
+from utils import BackendIntegrityError, PermissionDeniedError, get_item
 from tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
+
 
 
 class TestBaseViews(TestCaseDatabase):
@@ -206,7 +207,7 @@ class TestUserViews(TestCaseDatabase):
             library_data=self.stub_library.user_view_post_data
         )
 
-        self.assertEqual([], library.bibcode)
+        self.assertEqual({}, library.bibcode)
 
         # Check that the library was created with the correct permissions
         result = Permissions.query\
@@ -249,7 +250,7 @@ class TestUserViews(TestCaseDatabase):
             .all()
 
         library = result[0].library
-        self.assertIs(MutableList, type(library.bibcode), type(library.bibcode))
+        self.assertIs(MutableDict, type(library.bibcode), type(library.bibcode))
         self.assertTrue(
             len(library.bibcode) == len(stub_library.bibcode)
         )
@@ -859,7 +860,7 @@ class TestLibraryViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=original_bibcodes)
+                          bibcode={k: {} for k in original_bibcodes})
 
         # Give the user and library permissions
         permission = Permissions(read=True,
@@ -891,8 +892,11 @@ class TestLibraryViews(TestCaseDatabase):
                          'test3')
 
         library = Library.query.filter(Library.id == library.id).one()
-        self.assertNotEqual(library.bibcode, original_bibcodes)
-        self.assertEqual(library.bibcode, canonical_bibcodes)
+
+        self.assertUnsortedNotEqual(library.get_bibcodes(),
+                                    original_bibcodes)
+        self.assertUnsortedEqual(library.get_bibcodes(),
+                                 canonical_bibcodes)
 
     def test_that_solr_updates_canonical_bibcodes_with_multi_alternates(self):
         """
@@ -922,7 +926,7 @@ class TestLibraryViews(TestCaseDatabase):
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=original_bibcodes)
+                          bibcode={k: {} for k in original_bibcodes})
 
         # Give the user and library permissions
         permission = Permissions(read=True,
@@ -949,14 +953,22 @@ class TestLibraryViews(TestCaseDatabase):
         self.assertEqual(updates['num_updated'], 2)
         self.assertEqual(updates['duplicates_removed'], 1)
         update_list = updates['update_list']
-        self.assertEqual(update_list[0]['arXivtest3'],
-                         'test3')
-        self.assertEqual(update_list[1]['conftest3'],
-                         'test3')
+
+        self.assertEqual(
+            get_item(update_list, 'arXivtest3'),
+            'test3'
+        )
+        self.assertEqual(
+            get_item(update_list, 'conftest3'),
+            'test3'
+        )
 
         library = Library.query.filter(Library.id == library.id).one()
-        self.assertNotEqual(library.bibcode, original_bibcodes)
-        self.assertEqual(library.bibcode, canonical_bibcodes)
+
+        self.assertUnsortedNotEqual(library.get_bibcodes(),
+                                    original_bibcodes)
+        self.assertUnsortedEqual(library.get_bibcodes(),
+                                 canonical_bibcodes)
 
     def test_user_without_permission_cannot_access_private_library(self):
         """
@@ -1272,7 +1284,7 @@ class TestDocumentViews(TestCaseDatabase):
         # Check that the document is in the library
         library = Library.query.filter(Library.id == library_id).all()
         for _lib in library:
-            self.assertIn(self.stub_library.bibcode[0], _lib.bibcode)
+            self.assertIn(self.stub_library.bibcode.keys()[0], _lib.bibcode)
 
         # Add a different document to the library
         number_added = self.document_view.add_document_to_library(
@@ -1284,7 +1296,7 @@ class TestDocumentViews(TestCaseDatabase):
         # Check that the document is in the library
         library = Library.query.filter(Library.id == library_id).all()
         for _lib in library:
-            self.assertIn(self.stub_library_2.bibcode[0], _lib.bibcode)
+            self.assertIn(self.stub_library_2.bibcode.keys()[0], _lib.bibcode)
 
     def test_user_cannot_duplicate_same_document_in_library(self):
         """

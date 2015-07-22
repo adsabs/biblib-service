@@ -4,6 +4,8 @@ for this module. But are also used in differing modules insidide the same
 project, and so do not belong to anything specific.
 """
 
+from collections import Counter
+
 def get_post_data(request, types={}):
     """
     Attempt to coerce POST json data from the request, falling
@@ -57,6 +59,30 @@ def uniquify(input_list):
     seen = set()
     seen_add = seen.add
     return [item for item in input_list if not (item in seen or seen_add(item))]
+
+
+def assert_unsorted_equal(s, t):
+    """
+    Given two hashable types that are not sorted, this checks if the same number
+    of values are present in both.
+    :param s: first hashable item
+    :param t: second hashable item
+    :return: Equal (True) / Not equal (False)
+    """
+    return Counter(s) == Counter(t)
+
+def get_item(list_of_dictionaries, key):
+    """
+    Given a list of dictionaries, it returns the first dictionary that
+    contains the given key, and the item for that key.
+    :param list_of_dictionaries: list(dict())
+    :param key: key of dictionary wanted
+
+    :return: contents of list(dict[key])
+    """
+    return next(
+        item[key]for item in list_of_dictionaries if key in item.keys()
+    )
 
 class BackendIntegrityError(Exception):
     """
