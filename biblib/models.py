@@ -6,10 +6,9 @@ to be passed to the app creator within the Flask blueprint.
 """
 
 import uuid
-from utils import uniquify
 from datetime import datetime
 from flask.ext.sqlalchemy import SQLAlchemy
-from sqlalchemy.dialects.postgresql import ARRAY, UUID, JSON
+from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.types import TypeDecorator, CHAR, String
 
