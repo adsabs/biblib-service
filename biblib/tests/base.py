@@ -9,6 +9,7 @@ from flask import current_app
 from flask.ext.testing import TestCase
 from httpretty import HTTPretty
 from models import db
+from utils import assert_unsorted_equal
 
 
 class MockADSWSAPI(object):
@@ -228,6 +229,31 @@ class TestCaseDatabase(TestCase):
         """
         db.session.remove()
         db.drop_all()
+
+    def assertUnsortedEqual(self, hashable_1, hashable_2):
+        """
+        Wrapper function to make the tests easier to read. Wraps the utility
+        function that compares if two hashables are equal or not.
+        :param hashable_1: hashable value 1
+        :param hashable_2: hashable value 2
+        """
+
+        if not assert_unsorted_equal(hashable_1, hashable_2):
+            raise Exception('Not Equal: {0}, {1}'
+                            .format(hashable_1, hashable_2))
+
+    def assertUnsortedNotEqual(self, hashable_1, hashable_2):
+        """
+        Wrapper function to make the tests easier to read. Wraps the utility
+        function that compares if two hashables are equal or not.
+        :param hashable_1: hashable value 1
+        :param hashable_2: hashable value 2
+        """
+
+        if assert_unsorted_equal(hashable_1, hashable_2):
+            raise Exception('Equal: {0}, {1}'
+                            .format(hashable_1, hashable_2))
+
 
 class MockEndPoint(object):
     """

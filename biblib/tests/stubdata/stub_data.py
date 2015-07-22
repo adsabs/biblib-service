@@ -255,7 +255,7 @@ class LibraryShop(object):
         )
 
         if self.want_bibcode:
-            post_data['bibcode'] = self.bibcode
+            post_data['bibcode'] = self.bibcode.keys()
 
         json_data = json.dumps(post_data)
 

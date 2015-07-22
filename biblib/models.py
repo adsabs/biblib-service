@@ -153,97 +153,6 @@ class MutableDict(Mutable, dict):
         dict.pop(self, key, default)
         self.changed()
 
-class MutableList(Mutable, list):
-    """
-    The PostgreSQL type ARRAY cannot be mutated once it is set. This hack is
-    written by the author of SQLAlchemy as a solution. For further reading,
-    see:
-
-    https://groups.google.com/forum/#!topic/sqlalchemy/ZiDlGJkVTM0
-
-    and
-
-    http://kirang.in/2014/08/09/
-    creating-a-mutable-array-data-type-in-sqlalchemy
-    """
-    def append(self, value):
-        """
-        Define an append action
-        :param value: value to be appended
-
-        :return: no return
-        """
-
-        list.append(self, value)
-        self.changed()
-
-    def remove(self, value):
-        """
-        Define a remove action.
-        Passes if the value does not exist within the list.
-
-        :param value: value to be removed
-
-        :return: no return
-        """
-
-        try:
-            list.remove(self, value)
-            self.changed()
-        except ValueError:
-            pass
-
-    def extend(self, value):
-        """
-        Define an extend action
-        :param value: list to extend with
-
-        :return: no return
-        """
-        list.extend(self, value)
-        self.changed()
-
-    def shorten(self, value):
-        """
-        Define a shorten action. Opposite to extend
-
-        :param value: values to remove
-
-        :return: no return
-        """
-        for item in value:
-            self.remove(item)
-
-    def upsert(self, value):
-        """
-        Add values that do not exist in the current list
-        :param value:
-        :return:
-        """
-        value = uniquify(value)
-        value = [item for item in value if item not in list(self)]
-
-        self.extend(value)
-
-    @classmethod
-    def coerce(cls, key, value):
-        """
-        Re-define the coerce. Ensures that a class deriving from Mutable is
-        always returned
-
-        :param key:
-        :param value:
-
-        :return:
-        """
-        if not isinstance(value, MutableList):
-            if isinstance(value, list):
-                return MutableList(value)
-            return Mutable.coerce(key, value)
-        else:
-            return value
-
-
 class User(db.Model):
     """
     User table
@@ -274,9 +183,7 @@ class Library(db.Model):
     name = db.Column(db.String(50))
     description = db.Column(db.String(50))
     public = db.Column(db.Boolean)
-    # bibcode = db.Column(MutableList.as_mutable(ARRAY(db.String(50))), default=[])
-    default_bibcode = {}
-    bibcode = db.Column(MutableDict.as_mutable(JSON), default=default_bibcode)
+    bibcode = db.Column(MutableDict.as_mutable(JSON), default={})
     date_created = db.Column(
         db.DateTime,
         nullable=False,
@@ -320,6 +227,8 @@ class Library(db.Model):
 
         :param bibcodes: list of bibcodes
         """
+        if not self.bibcode:
+            self.bibcode = {}
         [self.bibcode.setdefault(item, {}) for item in bibcodes]
 
     def remove_bibcodes(self, bibcodes):
