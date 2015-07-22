@@ -20,7 +20,7 @@ class CreateDatabase(Command):
         Creates the database in the application context
         :return: no return
         """
-        with create_app(config_type='TEST').app_context():
+        with create_app().app_context():
             db.create_all()
             db.session.commit()
 
@@ -34,7 +34,7 @@ class DestroyDatabase(Command):
         Creates the database in the application context
         :return: no return
         """
-        with create_app(config_type='TEST').app_context():
+        with create_app().app_context():
             db.session.remove()
             db.drop_all()
 
@@ -46,33 +46,11 @@ class DeleteStaleUsers(Command):
     the cascade that has been implemented.
     """
 
-    def __init__(self, default_config_type='TEST'):
-        """
-        Constructor
-        :param default_config_type: Default configuration type to use
-        """
-        self.default_config_type = default_config_type
-
-    def get_options(self):
-        """
-        Sets the options that can be passed from the manage.py script
-        after invoking the run time operation.
-
-        :return: list of allowed options
-        """
-        return [
-            Option('--config_type',
-                   '-c',
-                   dest='config_type',
-                   default=self.default_config_type)
-        ]
-
-    def run(self, config_type):
+    def run(self):
         """
         Carries out the deletion of the stale content
-        :param config_type: Configuration type to use
         """
-        with create_app(config_type).app_context():
+        with create_app().app_context():
 
             # Obtain the list of API users
             api_engine = create_engine(
@@ -110,7 +88,7 @@ class DeleteStaleUsers(Command):
             db.session.commit()
 
 # Load the app with the factory
-app = create_app(config_type='TEST')
+app = create_app()
 
 # Set up the alembic migration
 migrate = Migrate(app, db, compare_type=True)

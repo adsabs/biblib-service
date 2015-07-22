@@ -210,7 +210,7 @@ class TestCaseDatabase(TestCase):
 
         :return: application instance
         """
-        app_ = app.create_app(config_type='TEST')
+        app_ = app.create_app()
         return app_
 
     def setUp(self):

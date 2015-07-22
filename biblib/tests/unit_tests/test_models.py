@@ -19,16 +19,6 @@ class TestLibraryModel(TestCaseDatabase):
     """
     Class for testing the methods usable by the Library model
     """
-
-    def create_app(self):
-        """
-        Create the wsgi application
-
-        :return: application instance
-        """
-        app_ = app.create_app(config_type='TEST')
-        return app_
-
     def test_get_bibcodes_from_model(self):
         """
         Checks that the get_bibcodes method works as expected
