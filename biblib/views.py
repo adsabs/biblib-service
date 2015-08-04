@@ -793,8 +793,8 @@ class LibraryView(BaseView):
         params = {
             'q': '*:*',
             'wt': 'json',
-            'fl': 'title,abstract,bibcode,author,aff,links_data,'
-                  'property,[citations],pub,pubdate',
+            'fl': 'title,bibcode,author,aff,links_data,'
+                  'property,[citations],pub,pubdate,read_count',
             'rows': '1000',
             'fq': '{!bitset}'
         }
