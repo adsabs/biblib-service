@@ -11,3 +11,4 @@ logs/
 *.coverage*
 *.ignore
 src/
+*.idea

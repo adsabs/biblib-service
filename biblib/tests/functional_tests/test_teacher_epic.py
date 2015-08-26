@@ -14,7 +14,7 @@ PROJECT_HOME = os.path.abspath(
 sys.path.append(PROJECT_HOME)
 
 import unittest
-from views import NO_PERMISSION_ERROR
+from views.http_errors import NO_PERMISSION_ERROR
 
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop

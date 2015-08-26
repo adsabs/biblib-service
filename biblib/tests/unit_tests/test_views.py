@@ -18,7 +18,8 @@ from views import UserView, LibraryView, DocumentView, PermissionView, \
     BaseView, TransferView
 from views import DEFAULT_LIBRARY_DESCRIPTION
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from utils import BackendIntegrityError, PermissionDeniedError, get_item
+from utils import get_item
+from biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
 
@@ -1232,16 +1233,6 @@ class TestDocumentViews(TestCaseDatabase):
             Permissions.query.filter(
                 Permissions.library_id == library.id
             ).one()
-
-    @unittest.skip('Not tested as cannot delete users yet')
-    def test_when_delete_user_it_removes_permissions_and_libraries(self):
-        """
-        Tests that when a user is deleted, all the relevant libraries and
-        permissions are also updated.
-
-        :return: no return
-        """
-        self.fail()
 
     def test_user_can_add_to_library(self):
         """
