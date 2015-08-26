@@ -35,8 +35,8 @@ class DestroyDatabase(Command):
         :return: no return
         """
         with create_app().app_context():
-            db.session.remove()
             db.drop_all()
+            # db.session.remove()
 
 class DeleteStaleUsers(Command):
     """
