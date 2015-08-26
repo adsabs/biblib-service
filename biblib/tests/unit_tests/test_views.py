@@ -114,7 +114,7 @@ class TestUserViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestUserViews, self).__init__(*args, **kwargs)
         self.user_view = UserView()
         self.document_view = DocumentView
         self.permission_view = PermissionView
@@ -678,7 +678,7 @@ class TestLibraryViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestLibraryViews, self).__init__(*args, **kwargs)
         self.user_view = UserView
         self.library_view = LibraryView
 
@@ -1051,7 +1051,7 @@ class TestDocumentViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestDocumentViews, self).__init__(*args, **kwargs)
         self.document_view = DocumentView
 
         # Stub data
@@ -1616,7 +1616,7 @@ class TestPermissionViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestPermissionViews, self).__init__(*args, **kwargs)
         self.permission_view = PermissionView
         self.user_view = UserView
 
@@ -2193,7 +2193,7 @@ class TestTransferViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestTransferViews, self).__init__(*args, **kwargs)
         self.permission_view = PermissionView
         self.transfer_view = TransferView
 
