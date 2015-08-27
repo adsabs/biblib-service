@@ -5,10 +5,9 @@ install:
  - pip install -r requirements.txt
 addons:
   postgresql: "9.3"
-before_script:
- - psql -c 'create database testdb;' -U postgres
 script:
  - bash biblib/tests/run_tests.sh
 after_success:
  - coverage combine
  - coveralls
+sudo: false

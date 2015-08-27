@@ -14,7 +14,7 @@ PROJECT_HOME = os.path.abspath(
 sys.path.append(PROJECT_HOME)
 
 import unittest
-from views import NO_PERMISSION_ERROR, API_MISSING_USER_EMAIL
+from views.http_errors import NO_PERMISSION_ERROR, API_MISSING_USER_EMAIL
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from tests.base import MockEmailService, MockSolrBigqueryService,\

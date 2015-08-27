@@ -9,8 +9,9 @@ PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
 
-import config
 import unittest
+import testing.postgresql
+from app import create_app
 from manage import CreateDatabase, DestroyDatabase, DeleteStaleUsers
 from models import User, Library, Permissions, db
 from sqlalchemy import create_engine
@@ -21,6 +22,41 @@ class TestManagePy(unittest.TestCase):
     """
     Class for testing the behaviour of the custom manage scripts
     """
+    """
+    Base test class for when databases are being used.
+    """
+
+    postgresql_url_dict = {
+        'port': 1234,
+        'host': '127.0.0.1',
+        'user': 'postgres',
+        'database': 'test'
+    }
+    postgresql_url = 'postgresql://{user}@{host}:{port}/{database}'\
+        .format(
+            user=postgresql_url_dict['user'],
+            host=postgresql_url_dict['host'],
+            port=postgresql_url_dict['port'],
+            database=postgresql_url_dict['database']
+        )
+
+    adsws_sqlite = 'sqlite:////tmp/test.db'
+
+    @classmethod
+    def setUpClass(cls):
+        cls.postgresql = \
+        cls.postgresql = \
+            testing.postgresql.Postgresql(**cls.postgresql_url_dict)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.postgresql.stop()
+
+    def setUp(self):
+        self._app = create_app()
+        self._app.config['SQLALCHEMY_BINDS']['libraries'] = \
+            TestManagePy.postgresql_url
+        self._app.config['BIBLIB_ADSWS_API_DB_URI'] = TestManagePy.adsws_sqlite
 
     def test_create_database(self):
         """
@@ -31,8 +67,8 @@ class TestManagePy(unittest.TestCase):
         """
 
         # Setup the tables
-        CreateDatabase.run()
-        engine = create_engine(config.SQLALCHEMY_BINDS['libraries'])
+        CreateDatabase.run(app=self._app)
+        engine = create_engine(TestManagePy.postgresql_url)
         connection = engine.connect()
 
         for model in [User, Library, Permissions]:
@@ -51,7 +87,7 @@ class TestManagePy(unittest.TestCase):
         """
 
         # Setup the tables
-        engine = create_engine(config.SQLALCHEMY_BINDS['libraries'])
+        engine = create_engine(TestManagePy.postgresql_url)
         connection = engine.connect()
         db.metadata.create_all(bind=engine)
 
@@ -59,7 +95,7 @@ class TestManagePy(unittest.TestCase):
             exists = engine.dialect.has_table(connection, model.__tablename__)
             self.assertTrue(exists)
 
-        DestroyDatabase.run()
+        DestroyDatabase.run(app=self._app)
 
         for model in [User, Library, Permissions]:
             exists = engine.dialect.has_table(connection, model.__tablename__)
@@ -74,7 +110,7 @@ class TestManagePy(unittest.TestCase):
         """
 
         # Setup an SQLite table for mocking the API response
-        engine = create_engine(config.BIBLIB_ADSWS_API_DB_URI)
+        engine = create_engine(TestManagePy.adsws_sqlite)
         sql_session_maker = scoped_session(sessionmaker(bind=engine))
         sql_session = sql_session_maker()
 
@@ -84,7 +120,7 @@ class TestManagePy(unittest.TestCase):
         sql_session.commit()
 
         # Setup the tables for the biblib service
-        engine = create_engine(config.SQLALCHEMY_BINDS['libraries'])
+        engine = create_engine(TestManagePy.postgresql_url)
         db.metadata.create_all(bind=engine)
 
         session_factory = scoped_session(sessionmaker(bind=engine))
@@ -147,7 +183,7 @@ class TestManagePy(unittest.TestCase):
             library_2_id = library_2.id
 
             # Now run the stale deletion
-            DeleteStaleUsers().run()
+            DeleteStaleUsers().run(app=self._app)
 
             # Check the state of users, libraries and permissions
             # User 2
@@ -209,7 +245,7 @@ class TestManagePy(unittest.TestCase):
             sql_session.close()
             session.close()
             db.metadata.drop_all(bind=engine)
-            os.remove(config.BIBLIB_ADSWS_API_DB_URI.replace('sqlite:///', ''))
+            os.remove(TestManagePy.adsws_sqlite.replace('sqlite:///', ''))
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

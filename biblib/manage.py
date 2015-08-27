@@ -10,17 +10,20 @@ from app import create_app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
+# Load the app with the factory
+app = create_app()
+
 class CreateDatabase(Command):
     """
     Creates the database based on models.py
     """
     @staticmethod
-    def run():
+    def run(app=app):
         """
         Creates the database in the application context
         :return: no return
         """
-        with create_app().app_context():
+        with app.app_context():
             db.create_all()
             db.session.commit()
 
@@ -29,14 +32,14 @@ class DestroyDatabase(Command):
     Creates the database based on models.py
     """
     @staticmethod
-    def run():
+    def run(app=app):
         """
         Creates the database in the application context
         :return: no return
         """
-        with create_app().app_context():
-            db.session.remove()
+        with app.app_context():
             db.drop_all()
+            # db.session.remove()
 
 class DeleteStaleUsers(Command):
     """
@@ -45,12 +48,12 @@ class DeleteStaleUsers(Command):
     also takes care of the associated permissions and libraries depending on
     the cascade that has been implemented.
     """
-
-    def run(self):
+    @staticmethod
+    def run(app=app):
         """
         Carries out the deletion of the stale content
         """
-        with create_app().app_context():
+        with app.app_context():
 
             # Obtain the list of API users
             api_engine = create_engine(
@@ -87,8 +90,6 @@ class DeleteStaleUsers(Command):
                         db.session.rollback()
             db.session.commit()
 
-# Load the app with the factory
-app = create_app()
 
 # Set up the alembic migration
 migrate = Migrate(app, db, compare_type=True)

@@ -12,9 +12,10 @@ sys.path.append(PROJECT_HOME)
 import json
 import unittest
 from flask import url_for
-from views import DUPLICATE_LIBRARY_NAME_ERROR, MISSING_LIBRARY_ERROR, \
-    MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, DEFAULT_LIBRARY_NAME_PREFIX, \
-    DEFAULT_LIBRARY_DESCRIPTION, WRONG_TYPE_ERROR, \
+from views import DEFAULT_LIBRARY_DESCRIPTION, DEFAULT_LIBRARY_NAME_PREFIX
+from views.http_errors import DUPLICATE_LIBRARY_NAME_ERROR, \
+    MISSING_LIBRARY_ERROR, MISSING_USERNAME_ERROR, \
+    NO_PERMISSION_ERROR, WRONG_TYPE_ERROR, \
     API_MISSING_USER_EMAIL, SOLR_RESPONSE_MISMATCH_ERROR
 from tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from tests.base import MockEmailService, MockSolrBigqueryService,\

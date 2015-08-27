@@ -18,7 +18,8 @@ from views import UserView, LibraryView, DocumentView, PermissionView, \
     BaseView, TransferView
 from views import DEFAULT_LIBRARY_DESCRIPTION
 from tests.stubdata.stub_data import UserShop, LibraryShop
-from utils import BackendIntegrityError, PermissionDeniedError, get_item
+from utils import get_item
+from biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
 
@@ -113,7 +114,7 @@ class TestUserViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestUserViews, self).__init__(*args, **kwargs)
         self.user_view = UserView()
         self.document_view = DocumentView
         self.permission_view = PermissionView
@@ -677,7 +678,7 @@ class TestLibraryViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestLibraryViews, self).__init__(*args, **kwargs)
         self.user_view = UserView
         self.library_view = LibraryView
 
@@ -1050,7 +1051,7 @@ class TestDocumentViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestDocumentViews, self).__init__(*args, **kwargs)
         self.document_view = DocumentView
 
         # Stub data
@@ -1232,16 +1233,6 @@ class TestDocumentViews(TestCaseDatabase):
             Permissions.query.filter(
                 Permissions.library_id == library.id
             ).one()
-
-    @unittest.skip('Not tested as cannot delete users yet')
-    def test_when_delete_user_it_removes_permissions_and_libraries(self):
-        """
-        Tests that when a user is deleted, all the relevant libraries and
-        permissions are also updated.
-
-        :return: no return
-        """
-        self.fail()
 
     def test_user_can_add_to_library(self):
         """
@@ -1625,7 +1616,7 @@ class TestPermissionViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestPermissionViews, self).__init__(*args, **kwargs)
         self.permission_view = PermissionView
         self.user_view = UserView
 
@@ -2202,7 +2193,7 @@ class TestTransferViews(TestCaseDatabase):
         :return: no return
         """
 
-        super(TestCaseDatabase, self).__init__(*args, **kwargs)
+        super(TestTransferViews, self).__init__(*args, **kwargs)
         self.permission_view = PermissionView
         self.transfer_view = TransferView
 

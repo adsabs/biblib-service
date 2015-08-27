@@ -14,7 +14,7 @@ PROJECT_HOME = os.path.abspath(
 sys.path.append(PROJECT_HOME)
 
 import unittest
-from views import USER_ID_KEYWORD, NO_PERMISSION_ERROR
+from views.http_errors import NO_PERMISSION_ERROR
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from tests.base import TestCaseDatabase, MockSolrBigqueryService, MockEndPoint
@@ -84,7 +84,6 @@ class TestAnonymousEpic(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('documents', response.json)
 
-    @unittest.expectedFailure
     def test_scopes(self):
         """
         Separately test the number of scopes that are scopeless. This will only
@@ -93,16 +92,15 @@ class TestAnonymousEpic(TestCaseDatabase):
 
         :return: no return
         """
-        number_of_scopeless = 0
         response = self.client.get('/resources')
+        end_points = []
         for end_point in response.json.keys():
 
             if len(response.json[end_point]['scopes']) == 0:
-                number_of_scopeless += 1
-                endpoint = end_point
+                end_points.append(end_point)
 
-        self.assertEqual(1, number_of_scopeless)
-        self.assertEqual('/libraries/<string:library>', endpoint)
+        self.assertEqual(1, len(end_points))
+        self.assertEqual('/libraries/<string:library>', end_points[0])
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -10,7 +10,7 @@ from flask.ext.testing import TestCase
 from httpretty import HTTPretty
 from models import db
 from utils import assert_unsorted_equal
-
+import testing.postgresql
 
 class MockADSWSAPI(object):
     """
@@ -204,6 +204,20 @@ class TestCaseDatabase(TestCase):
     Base test class for when databases are being used.
     """
 
+    postgresql_url_dict = {
+        'port': 1234,
+        'host': '127.0.0.1',
+        'user': 'postgres',
+        'database': 'test'
+    }
+    postgresql_url = 'postgresql://{user}@{host}:{port}/{database}'\
+        .format(
+            user=postgresql_url_dict['user'],
+            host=postgresql_url_dict['host'],
+            port=postgresql_url_dict['port'],
+            database=postgresql_url_dict['database']
+        )
+
     def create_app(self):
         """
         Create the wsgi application
@@ -211,7 +225,18 @@ class TestCaseDatabase(TestCase):
         :return: application instance
         """
         app_ = app.create_app()
+        app_.config['SQLALCHEMY_BINDS']['libraries'] = \
+            TestCaseDatabase.postgresql_url
         return app_
+
+    @classmethod
+    def setUpClass(cls):
+        cls.postgresql = \
+            testing.postgresql.Postgresql(**cls.postgresql_url_dict)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.postgresql.stop()
 
     def setUp(self):
         """
@@ -219,6 +244,7 @@ class TestCaseDatabase(TestCase):
 
         :return: no return
         """
+
         current_app.logger.info('Setting up db on: {0}'
                                 .format(current_app.config['SQLALCHEMY_BINDS']))
         db.create_all()

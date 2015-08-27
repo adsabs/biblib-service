@@ -13,9 +13,7 @@ PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_HOME)
 
-import time
 import unittest
-from datetime import datetime, timedelta
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from tests.base import MockSolrBigqueryService, TestCaseDatabase, MockEndPoint

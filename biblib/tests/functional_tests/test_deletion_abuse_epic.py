@@ -17,7 +17,7 @@ import unittest
 from flask import url_for
 from tests.stubdata.stub_data import UserShop, LibraryShop
 from tests.base import TestCaseDatabase, MockEmailService
-from views import NO_PERMISSION_ERROR
+from views.http_errors import NO_PERMISSION_ERROR
 
 
 class TestDeletionAbuseEpic(TestCaseDatabase):

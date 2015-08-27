@@ -21,7 +21,7 @@ def upgrade():
     sa.Column('name', sa.String(length=50), nullable=True),
     sa.Column('description', sa.String(length=50), nullable=True),
     sa.Column('public', sa.Boolean(), nullable=True),
-    sa.Column('bibcode', postgresql.ARRAY(sa.String(length=50)), nullable=True),
+    sa.Column('bibcode', postgresql.JSON(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user',
