@@ -6,7 +6,7 @@ install:
 addons:
   postgresql: "9.3"
 script:
- - bash biblib/tests/run_tests.sh
+ - nosetests --with-coverage
 after_success:
  - coverage combine
  - coveralls

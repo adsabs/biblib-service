@@ -2,18 +2,12 @@
 Tests the methods within the flask-script file manage.py
 """
 
-import sys
 import os
-
-PROJECT_HOME = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '../../'))
-sys.path.append(PROJECT_HOME)
-
 import unittest
 import testing.postgresql
-from app import create_app
-from manage import CreateDatabase, DestroyDatabase, DeleteStaleUsers
-from models import User, Library, Permissions, db
+from biblib.app import create_app
+from biblib.manage import CreateDatabase, DestroyDatabase, DeleteStaleUsers
+from biblib.models import User, Library, Permissions, db
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.exc import NoResultFound

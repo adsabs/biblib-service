@@ -1,8 +1,8 @@
 """
 Transfer view
 """
-from utils import uniquify, err, get_post_data
-from models import db, User, Library, Permissions
+from ..utils import err, get_post_data
+from ..models import db, Permissions
 from .base_view import BaseView
 from flask import request, current_app
 from flask.ext.discoverer import advertise

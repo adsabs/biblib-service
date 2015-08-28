@@ -3,13 +3,13 @@ Common utilities used by the test classes
 """
 
 import re
-import app
 import json
 from flask import current_app
 from flask.ext.testing import TestCase
+from biblib import app
 from httpretty import HTTPretty
-from models import db
-from utils import assert_unsorted_equal
+from biblib.models import db
+from biblib.utils import assert_unsorted_equal
 import testing.postgresql
 
 class MockADSWSAPI(object):

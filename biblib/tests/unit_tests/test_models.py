@@ -2,18 +2,9 @@
 Tests the underlying models of the database
 """
 
-import sys
-import os
-
-PROJECT_HOME = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '../../'))
-sys.path.append(PROJECT_HOME)
-
-import app
 import unittest
-from models import db, User, Library, Permissions, MutableDict
-from flask.ext.testing import TestCase
-from tests.base import TestCaseDatabase
+from biblib.models import db, User, Library, Permissions, MutableDict
+from biblib.tests.base import TestCaseDatabase
 
 class TestLibraryModel(TestCaseDatabase):
     """

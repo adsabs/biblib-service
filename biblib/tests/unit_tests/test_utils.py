@@ -2,16 +2,8 @@
 Tests the functions within the utils module
 """
 
-import sys
-import os
-
-PROJECT_HOME = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '../../'))
-sys.path.append(PROJECT_HOME)
-
-
 import unittest
-from utils import uniquify, assert_unsorted_equal, get_item
+from biblib.utils import uniquify, assert_unsorted_equal, get_item
 
 class TestUtils(unittest.TestCase):
     """

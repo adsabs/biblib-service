@@ -6,20 +6,12 @@ Retiring Librarian Epic
 Storyboard is defined within the comments of the program itself
 """
 
-import sys
-import os
-
-PROJECT_HOME = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '../../'))
-sys.path.append(PROJECT_HOME)
-
 import unittest
-from views.http_errors import NO_PERMISSION_ERROR, API_MISSING_USER_EMAIL
 from flask import url_for
-from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import MockEmailService, MockSolrBigqueryService,\
+from biblib.views.http_errors import NO_PERMISSION_ERROR, API_MISSING_USER_EMAIL
+from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
+from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint
-
 
 class TestRetiringLibrarianEpic(TestCaseDatabase):
     """

@@ -2,25 +2,18 @@
 Tests Views of the application
 """
 
-import sys
-import os
-
-PROJECT_HOME = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '../../'))
-sys.path.append(PROJECT_HOME)
-
 import unittest
 import uuid
-from models import db, User, Library, Permissions, MutableDict
+from biblib.models import db, User, Library, Permissions, MutableDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from views import UserView, LibraryView, DocumentView, PermissionView, \
+from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
     BaseView, TransferView
-from views import DEFAULT_LIBRARY_DESCRIPTION
-from tests.stubdata.stub_data import UserShop, LibraryShop
-from utils import get_item
-from biblib_exceptions import BackendIntegrityError, PermissionDeniedError
-from tests.base import TestCaseDatabase, MockEmailService, \
+from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
+from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
+from biblib.utils import get_item
+from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
+from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
 
 
