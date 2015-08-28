@@ -6,19 +6,11 @@ Deletion Abuse Epic
 Storyboard is defined within the comments of the program itself
 """
 
-import sys
-import os
-
-PROJECT_HOME = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '../../'))
-sys.path.append(PROJECT_HOME)
-
 import unittest
 from flask import url_for
-from tests.stubdata.stub_data import UserShop, LibraryShop
-from tests.base import TestCaseDatabase, MockEmailService
-from views.http_errors import NO_PERMISSION_ERROR
-
+from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
+from biblib.tests.base import TestCaseDatabase, MockEmailService
+from biblib.views.http_errors import NO_PERMISSION_ERROR
 
 class TestDeletionAbuseEpic(TestCaseDatabase):
     """

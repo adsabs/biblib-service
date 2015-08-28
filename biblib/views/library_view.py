@@ -1,10 +1,10 @@
 """
 Library view
 """
-from views import USER_ID_KEYWORD
-from utils import err, get_post_data
-from models import db, User, Library, Permissions
-from client import client
+from ..views import USER_ID_KEYWORD
+from ..utils import err
+from ..models import db, User, Library, Permissions
+from ..client import client
 from .base_view import BaseView
 from flask import request, current_app
 from flask.ext.discoverer import advertise

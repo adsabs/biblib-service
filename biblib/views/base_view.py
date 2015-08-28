@@ -4,15 +4,15 @@ Base view
 import uuid
 import base64
 
-from views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
+from ..views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
     USER_ID_KEYWORD
 from flask import request, current_app
 from flask.ext.restful import Resource
-from models import db, User, Library, Permissions
-from client import client
+from ..models import db, User, Library, Permissions
+from ..client import client
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from biblib_exceptions import BackendIntegrityError, PermissionDeniedError
+from ..biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 
 class BaseView(Resource):
     """

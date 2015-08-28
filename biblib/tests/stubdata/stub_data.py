@@ -5,8 +5,8 @@ Contains stub data that is to be used within the tests to avoid DRY
 import json
 import factory
 from faker import Faker
-from models import User, Library
-from views import USER_ID_KEYWORD
+from biblib.models import User, Library
+from biblib.views import USER_ID_KEYWORD
 
 faker = Faker()
 

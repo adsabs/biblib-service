@@ -4,14 +4,14 @@ Perimssion view
 
 from flask import request, current_app
 from flask.ext.discoverer import advertise
-from models import db, User, Library, Permissions
-from client import client
+from ..models import db, User, Library, Permissions
+from ..client import client
 from .base_view import BaseView
 from sqlalchemy.orm.exc import NoResultFound
-from utils import get_post_data, err, uniquify
+from ..utils import get_post_data, err
 from http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
     WRONG_TYPE_ERROR, API_MISSING_USER_EMAIL
-from biblib_exceptions import PermissionDeniedError
+from ..biblib_exceptions import PermissionDeniedError
 
 class PermissionView(BaseView):
     """
