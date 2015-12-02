@@ -5,7 +5,7 @@ User view
 from ..utils import uniquify, err, get_post_data
 from ..models import db, User, Library, Permissions
 from ..client import client
-from .base_view import BaseView
+from base_view import BaseView
 from flask import request, current_app
 from flask.ext.discoverer import advertise
 from sqlalchemy.exc import IntegrityError

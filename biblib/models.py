@@ -98,6 +98,7 @@ class GUID(TypeDecorator):
         else:
             return isinstance(conn_type, String)
 
+
 class MutableDict(Mutable, dict):
     """
     By default, SQLAlchemy only tracks changes of the value itself, which works
@@ -151,6 +152,7 @@ class MutableDict(Mutable, dict):
         """
         dict.pop(self, key, default)
         self.changed()
+
 
 class User(db.Model):
     """
@@ -242,6 +244,7 @@ class Library(db.Model):
         """
         [self.bibcode.pop(key, None) for key in bibcodes]
 
+
 class Permissions(db.Model):
     """
     Permissions table
@@ -265,6 +268,6 @@ class Permissions(db.Model):
 
     def __repr__(self):
         return '<Permissions, user_id: {0}, library_id: {1}, read: {2}, '\
-               'write: {3}, admin: {4}, owner: {5}'\
+               'write: {3}, admin: {4}, owner: {5}>'\
             .format(self.user_id, self.library_id, self.read, self.write,
                     self.admin, self.owner)
