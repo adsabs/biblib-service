@@ -15,4 +15,5 @@ coveralls
 ConcurrentLogHandler
 fake-factory
 factory_boy
-flask-consulate
+consulate==0.6.0
+flask-consulate==0.1.2

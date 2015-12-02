@@ -5,7 +5,7 @@ from ..views import USER_ID_KEYWORD
 from ..utils import err
 from ..models import db, User, Library, Permissions
 from ..client import client
-from .base_view import BaseView
+from base_view import BaseView
 from flask import request, current_app
 from flask.ext.discoverer import advertise
 from http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \

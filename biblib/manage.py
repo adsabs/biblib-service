@@ -1,17 +1,22 @@
 """
 Alembic migration management file
 """
-
+import os
+import sys
+PROJECT_HOME = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(PROJECT_HOME)
 from flask import current_app
 from flask.ext.script import Manager, Command, Option
 from flask.ext.migrate import Migrate, MigrateCommand
 from models import db, User, Permissions, Library
-from app import create_app
+from biblib.app import create_app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 # Load the app with the factory
 app = create_app()
+
 
 class CreateDatabase(Command):
     """
@@ -27,6 +32,7 @@ class CreateDatabase(Command):
             db.create_all()
             db.session.commit()
 
+
 class DestroyDatabase(Command):
     """
     Creates the database based on models.py
@@ -40,6 +46,7 @@ class DestroyDatabase(Command):
         with app.app_context():
             db.drop_all()
             # db.session.remove()
+
 
 class DeleteStaleUsers(Command):
     """
@@ -74,21 +81,25 @@ class DeleteStaleUsers(Command):
                 if service_user.absolute_uid not in list_of_api_users:
                     try:
                         # Obtain the libraries that should be deleted
-                        libraries, permissions = db.session.query(
-                            Permissions, Library
-                        ).join(Permissions.library)\
-                            .filter(Permissions.user_id == service_user.id)\
-                            .all()
+                        permissions = Permissions.query.filter(Permissions.user_id == service_user.id).all()
+                        libraries = [Library.query.filter(Library.id == permission.library_id).one() for permission in permissions if permission.owner]
 
                         # Delete all the libraries found
                         # By cascade this should delete all the permissions
-                        [db.session.delete(library) for library in libraries]
+                        d = [db.session.delete(library) for library in libraries]
+                        p = [db.session.delete(permission) for permission in permissions]
+                        d = len(d)
+
                         db.session.delete(service_user)
+                        db.session.commit()
+                        current_app.logger.info('Removed stale user: {} and {} libraries'.format(service_user, d))
+                        removal_list.append(service_user)
+
                     except Exception as error:
-                        current_app.logger.info('Problem with database: {0}'
-                                                .format(error))
+                        current_app.logger.info('Problem with database, could not remove user {}: {}'
+                                                .format(service_user, error))
                         db.session.rollback()
-            db.session.commit()
+            current_app.logger.info('Deleted {} stale users: {}'.format(len(removal_list), removal_list))
 
 
 # Set up the alembic migration
