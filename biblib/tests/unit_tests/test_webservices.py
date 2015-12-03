@@ -9,11 +9,12 @@ from biblib.views import DEFAULT_LIBRARY_DESCRIPTION, DEFAULT_LIBRARY_NAME_PREFI
 from biblib.views.http_errors import DUPLICATE_LIBRARY_NAME_ERROR, \
     MISSING_LIBRARY_ERROR, MISSING_USERNAME_ERROR, \
     NO_PERMISSION_ERROR, WRONG_TYPE_ERROR, \
-    API_MISSING_USER_EMAIL, SOLR_RESPONSE_MISMATCH_ERROR
+    API_MISSING_USER_EMAIL, SOLR_RESPONSE_MISMATCH_ERROR, NO_CLASSIC_ACCOUNT
 from biblib.tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
-    TestCaseDatabase, MockEndPoint
+    TestCaseDatabase, MockEndPoint, MockClassicService
 from biblib.utils import get_item
+
 
 class TestWebservices(TestCaseDatabase):
     """
@@ -2006,6 +2007,64 @@ class TestWebservices(TestCaseDatabase):
                          NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'],
                          NO_PERMISSION_ERROR['body'])
+
+    def test_when_user_has_no_ads_classic_credentials(self):
+        """
+        Test the scenario where the user accessing classic view has no ADS
+        credentials associated to their account
+        """
+        user = UserShop()
+        url = url_for('classicview')
+
+        with MockClassicService(status=NO_CLASSIC_ACCOUNT['number'],
+                                body={'error': NO_CLASSIC_ACCOUNT['body']}):
+            response = self.client.get(url, headers=user.headers)
+
+        self.assertEqual(response.status_code, NO_CLASSIC_ACCOUNT['number'])
+        self.assertEqual(response.json['error'], NO_CLASSIC_ACCOUNT['body'])
+
+    def test_when_user_has_classic_credentials_and_library_returns(self):
+        """
+        Tests that when you have ADS Credentials, it stores the libraries from
+        your ADS Classic account
+        """
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+        url = url_for('classicview')
+
+        with MockClassicService(status=200, libraries=[stub_library]):
+            response = self.client.get(url, headers=stub_user.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json[0]['action'], 'created')
+        self.assertEqual(response.json[0]['num_added'], len(stub_library.get_bibcodes()))
+
+        # Check they were stored
+        url = url_for('userview')
+        with MockEmailService(stub_user, end_type='uid'):
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+        self.assertTrue(len(response.json['libraries']) > 0,
+                        msg='No libraries returned: {}'.format(response.json))
+        self.assertEqual(response.json['libraries'][0]['name'], stub_library.name)
+        self.assertEqual(response.json['libraries'][0]['description'],
+                         stub_library.description)
+        library_id = response.json['libraries'][0]['id']
+
+        url = url_for('libraryview', library=library_id)
+        with MockEmailService(stub_user, end_type='uid') as ES, \
+                MockSolrBigqueryService(canonical_bibcode=stub_library.bibcode) as BQ:
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+        self.assertEqual(
+            stub_library.get_bibcodes(),
+            response.json['documents'],
+            msg='Bibcodes received do not match: {} != {}'
+                .format(stub_library.bibcode, response.json['documents'])
+        )
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

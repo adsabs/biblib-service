@@ -17,3 +17,4 @@ fake-factory
 factory_boy
 consulate==0.6.0
 flask-consulate==0.1.2
+httmock==1.2.3

@@ -328,6 +328,17 @@ class LibraryShop(object):
                                                public=public)
         return json.dumps(put_data)
 
+    def classic_view_data(self):
+        """
+        JSON expected for classic view
+        :return:
+        """
+        return {
+            'name': self.name,
+            'description': self.description,
+            'documents': self.get_bibcodes()
+        }
+
     @staticmethod
     def user_view_get_response():
         """
