@@ -8,14 +8,13 @@ from biblib.models import db, User, Library, Permissions, MutableDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
-    BaseView, TransferView
+    BaseView, TransferView, ClassicView
 from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
 from biblib.utils import get_item
 from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
-
 
 
 class TestBaseViews(TestCaseDatabase):
@@ -2172,6 +2171,7 @@ class TestPermissionViews(TestCaseDatabase):
         self.assertEqual(['owner'], return_1[0][self.stub_user_1.email])
         self.assertEqual(['admin'], return_2[0][self.stub_user_2.email])
 
+
 class TestTransferViews(TestCaseDatabase):
     """
     Base class to test the transferring of libraries between users.
@@ -2431,6 +2431,235 @@ class TestTransferViews(TestCaseDatabase):
             Permissions.library_id == stub_library_1.id
         ).one()
         self.assertTrue(permission.read)
+
+
+class TestClassicViews(TestCaseDatabase):
+    """
+    Base class to test the import of libraries from ADS Classic
+    """
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor of the class
+
+        :param args: to pass on to the super class
+        :param kwargs: to pass on to the super class
+
+        :return: no return
+        """
+
+        super(TestClassicViews, self).__init__(*args, **kwargs)
+        self.classic_view = ClassicView
+
+        # Stub data
+        self.stub_user = self.stub_user_1 = UserShop()
+        self.stub_user_2 = UserShop()
+        self.stub_library = self.stub_library_1 = LibraryShop()
+        self.stub_library_2 = LibraryShop()
+
+    def test_can_upsert_a_library_into_database(self):
+        """
+        Tests that you can create a library and upsert any bibcodes when there
+        are no matching bibcodes
+        """
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        db.session.add(user)
+        db.session.commit()
+
+        self.classic_view.upsert_library(
+            service_uid=user.id,
+            library=self.stub_library.classic_view_data()
+        )
+
+        library = Library.query.filter(Library.name == self.stub_library.name).one()
+        self.assertEqual(library.bibcode, self.stub_library.bibcode)
+
+    def test_can_upsert_a_library_when_the_names_match(self):
+        """
+        Tests that can try adding bibcodes when there is a library with a matching
+        name
+        """
+        stub_user = User(absolute_uid=self.stub_user.absolute_uid)
+        stub_library = Library(
+            name=self.stub_library.name,
+            description=self.stub_library.description,
+            bibcode=self.stub_library.bibcode
+        )
+        stub_permission = Permissions(owner=True)
+        stub_user.permissions.append(stub_permission)
+        stub_library.permissions.append(stub_permission)
+
+        db.session.add_all([stub_user, stub_library, stub_permission])
+        db.session.commit()
+
+        stub_library_new = self.stub_library.classic_view_data().copy()
+        stub_library_new['documents'].append('new bibcode')
+
+        self.classic_view.upsert_library(
+            service_uid=stub_user.id,
+            library=stub_library_new
+        )
+
+        library = Library.query.filter(Library.name == stub_library_new['name']).all()
+        self.assertEqual(
+            len(library),
+            1,
+            msg='There should only be one library with this name: {}'.format(library)
+        )
+
+        library = library[0]
+        self.assertEqual(library.get_bibcodes(), stub_library_new['documents'])
+        self.assertNotEqual(library.get_bibcodes(), self.stub_library.get_bibcodes())
+
+    def test_that_it_does_not_modify_another_library_with_the_same_name(self):
+        """
+        Sanity check of the logic, that it is correctly modifying the users
+        library, and not someone elses.
+        """
+        stub_user_1 = User(absolute_uid=self.stub_user_1.absolute_uid)
+        stub_user_2 = User(absolute_uid=self.stub_user_2.absolute_uid)
+        db.session.add_all([stub_user_1, stub_user_2])
+        db.session.commit()
+
+        # Ensure a library exists
+        stub_library_1 = Library(
+            name=self.stub_library.name,
+            description=self.stub_library.description,
+            bibcode=self.stub_library.bibcode
+        )
+        stub_library_2 = Library(
+            name=self.stub_library.name,
+            description=self.stub_library.description,
+            bibcode=self.stub_library.bibcode
+        )
+        db.session.add_all([
+            stub_library_1,
+            stub_library_2
+        ])
+        db.session.commit()
+
+        # Generate and add permissions
+        permission_user_1 = Permissions(
+            owner=True,
+            library_id=stub_library_1.id,
+            user_id=stub_user_1.id
+        )
+        permission_user_2 = Permissions(
+            owner=True,
+            library_id=stub_library_2.id,
+            user_id=stub_user_2.id
+        )
+        db.session.add_all([permission_user_1, permission_user_2])
+        db.session.commit()
+
+        stub_library_new = self.stub_library.classic_view_data().copy()
+        stub_library_new['documents'].append('new bibcode')
+
+        self.assertEqual(stub_library_1.get_bibcodes(), stub_library_2.get_bibcodes())
+
+        self.classic_view.upsert_library(
+            service_uid=stub_user_1.id,
+            library=stub_library_new
+        )
+
+        library_1 = Library.query.filter(Library.id == stub_library_1.id).one()
+        library_2 = Library.query.filter(Library.id == stub_library_2.id).one()
+
+        self.assertUnsortedEqual(library_1.get_bibcodes(), stub_library_new['documents'])
+        self.assertUnsortedEqual(library_2.get_bibcodes(), self.stub_library.get_bibcodes())
+        self.assertNotEqual(library_1.get_bibcodes(), library_2.get_bibcodes())
+
+    def test_it_does_nothing_if_the_same_library_name_exists(self):
+        """
+        Sanity check that it does nothing if another user has that library, but
+        the requesting user does not
+        """
+        stub_user_1 = User(absolute_uid=self.stub_user_1.absolute_uid)
+        stub_user_2 = User(absolute_uid=self.stub_user_2.absolute_uid)
+        db.session.add_all([stub_user_1, stub_user_2])
+        db.session.commit()
+
+        # Ensure a library exists
+        stub_library = Library(
+            name=self.stub_library.name,
+            description=self.stub_library.description,
+            bibcode=self.stub_library.bibcode
+        )
+        db.session.add_all([
+            stub_library
+        ])
+        db.session.commit()
+
+        # Generate and add permissions
+        permission_user_2 = Permissions(
+            owner=True,
+            library_id=stub_library.id,
+            user_id=stub_user_2.id
+        )
+        db.session.add(permission_user_2)
+        db.session.commit()
+
+        stub_library_new = self.stub_library.classic_view_data().copy()
+        stub_library_new['documents'].append('new bibcode')
+
+        lib = self.classic_view.upsert_library(
+            service_uid=stub_user_1.id,
+            library=stub_library_new
+        )
+        lib_id = BaseView.helper_slug_to_uuid(lib['library_id'])
+
+        library_1 = Library.query.filter(Library.id == lib_id).one()
+        library_2 = Library.query.filter(Library.id == stub_library.id).one()
+
+        self.assertUnsortedEqual(library_1.get_bibcodes(), stub_library_new['documents'])
+        self.assertUnsortedEqual(library_2.get_bibcodes(), self.stub_library.get_bibcodes())
+        self.assertNotEqual(library_1.get_bibcodes(), library_2.get_bibcodes())
+        self.assertNotIn('new bibcode', library_2.get_bibcodes())
+
+    def test_it_does_not_work_if_the_permission_is_not_owner(self):
+        # Stub user
+        stub_user = User(absolute_uid=self.stub_user_1.absolute_uid)
+        db.session.add(stub_user)
+        db.session.commit()
+
+        # Ensure a library exists
+        stub_library = Library(
+            name=self.stub_library.name,
+            description=self.stub_library.description,
+            bibcode=self.stub_library.bibcode
+        )
+        db.session.add(stub_library)
+        db.session.commit()
+
+        # Some permissions
+        permission_user = Permissions(
+            read=True,
+            library_id=stub_library.id,
+            user_id=stub_user.id
+        )
+        db.session.add(permission_user)
+        db.session.commit()
+
+        stub_library_new = self.stub_library.classic_view_data().copy()
+        stub_library_new['documents'].append('new bibcode')
+
+        for access in ['read', 'write', 'admin']:
+
+            permission = Permissions.query.filter(Permissions.library_id == stub_library.id).one()
+            permission.read = False
+            permission.write = False
+            permission.admin = False
+            permission.owner = False
+            setattr(permission, access, True)
+            db.session.add(permission)
+            db.session.commit()
+
+            self.classic_view.upsert_library(
+                service_uid=stub_user.id,
+                library=stub_library_new
+            )
+
+        self.assertNotIn('new bibcode', stub_library.get_bibcodes())
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

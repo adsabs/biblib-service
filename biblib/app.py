@@ -4,7 +4,7 @@ Application
 
 import logging.config
 from views import UserView, LibraryView, DocumentView, PermissionView, \
-    TransferView
+    TransferView, ClassicView
 from models import db
 
 from flask import Flask
@@ -54,6 +54,11 @@ def create_app():
     api.add_resource(TransferView,
                      '/transfer/<string:library>',
                      methods=['POST'])
+
+    api.add_resource(ClassicView,
+                     '/classic',
+                     methods=['GET']
+                     )
 
     return app
 

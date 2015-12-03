@@ -13,3 +13,4 @@ from library_view import LibraryView
 from document_view import DocumentView
 from permission_view import PermissionView
 from transfer_view import TransferView
+from classic_view import ClassicView

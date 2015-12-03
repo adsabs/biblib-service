@@ -12,6 +12,68 @@ from biblib.models import db
 from biblib.utils import assert_unsorted_equal
 import testing.postgresql
 
+
+class HTTPrettyContext(object):
+
+    def __enter__(self):
+        """
+        Defines the behaviour for __enter__
+        :return: no return
+        """
+
+        HTTPretty.enable()
+
+    def __exit__(self, etype, value, traceback):
+        """
+        Defines the behaviour for __exit__
+        :param etype: exit type
+        :param value: exit value
+        :param traceback: the traceback for the exit
+        :return: no return
+        """
+
+        HTTPretty.reset()
+        HTTPretty.disable()
+
+
+class MockClassicService(HTTPrettyContext):
+
+    def __init__(self, **kwargs):
+        """
+        Constructor
+        """
+        self.kwargs = kwargs
+
+        def request_callback(request, uri, headers):
+            """
+            :param request: HTTP request
+            :param uri: URI/URL to send the request
+            :param headers: header of the HTTP request
+            """
+
+            response = {}
+            try:
+                libraries = self.kwargs['libraries']
+                response['libraries'] = []
+                for library in libraries:
+                    response['libraries'].append({
+                        'documents': library.bibcode,
+                        'name': library.name,
+                        'description': library.description
+                    })
+            except KeyError:
+                response = self.kwargs.get('body', {})
+
+            return self.kwargs.get('status', 200), headers, json.dumps(response)
+
+        HTTPretty.register_uri(
+            HTTPretty.GET,
+            re.compile('{}.*'.format(current_app.config['BIBLIB_CLASSIC_SERVICE_URL'])),
+            body=request_callback,
+            content_type='application/json'
+        )
+
+
 class MockADSWSAPI(object):
     """
     Mock of the ADSWS API
@@ -78,6 +140,7 @@ class MockADSWSAPI(object):
 
         HTTPretty.reset()
         HTTPretty.disable()
+
 
 class MockSolrBigqueryService(MockADSWSAPI):
     """
@@ -164,6 +227,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
 
         HTTPretty.reset()
         HTTPretty.disable()
+
 
 class MockEmailService(MockADSWSAPI):
 

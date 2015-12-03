@@ -46,3 +46,7 @@ SOLR_RESPONSE_MISMATCH_ERROR = dict(
          'request.',
     number=404
 )
+NO_CLASSIC_ACCOUNT = dict(
+    body='This user has not setup an ADS Classic account',
+    number=400
+)
