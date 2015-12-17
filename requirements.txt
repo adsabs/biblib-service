@@ -5,7 +5,7 @@ Flask-Testing
 flask-sqlalchemy
 flask-discoverer
 Flask-Migrate
-requests
+requests==2.8.1
 httpretty
 SQLAlchemy
 psycopg2
