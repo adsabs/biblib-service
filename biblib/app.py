@@ -1,12 +1,13 @@
+# encoding: utf-8
 """
 Application
 """
 
 import logging.config
-from views import UserView, LibraryView, DocumentView, PermissionView, \
-    TransferView, ClassicView
-from models import db
 
+from views import UserView, LibraryView, DocumentView, PermissionView, \
+    TransferView, ClassicView, TwoPointOhView
+from models import db
 from flask import Flask
 from flask.ext.restful import Api
 from flask.ext.discoverer import Discoverer
@@ -60,7 +61,13 @@ def create_app():
                      methods=['GET']
                      )
 
+    api.add_resource(TwoPointOhView,
+                     '/twopointoh',
+                     methods=['GET']
+                     )
+
     return app
+
 
 def load_config(app):
     """

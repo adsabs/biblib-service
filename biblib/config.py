@@ -1,3 +1,4 @@
+# encoding: utf-8
 """
 Configuration file. Please prefix application specific config values with
 the application name.
@@ -47,6 +48,7 @@ BIBLIB_LOGGING = {
 
 # These lines are necessary only if the app needs to be a client of the
 # adsws-api
+BIBLIB_TWOPOINT_OH_SERVICE_URL = 'https://api.adsabs.edu/v1/harbour'
 BIBLIB_CLASSIC_SERVICE_URL = 'https://api.adsabs.edu/v1/harbour'
 BIBLIB_SOLR_BIG_QUERY_URL = 'https://api.adsabs.search/v1/bigquery'
 BIBLIB_USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
