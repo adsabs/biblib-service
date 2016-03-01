@@ -81,9 +81,7 @@ class TestAnonymousEpic(TestCaseDatabase):
         """
         Separately test the number of scopes that are scopeless. This will only
         fail during staging when the scopes are all set to be open. In the
-        production system, there is only once end point that will be scopelss.
-
-        :return: no return
+        production system, there is only once end point that will be scopeless.
         """
         response = self.client.get('/resources')
         end_points = []

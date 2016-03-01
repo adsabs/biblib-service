@@ -22,7 +22,7 @@ class TestBBClassicUserEpic(TestCaseDatabase):
     Base class used to test the Bumblebee and Classic User Epic
     """
 
-    def test_bb_classic_user_epic(self):
+    def helper_bb_classic_user_epic(self, harbour_view):
         """
         Carries out the epic 'Bumblebee and Classic User', where a user that
         comes to the new interface makes some libraries, and has some permission
@@ -74,7 +74,7 @@ class TestBBClassicUserEpic(TestCaseDatabase):
         stub_library_2.bibcode = stub_library_1.bibcode.copy()
         stub_library_2.bibcode['new bibcode'] = {}
 
-        url = url_for('classicview')
+        url = url_for(harbour_view)
         with MockClassicService(status=200, libraries=[stub_library_2]):
             response = self.client.get(url, headers=user_gpa.headers)
         self.assertEqual(response.status_code, 200)
@@ -113,9 +113,9 @@ class TestBBClassicUserEpic(TestCaseDatabase):
             )
         self.assertNotIn('new bibcode', response.json['documents'])
 
-        # Gpa then re-imports again by accident, but this is fine as this should
-        # be an indempotent process
-        url = url_for('classicview')
+        # Gpa then re-imports again by accident, but this is fine as this
+        # should be an indempotent process
+        url = url_for(harbour_view)
         with MockClassicService(status=200, libraries=[stub_library_2]):
             response = self.client.get(url, headers=user_gpa.headers)
         self.assertEqual(response.status_code, 200)
@@ -150,6 +150,21 @@ class TestBBClassicUserEpic(TestCaseDatabase):
                 headers=user_mary.headers
             )
         self.assertNotIn('new bibcode', response.json['documents'])
+
+    def test_bb_classic_user_epic(self):
+        """
+        Test ADS Classic import and its indempotence
+        """
+        self.app.config['BIBLIB_CLASSIC_SERVICE_URL'] = 'http://harbour.adsabs.edu'
+        self.helper_bb_classic_user_epic(harbour_view='classicview')
+
+    def test_bb_twopointoh_user_epic(self):
+        """
+        Test ADS 2.0 import and its indempotence
+        """
+        self.app.config['BIBLIB_CLASSIC_SERVICE_URL'] = 'https://api.adsabs.edu/v1/harbour'
+        self.app.config['BIBLIB_TWOPOINTOH_SERVICE_URL'] = 'https://api.adsabs.edu/v1/harbour'
+        self.helper_bb_classic_user_epic(harbour_view='twopointohview')
 
 
 if __name__ == '__main__':

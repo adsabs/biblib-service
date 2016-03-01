@@ -13,14 +13,15 @@ from sqlalchemy.orm.exc import NoResultFound
 from http_errors import MISSING_USERNAME_ERROR
 
 
-class ClassicView(BaseView):
+class HarbourView(BaseView):
     """
-    End point to import libraries from ADS Classic
+    End point to import libraries from external systems
     """
 
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = ['user']
     rate_limit = [1000, 60*60*24]
+    service_url = 'default'
 
     @staticmethod
     def upsert_library(service_uid, library):
@@ -138,8 +139,8 @@ class ClassicView(BaseView):
 
         service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
-        url = '{classic_service}/{user_id}'.format(
-            classic_service=current_app.config['BIBLIB_CLASSIC_SERVICE_URL'],
+        url = '{external_service}/{user_id}'.format(
+            external_service=current_app.config[self.service_url],
             user_id=user
         )
         current_app.logger.info('Collecting libraries for user {} from {}'
@@ -154,3 +155,23 @@ class ClassicView(BaseView):
             resp.append(self.upsert_library(service_uid=service_uid, library=library))
 
         return resp, 200
+
+
+class ClassicView(HarbourView):
+    """
+    Wrapper for importing libraries from ADS Classic
+    """
+    decorators = [advertise('scopes', 'rate_limit')]
+    scopes = ['user']
+    rate_limit = [1000, 60*60*24]
+    service_url = 'BIBLIB_CLASSIC_SERVICE_URL'
+
+
+class TwoPointOhView(HarbourView):
+    """
+    Wrapper for importing libraries from ADS 2.0
+    """
+    decorators = [advertise('scopes', 'rate_limit')]
+    scopes = ['user']
+    rate_limit = [1000, 60*60*24]
+    service_url = 'BIBLIB_TWOPOINT_OH_SERVICE_URL'
