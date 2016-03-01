@@ -174,4 +174,4 @@ class TwoPointOhView(HarbourView):
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = ['user']
     rate_limit = [1000, 60*60*24]
-    service_url = 'BIBLIB_TWOPOINT_OH_SERVICE_URL'
+    service_url = 'BIBLIB_TWOPOINTOH_SERVICE_URL'
