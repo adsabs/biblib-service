@@ -133,7 +133,7 @@ class LibraryView(BaseView):
         return False
 
     @staticmethod
-    def solr_big_query(bibcodes):
+    def solr_big_query(bibcodes, start, rows, sort, fl):
         """
         A thin wrapper for the solr bigquery service.
 
@@ -146,9 +146,9 @@ class LibraryView(BaseView):
         params = {
             'q': '*:*',
             'wt': 'json',
-            'fl': 'title,bibcode,author,aff,links_data,'
-                  'property,[citations],pub,pubdate,read_count',
-            'rows': '1000',
+            'fl': fl,
+            'rows': rows,
+            'start': start,
             'fq': '{!bitset}'
         }
 
@@ -291,12 +291,26 @@ class LibraryView(BaseView):
           - admin
           - write
           - read
+
+        Default Pagination Values:
+        -----------
+        - start : 0
+        - rows : 20 (max 100)
+        - sort : 'date desc'
+        - fl : 'bibcode'
+
         """
         try:
             user = int(request.headers[USER_ID_KEYWORD])
         except KeyError:
             current_app.logger.error('No username passed')
             return err(MISSING_USERNAME_ERROR)
+
+        # values to be forwarded to solr (pagination + fields)
+        start = request.args.get('start', 0)
+        rows = max(request.args.get('rows', 20), 100)
+        sort = request.args.get('sort', 'date desc');
+        fl = request.args.get('fl', 'bibcode');
 
         library = self.helper_slug_to_uuid(library)
 
@@ -319,9 +333,14 @@ class LibraryView(BaseView):
             )
             # pay attention to any functions that try to mutate the list
             # this will alter expected returns later
-
             try:
-                solr = self.solr_big_query(bibcodes=library.bibcode).json()
+                solr = self.solr_big_query(
+                bibcodes = library.bibcode,
+                start = start,
+                rows = rows,
+                sort = sort,
+                fl = fl
+                ).json()
             except Exception as error:
                 current_app.logger.warning('Could not parse solr data: {0}'
                                            .format(error))
