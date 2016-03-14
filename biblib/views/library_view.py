@@ -133,11 +133,31 @@ class LibraryView(BaseView):
         return False
 
     @staticmethod
-    def solr_big_query(bibcodes, start, rows, sort, fl):
+    def solr_big_query(
+            bibcodes,
+            start=0,
+            rows=200,
+            sort='date asc',
+            fl='title,bibcode,author,aff,links_data,property,[citations],pub,pubdate,read_count'
+    ):
         """
         A thin wrapper for the solr bigquery service.
 
-        :param bibcodes: list of bibcodes
+        :param bibcodes: bibcodes
+        :type bibcodes: list
+
+        :param start: start index
+        :type start: int
+
+        :param rows: number of rows
+        :type rows: int
+
+        :param sort: how the response should be sorted
+        :type sort: str
+
+        :param fl: Solr fields to be returned
+        :type fl: str
+
         :return: solr bigquery end point response
         """
 
