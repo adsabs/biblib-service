@@ -1,3 +1,4 @@
+# encoding: utf-8
 """
 Tests Views of the application
 """
@@ -11,13 +12,11 @@ from sqlalchemy.orm.exc import NoResultFound
 from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
     BaseView, TransferView, ClassicView
 from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
-from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
+from biblib.tests.stubdata.stub_data import UserShop, LibraryShop, fake_biblist
 from biblib.utils import get_item
 from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
-
-
 
 
 class TestLibraryViews(TestCaseDatabase):
@@ -44,8 +43,10 @@ class TestLibraryViews(TestCaseDatabase):
 
         self.stub_library = LibraryShop()
 
+    @unittest.skip('')
     def test_library_pagination_default(self):
         """
+        Test that users that do not request pagination, do not have any issues
         """
 
         # Ensure a user exists
@@ -53,11 +54,13 @@ class TestLibraryViews(TestCaseDatabase):
         db.session.add(user)
         db.session.commit()
 
+        bibcodes = {i: {} for i in fake_biblist(40)}
+
         # Ensure a library exists
         library = Library(name='MyLibrary',
                           description='My library',
                           public=True,
-                          bibcode=self.stub_library.bibcode)
+                          bibcode=bibcodes)
 
         # Give the user and library permissions
         permission = Permissions(owner=True,
@@ -70,18 +73,25 @@ class TestLibraryViews(TestCaseDatabase):
         db.session.add_all([library, permission, user])
         db.session.commit()
 
-        #test default pagination
-
-        lib_id=LibraryView.helper_uuid_to_slug(library.id)
+        # Test default pagination
+        lib_id = LibraryView.helper_uuid_to_slug(library.id)
 
         url = url_for('libraryview', library=lib_id)
 
-        r = self.client.get(url, headers={'X-Adsws-Uid': self.stub_user.absolute_uid})
+        with MockSolrBigqueryService(number_of_bibcodes=20) as BQ, \
+                MockEmailService(self.stub_user, end_type='uid') as EP:
+            r = self.client.get(
+                url,
+                headers=self.stub_user.headers()
+            )
 
-        print r
+        self.assertStatus(r, 200)
+        self.assertAlmostEqual(
+            self.stub_library.bibcode.keys(),
+            r.json['documents']
+        )
 
-
-
+    @unittest.skip('')
     def test_library_pagination_user_supplied(self):
         """
         """

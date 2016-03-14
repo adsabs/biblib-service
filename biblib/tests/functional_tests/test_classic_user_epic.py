@@ -72,7 +72,7 @@ class TestClassicUserEpic(TestCaseDatabase):
         # Gpa clicks the library page and checks that the content is as expected
         for library_id, stub_library in [[library_id_1, stub_library_1], [library_id_2, stub_library_2]]:
             url = url_for('libraryview', library=library_id)
-            with MockSolrBigqueryService(canonical_bibcodes=stub_library_1.get_bibcodes()) as BQ, \
+            with MockSolrBigqueryService(canonical_bibcode=stub_library.get_bibcodes()) as BQ, \
                     MockEndPoint([user_gpa]) as EP:
                 response = self.client.get(
                     url,

@@ -136,9 +136,9 @@ class LibraryView(BaseView):
     def solr_big_query(
             bibcodes,
             start=0,
-            rows=200,
-            sort='date asc',
-            fl='title,bibcode,author,aff,links_data,property,[citations],pub,pubdate,read_count'
+            rows=20,
+            sort='date desc',
+            fl='bibcode'
     ):
         """
         A thin wrapper for the solr bigquery service.
@@ -161,6 +161,8 @@ class LibraryView(BaseView):
         :return: solr bigquery end point response
         """
 
+        rows = max(rows, 100)
+
         bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
 
         params = {
@@ -169,7 +171,8 @@ class LibraryView(BaseView):
             'fl': fl,
             'rows': rows,
             'start': start,
-            'fq': '{!bitset}'
+            'fq': '{!bitset}',
+            'sort': sort
         }
 
         headers = {
@@ -314,10 +317,10 @@ class LibraryView(BaseView):
 
         Default Pagination Values:
         -----------
-        - start : 0
-        - rows : 20 (max 100)
-        - sort : 'date desc'
-        - fl : 'bibcode'
+        - start: 0
+        - rows: 20 (max 100)
+        - sort: 'date desc'
+        - fl: 'bibcode'
 
         """
         try:
@@ -326,11 +329,11 @@ class LibraryView(BaseView):
             current_app.logger.error('No username passed')
             return err(MISSING_USERNAME_ERROR)
 
-        # values to be forwarded to solr (pagination + fields)
+        # Parameters to be forwarded to Solr: pagination, and fields
         start = request.args.get('start', 0)
         rows = max(request.args.get('rows', 20), 100)
-        sort = request.args.get('sort', 'date desc');
-        fl = request.args.get('fl', 'bibcode');
+        sort = request.args.get('sort', 'date desc')
+        fl = request.args.get('fl', 'bibcode')
 
         library = self.helper_slug_to_uuid(library)
 
@@ -355,11 +358,11 @@ class LibraryView(BaseView):
             # this will alter expected returns later
             try:
                 solr = self.solr_big_query(
-                bibcodes = library.bibcode,
-                start = start,
-                rows = rows,
-                sort = sort,
-                fl = fl
+                    bibcodes=library.bibcode,
+                    start=start,
+                    rows=rows,
+                    sort=sort,
+                    fl=fl
                 ).json()
             except Exception as error:
                 current_app.logger.warning('Could not parse solr data: {0}'
@@ -374,6 +377,8 @@ class LibraryView(BaseView):
                     library=library,
                     solr_docs=solr['response']['docs']
                 )
+
+                documents = [i['bibcode'] for i in solr['response']['docs']]
             else:
                 # Some problem occurred, we will just ignore it, but will
                 # definitely log it.
@@ -381,10 +386,11 @@ class LibraryView(BaseView):
                 current_app.logger.warning('Problem with solr response: {0}'
                                            .format(solr))
                 updates = {}
+                documents = library.get_bibcodes()[start:start+rows]
 
             # Make the response dictionary
             response = dict(
-                documents=library.get_bibcodes(),
+                documents=documents,
                 solr=solr,
                 metadata=metadata,
                 updates=updates

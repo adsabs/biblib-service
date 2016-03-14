@@ -170,9 +170,12 @@ class MockSolrBigqueryService(MockADSWSAPI):
 
             if self.kwargs.get('solr_docs'):
                 docs = self.kwargs['solr_docs']
-                # for i in range(len(self.kwargs.get('canonical_bibcode'))):
-                #     bibcode = self.kwargs.get('canonical_bibcode')[i]
-                #     docs.append({'bibcode': bibcode})
+            elif self.kwargs.get('canonical_bibcode'):
+                docs = []
+                canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                for i in range(len(canonical_bibcodes)):
+                    docs.append({'bibcode': canonical_bibcodes[i]})
+                    print docs
             else:
                 docs = [{'bibcode': 'bibcode'} for i
                         in range(self.kwargs.get('number_of_bibcodes', 1))]
