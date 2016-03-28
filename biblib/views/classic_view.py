@@ -84,8 +84,8 @@ class HarbourView(BaseView):
                                     .format(library))
             permission = Permissions(owner=True)
             lib = Library(
-                name=library['name'],
-                description=library['description'],
+                name=library['name'][0:50],
+                description=library['description'][0:200],
             )
             lib.add_bibcodes(library['documents'])
 
