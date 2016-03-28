@@ -182,7 +182,7 @@ class Library(db.Model):
     __tablename__ = 'library'
     id = db.Column(GUID, primary_key=True, default=uuid.uuid4)
     name = db.Column(db.String(50))
-    description = db.Column(db.String(50))
+    description = db.Column(db.String(200))
     public = db.Column(db.Boolean)
     bibcode = db.Column(MutableDict.as_mutable(JSON), default={})
     date_created = db.Column(

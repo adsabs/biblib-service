@@ -2,6 +2,10 @@
 All notable changes to the config fileswill be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.0.6] - ????-??-??
+### Changed
+  * Increased description length to 200, and included db migration files.
+  * Imports changed to enforce 200 and 50 for desc and name.
 
 ## [1.0.5] - 2016-03-09
 ### Changed
