@@ -133,23 +133,46 @@ class LibraryView(BaseView):
         return False
 
     @staticmethod
-    def solr_big_query(bibcodes):
+    def solr_big_query(
+            bibcodes,
+            start=0,
+            rows=20,
+            sort='date desc',
+            fl='bibcode'
+    ):
         """
         A thin wrapper for the solr bigquery service.
 
-        :param bibcodes: list of bibcodes
+        :param bibcodes: bibcodes
+        :type bibcodes: list
+
+        :param start: start index
+        :type start: int
+
+        :param rows: number of rows
+        :type rows: int
+
+        :param sort: how the response should be sorted
+        :type sort: str
+
+        :param fl: Solr fields to be returned
+        :type fl: str
+
         :return: solr bigquery end point response
         """
+
+        rows = min(rows, 100)
 
         bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
 
         params = {
             'q': '*:*',
             'wt': 'json',
-            'fl': 'title,bibcode,author,aff,links_data,'
-                  'property,[citations],pub,pubdate,read_count',
-            'rows': '1000',
-            'fq': '{!bitset}'
+            'fl': fl,
+            'rows': rows,
+            'start': start,
+            'fq': '{!bitset}',
+            'sort': sort
         }
 
         headers = {
@@ -291,12 +314,35 @@ class LibraryView(BaseView):
           - admin
           - write
           - read
+
+        Default Pagination Values:
+        -----------
+        - start: 0
+        - rows: 20 (max 100)
+        - sort: 'date desc'
+        - fl: 'bibcode'
+
         """
         try:
             user = int(request.headers[USER_ID_KEYWORD])
         except KeyError:
             current_app.logger.error('No username passed')
             return err(MISSING_USERNAME_ERROR)
+
+        # Parameters to be forwarded to Solr: pagination, and fields
+        try:
+            start = int(request.args.get('start', 0))
+            rows = min(int(request.args.get('rows', 20)), 100)
+        except ValueError:
+            start = 0
+            rows = 20
+        sort = request.args.get('sort', 'date desc')
+        fl = request.args.get('fl', 'bibcode')
+        current_app.logger.info('User gave pagination parameters:'
+                                'start: {}, '
+                                'rows: {}, '
+                                'sort: "{}", '
+                                'fl: "{}"'.format(start, rows, sort, fl))
 
         library = self.helper_slug_to_uuid(library)
 
@@ -319,9 +365,14 @@ class LibraryView(BaseView):
             )
             # pay attention to any functions that try to mutate the list
             # this will alter expected returns later
-
             try:
-                solr = self.solr_big_query(bibcodes=library.bibcode).json()
+                solr = self.solr_big_query(
+                    bibcodes=library.bibcode,
+                    start=start,
+                    rows=rows,
+                    sort=sort,
+                    fl=fl
+                ).json()
             except Exception as error:
                 current_app.logger.warning('Could not parse solr data: {0}'
                                            .format(error))
@@ -335,6 +386,8 @@ class LibraryView(BaseView):
                     library=library,
                     solr_docs=solr['response']['docs']
                 )
+
+                documents = [i['bibcode'] for i in solr['response']['docs']]
             else:
                 # Some problem occurred, we will just ignore it, but will
                 # definitely log it.
@@ -342,10 +395,13 @@ class LibraryView(BaseView):
                 current_app.logger.warning('Problem with solr response: {0}'
                                            .format(solr))
                 updates = {}
+                documents = library.get_bibcodes()
+                documents.sort()
+                documents = documents[start:start+rows]
 
             # Make the response dictionary
             response = dict(
-                documents=library.get_bibcodes(),
+                documents=documents,
                 solr=solr,
                 metadata=metadata,
                 updates=updates
