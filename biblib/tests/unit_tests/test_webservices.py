@@ -237,6 +237,41 @@ class TestWebservices(TestCaseDatabase):
         self.assertIn('documents', response.json)
         self.assertIn('solr', response.json)
 
+    def test_pagination_when_someone_passes_strings(self):
+        """
+        Ensure that even if someone passes strings as start/rows, that it does
+        not crash the end point
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop(want_bibcode=True)
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+        for key in ['name', 'id', 'bibcode', 'description']:
+            self.assertIn(key, response.json)
+
+        # Check the library exists in the database
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService() as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
+            response = self.client.get(
+                url,
+                headers=stub_user.headers,
+                query_string=dict(start='not a number', rows='not a number')
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('documents', response.json)
+        self.assertIn('solr', response.json)
+
     def test_update_library_with_solr_data(self):
         """
         Test the /libraries/<> such that the library bibcodes are updated if
@@ -2065,6 +2100,7 @@ class TestWebservices(TestCaseDatabase):
             msg='Bibcodes received do not match: {} != {}'
                 .format(stub_library.bibcode, response.json['documents'])
         )
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

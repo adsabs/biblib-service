@@ -7,6 +7,7 @@ Pagination Epic
 Storyboard is defined within the comments of the program itself
 """
 
+import mock
 import unittest
 from flask import url_for
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
@@ -85,6 +86,84 @@ class TestPaginationEpic(TestCaseDatabase):
         url = url_for('libraryview', library=library_id)
         with MockSolrBigqueryService(solr_docs=solr_docs_page_2) as BQ, \
                 MockEndPoint([user_mary]) as EP:
+            response = self.client.get(
+                url,
+                headers=user_mary.headers,
+                query_string=params
+            )
+        self.assertStatus(response, 200)
+        self.assertEqual(docs_page_2, response.json['documents'])
+
+    @mock.patch('biblib.views.library_view.LibraryView.solr_big_query')
+    def test_pagination_epic_no_solr(self, mocked_big_query):
+        """
+        Carries out the epic 'Pagination', where a user is paginating through
+        pages of 20 documents on their user interface. In this case, we assume
+        that Solr is not responding, but want to check that documents are still
+        returned
+        """
+
+        # Solr will not respond when it is contacted, but we expect it to raise
+        # an error when there is no JSON response. To mock this, we simply do
+        # the following:
+        mocked_big_query.side_effect = Exception('Fake exception')
+
+        # Mary creates a private library and
+        #   1. Gives it a name.
+        #   2. Gives it a description.
+
+        # Create stub data for:
+        # 1. the user, named Mary
+        # 2. a library, prefilled with name, description, and bibcodes
+        user_mary = UserShop()
+        stub_bibcodes = {
+            '2010MNRAS': {},
+            '2011MNRAS': {},
+            '2012MNRAS': {},
+            '2013MNRAS': {},
+        }
+
+        docs_page_1 = ['2010MNRAS', '2011MNRAS']
+        docs_page_2 = ['2012MNRAS', '2013MNRAS']
+
+        stub_library = LibraryShop(want_bibcode=True, bibcode=stub_bibcodes)
+
+        # Make the library by using the /library POST end point
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_mary.headers
+        )
+        self.assertStatus(response, 200)
+
+        # Library ID is returned from this POST request
+        library_id = response.json['id']
+
+        # Now we check that we can retrieve the first 20 paginated documents
+        # First set up the parameters for pagination
+        params = {
+            'start': 0,
+            'rows': 2,
+        }
+        # Then send the GET request
+        url = url_for('libraryview', library=library_id)
+        with MockEndPoint([user_mary]) as EP:
+            response = self.client.get(
+                url,
+                headers=user_mary.headers,
+                query_string=params
+            )
+        self.assertStatus(response, 200)
+        self.assertEqual(docs_page_1, response.json['documents'])
+
+        # Then ask for the second page
+        params = {
+            'start': 2,
+            'rows': 2
+        }
+        url = url_for('libraryview', library=library_id)
+        with MockEndPoint([user_mary]) as EP:
             response = self.client.get(
                 url,
                 headers=user_mary.headers,

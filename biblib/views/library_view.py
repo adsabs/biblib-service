@@ -161,7 +161,7 @@ class LibraryView(BaseView):
         :return: solr bigquery end point response
         """
 
-        rows = max(rows, 100)
+        rows = min(rows, 100)
 
         bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
 
@@ -330,10 +330,19 @@ class LibraryView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # Parameters to be forwarded to Solr: pagination, and fields
-        start = request.args.get('start', 0)
-        rows = max(request.args.get('rows', 20), 100)
+        try:
+            start = int(request.args.get('start', 0))
+            rows = min(int(request.args.get('rows', 20)), 100)
+        except ValueError:
+            start = 0
+            rows = 20
         sort = request.args.get('sort', 'date desc')
         fl = request.args.get('fl', 'bibcode')
+        current_app.logger.info('User gave pagination parameters:'
+                                'start: {}, '
+                                'rows: {}, '
+                                'sort: "{}", '
+                                'fl: "{}"'.format(start, rows, sort, fl))
 
         library = self.helper_slug_to_uuid(library)
 
@@ -386,7 +395,9 @@ class LibraryView(BaseView):
                 current_app.logger.warning('Problem with solr response: {0}'
                                            .format(solr))
                 updates = {}
-                documents = library.get_bibcodes()[start:start+rows]
+                documents = library.get_bibcodes()
+                documents.sort()
+                documents = documents[start:start+rows]
 
             # Make the response dictionary
             response = dict(
