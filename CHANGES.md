@@ -2,6 +2,25 @@
 All notable changes to the config fileswill be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.0.6] - ????-??-??
+### Changed
+  * Increased description length to 200, and included db migration files.
+  * Imports changed to enforce 200 and 50 for desc and name.
+
+## [1.0.5] - 2016-03-09
+### Changed
+  * Renaming/restructuring of the import end points as there are now multiple
+
+### Added
+
+  * Added an ADS 2.0 import end point
+  * Added an ADS 2.0 Zotero export (to zip file) end point
+
+## [1.0.4] - 2015-12-17
+### Changed
+
+  * Split requirements.txt into a dev-requirements.txt and requirements.txt
+
 ## [1.0.3] - 2015-12-09
 ### Added
 
