@@ -2507,7 +2507,11 @@ class TestClassicViews(TestCaseDatabase):
         )
 
         library = library[0]
-        self.assertAlmostEqual(library.get_bibcodes(), stub_library_new['documents'])
+        first_list = library.get_bibcodes()
+        second_list = stub_library_new['documents']
+        first_list.sort()
+        second_list.sort()
+        self.assertEqual(first_list, second_list)
         self.assertNotEqual(library.get_bibcodes(), self.stub_library.get_bibcodes())
 
     def test_that_it_does_not_modify_another_library_with_the_same_name(self):
