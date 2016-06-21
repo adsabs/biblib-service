@@ -20,6 +20,7 @@ SQLALCHEMY_BINDS = {
     'libraries': 'postgresql+psycopg2://postgres:@localhost/testdb'
 }
 
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'staging').lower()
 BIBLIB_LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -31,6 +32,12 @@ BIBLIB_LOGGING = {
         }
     },
     'handlers': {
+        'file': {
+            'formatter': 'default',
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': '/tmp/biblib.app.{}.log'.format(ENVIRONMENT),
+        },
         'console': {
             'formatter': 'default',
             'level': 'DEBUG',
