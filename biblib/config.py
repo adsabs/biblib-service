@@ -46,7 +46,7 @@ BIBLIB_LOGGING = {
     },
     'loggers': {
         '': {
-            'handlers': ['console'],
+            'handlers': ['file'],
             'level': 'DEBUG',
             'propagate': True,
         },
