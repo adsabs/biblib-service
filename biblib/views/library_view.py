@@ -165,6 +165,16 @@ class LibraryView(BaseView):
 
         bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
 
+        # We need atleast bibcode and alternate bibcode for other methods
+        # to work properly
+        if fl == '':
+            fl = 'bibcode,alternate_bibcode'
+        else:
+            fl_split = fl.split(',')
+            for required_fl in ['bibcode', 'alternate_bibcode']:
+                if required_fl not in fl_split:
+                    fl = '{},{}'.format(fl, required_fl)
+
         params = {
             'q': '*:*',
             'wt': 'json',
