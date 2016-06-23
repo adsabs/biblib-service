@@ -2,6 +2,10 @@
 All notable changes to the config fileswill be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.0.9] - 2016-06-23
+### Changed
+  * field alternate_bibcode, ensured always to be used in BigQuery; fixes hotfix where users could not delete stale bibcodes
+
 ## [1.0.8] - 2016-06-21
 ### Changed
   * Configuration file for logging
