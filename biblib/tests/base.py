@@ -334,7 +334,7 @@ class TestCaseDatabase(TestCase):
         """
 
         if not assert_unsorted_equal(hashable_1, hashable_2):
-            raise Exception('Not Equal: {0}, {1}'
+            raise Exception('Not Equal: arg1[{0}], arg2[{1}]'
                             .format(hashable_1, hashable_2))
 
     def assertUnsortedNotEqual(self, hashable_1, hashable_2):
@@ -346,7 +346,7 @@ class TestCaseDatabase(TestCase):
         """
 
         if assert_unsorted_equal(hashable_1, hashable_2):
-            raise Exception('Equal: {0}, {1}'
+            raise Exception('Equal: arg1[{0}], arg2[{1}]'
                             .format(hashable_1, hashable_2))
 
 

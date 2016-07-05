@@ -11,6 +11,7 @@ from flask.ext.discoverer import advertise
 from http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
     MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR
 
+
 class LibraryView(BaseView):
     """
     End point to interact with a specific library, only returns library content
@@ -252,6 +253,10 @@ class LibraryView(BaseView):
                         library.bibcode[bibcode]
                 else:
                     duplicates_removed += 1
+
+            elif bibcode not in canonical_bibcodes and\
+                    bibcode not in alternate_bibcodes.keys():
+                new_bibcode[bibcode] = library.bibcode[bibcode]
 
         if update:
             # Update the database
