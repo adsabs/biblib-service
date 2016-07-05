@@ -982,9 +982,7 @@ class TestLibraryViews(TestCaseDatabase):
         # We will paginate with 2, so solr will only return 2 documents
         solr_docs = [
             {'bibcode': 'test1'},
-            {'bibcode': 'test2', 'alternate_bibcode': ['arx']},
-            {'bibcode': 'test3', 'alternate_bibcode': ['arXivtest3']},
-            {'bibcode': 'test4'}
+            {'bibcode': 'test2', 'alternate_bibcode': ['arXivtest2']},
         ]
 
         # Ensure a library exists
@@ -1019,8 +1017,8 @@ class TestLibraryViews(TestCaseDatabase):
         self.assertEqual(updates['num_updated'], 1)
         self.assertEqual(updates['duplicates_removed'], 0)
         update_list = updates['update_list']
-        self.assertEqual(update_list[0]['arXivtest3'],
-                         'test3')
+        self.assertEqual(update_list[0]['arXivtest2'],
+                         'test2')
 
         library = Library.query.filter(Library.id == library.id).one()
 
