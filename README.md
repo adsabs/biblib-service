@@ -20,7 +20,7 @@ To load and enter the VM: `vagrant up && vagrant ssh`
 
 Run the tests using `nosetests` or `py.test`:
 ```bash
-nosetests biblib/tests/
+pip install -r dev-requirements.txt ; nosetests biblib/tests/
 ```
 
 ### Layout
