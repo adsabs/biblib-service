@@ -40,20 +40,20 @@ class HarbourView(BaseView):
         user = User.query.filter(User.id == service_uid).one()
 
         try:
-            # XXX: is a join faster or slower than this logic? or is it even
-            #      important in this scenario?
+            # we are passed the library from classic
+            #   and need to find the corresponding library in bumblebee
+            # the corresponding library is the one with
+            #   the same name and the same owner
 
-            # Find all the permissions of the user
-            permissions = Permissions.query\
-                .filter(Permissions.user_id == user.id)\
-                .filter(Permissions.owner == True)\
-                .all()
-            if len(permissions) == 0:
-                raise NoResultFound
+            # in raw sql, this is essentially
+            # q = "select library.id from library,permissions where library.name='{}' and permissions.library_id=library.id and permissions.user_id={} and permissions.owner=True"
+            # q = q.format(library['name'], user.id)
 
-            # Collect all the libraries for which they are the owner
-            libs = [Library.query.filter(Library.id == permission.library_id).one() for permission in permissions]
-            lib = [lib_ for lib_ in libs if lib_.name == library['name']]
+            # but, this must be done via the orm api
+            q = db.session.query(Library).join(Permissions).filter(Library.id == Permissions.library_id)\
+                .filter(Permissions.user_id == user.id).filter(Permissions.owner == True).filter(Library.name == library['name'])
+            lib = q.all()
+
 
             # Raise if there is not exactly one, it should be 1 or 0, but if
             # multiple are returned, there is some problem
