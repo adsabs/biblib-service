@@ -1,6 +1,9 @@
 # Change Log
-All notable changes to the config fileswill be documented in this file.
+All notable changes to the config files will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
+## [1.0.12] - 2016-09-27
+### Changed
+  * Calling the endpoint to transfer ownership resulted in an internal server error because of an attribute conflict (API returns "id" while code assumed "uid")
 
 ## [1.0.10] - 2016-07-05
 ### Changed
