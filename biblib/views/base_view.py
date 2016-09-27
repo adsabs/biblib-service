@@ -174,7 +174,7 @@ class BaseView(Resource):
             raise
 
         if response.status_code == 200:
-            return int(response.json()['id'])
+            return int(response.json()['uid'])
         elif response.status_code == 404:
             raise NoResultFound('API does not have this user')
         else:
