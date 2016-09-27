@@ -255,7 +255,7 @@ class MockEmailService(MockADSWSAPI):
             fail = True
 
         response_kwargs = {
-            'uid': stub_user.absolute_uid,
+            'id': stub_user.absolute_uid,
             'email': stub_user.email,
             'fail': fail,
         }
