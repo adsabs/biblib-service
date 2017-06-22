@@ -3,7 +3,7 @@ Perimssion view
 """
 
 from flask import request, current_app
-from flask.ext.discoverer import advertise
+from flask_discoverer import advertise
 from ..models import db, User, Library, Permissions
 from ..client import client
 from base_view import BaseView

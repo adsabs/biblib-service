@@ -7,7 +7,7 @@ import base64
 from ..views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
     USER_ID_KEYWORD
 from flask import request, current_app
-from flask.ext.restful import Resource
+from flask_restful import Resource
 from ..models import db, User, Library, Permissions
 from ..client import client
 from sqlalchemy.exc import IntegrityError

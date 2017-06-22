@@ -5,7 +5,7 @@ from ..utils import err, get_post_data
 from ..models import db, Permissions
 from base_view import BaseView
 from flask import request, current_app
-from flask.ext.discoverer import advertise
+from flask_discoverer import advertise
 from http_errors import MISSING_USERNAME_ERROR, WRONG_TYPE_ERROR, \
     API_MISSING_USER_EMAIL, NO_PERMISSION_ERROR
 from sqlalchemy.orm.exc import NoResultFound

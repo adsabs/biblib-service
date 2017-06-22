@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the config files will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
+## [1.0.13] - 2017-06-22
+### Changed
+* Some code cleanup (removal of Consul) and update of requirements.txt
+
 ## [1.0.12] - 2016-09-27
 ### Changed
   * Calling the endpoint to transfer ownership resulted in an internal server error because of an attribute conflict (API returns "id" while code assumed "uid")
