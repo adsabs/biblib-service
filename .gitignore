@@ -12,3 +12,5 @@ logs/
 src/
 *.idea
 *~
+venv
+.coverage*
