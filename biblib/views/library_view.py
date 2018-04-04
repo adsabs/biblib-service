@@ -3,7 +3,7 @@ Library view
 """
 from ..views import USER_ID_KEYWORD
 from ..utils import err
-from ..models import db, User, Library, Permissions
+from ..models import User, Library, Permissions
 from ..client import client
 from base_view import BaseView
 from flask import request, current_app
@@ -34,84 +34,87 @@ class LibraryView(BaseView):
         :return: bibcodes
         """
 
-        # Get the library
-        library = Library.query.filter(Library.id == library_id).one()
+        with current_app.session_scope() as session:
+            # Get the library
+            library = session.query(Library).filter_by(id=library_id).one()
 
-        # Get the owner of the library
-        result = db.session.query(Permissions, User)\
-            .join(Permissions.user)\
-            .filter(Permissions.library_id == library_id)\
-            .filter(Permissions.owner == True)\
-            .one()
-        owner_permissions, owner = result
+            # Get the owner of the library
+            result = session.query(Permissions, User)\
+                .join(Permissions.user)\
+                .filter(Permissions.library_id == library_id)\
+                .filter(Permissions.owner == True)\
+                .one()
+            owner_permissions, owner = result
 
-        service = '{api}/{uid}'.format(
-            api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
-            uid=owner.absolute_uid
-        )
-        current_app.logger.info('Obtaining email of user: {0} [API UID]'
-                                .format(owner.absolute_uid))
-        response = client().get(
-            service
-        )
+            service = '{api}/{uid}'.format(
+                api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
+                uid=owner.absolute_uid
+            )
+            current_app.logger.info('Obtaining email of user: {0} [API UID]'
+                                    .format(owner.absolute_uid))
+            response = client().get(
+                service
+            )
 
-        # For this library get all the people who have permissions
-        users = Permissions.query.filter(
-            Permissions.library_id == library.id
-        ).all()
+            # For this library get all the people who have permissions
+            users = session.query(Permissions).filter_by(
+                library_id = library.id
+            ).all()
 
-        if response.status_code != 200:
-            current_app.logger.error('Could not find user in the API'
-                                     'database: {0}.'.format(service))
-            owner = 'Not available'
-        else:
-            owner = response.json()['email'].split('@')[0]
+            if response.status_code != 200:
+                current_app.logger.error('Could not find user in the API'
+                                         'database: {0}.'.format(service))
+                owner = 'Not available'
+            else:
+                owner = response.json()['email'].split('@')[0]
 
-        # User requesting to see the content
-        if service_uid:
-            try:
-                permission = Permissions.query.filter(
-                    Permissions.user_id == service_uid
-                ).filter(
-                    Permissions.library_id == library_id
-                ).one()
+            # User requesting to see the content
+            if service_uid:
+                try:
+                    permission = session.query(Permissions).filter(
+                        Permissions.user_id == service_uid
+                    ).filter(
+                        Permissions.library_id == library_id
+                    ).one()
 
-                if permission.owner:
-                    main_permission = 'owner'
-                elif permission.admin:
-                    main_permission = 'admin'
-                elif permission.write:
-                    main_permission = 'write'
-                elif permission.read:
-                    main_permission = 'read'
-                else:
+                    if permission.owner:
+                        main_permission = 'owner'
+                    elif permission.admin:
+                        main_permission = 'admin'
+                    elif permission.write:
+                        main_permission = 'write'
+                    elif permission.read:
+                        main_permission = 'read'
+                    else:
+                        main_permission = 'none'
+                except:
                     main_permission = 'none'
-            except:
+            else:
                 main_permission = 'none'
-        else:
-            main_permission = 'none'
 
-        if main_permission == 'owner' or main_permission == 'admin':
-            num_users = len(users)
-        elif library.public:
-            num_users = len(users)
-        else:
-            num_users = 0
+            if main_permission == 'owner' or main_permission == 'admin':
+                num_users = len(users)
+            elif library.public:
+                num_users = len(users)
+            else:
+                num_users = 0
 
-        metadata = dict(
-            name=library.name,
-            id='{0}'.format(cls.helper_uuid_to_slug(library.id)),
-            description=library.description,
-            num_documents=len(library.bibcode),
-            date_created=library.date_created.isoformat(),
-            date_last_modified=library.date_last_modified.isoformat(),
-            permission=main_permission,
-            public=library.public,
-            num_users=num_users,
-            owner=owner
-        )
+            metadata = dict(
+                name=library.name,
+                id='{0}'.format(cls.helper_uuid_to_slug(library.id)),
+                description=library.description,
+                num_documents=len(library.bibcode),
+                date_created=library.date_created.isoformat(),
+                date_last_modified=library.date_last_modified.isoformat(),
+                permission=main_permission,
+                public=library.public,
+                num_users=num_users,
+                owner=owner
+            )
+            session.refresh(library)
+            session.expunge(library)
 
-        return library, metadata
+            return library, metadata
 
     @classmethod
     def read_access(cls, service_uid, library_id):
@@ -202,10 +205,10 @@ class LibraryView(BaseView):
         return response
 
     @staticmethod
-    def solr_update_library(library, solr_docs):
+    def solr_update_library(library_id, solr_docs):
         """
         Updates the library based on the solr canonical bibcodes response
-        :param library: library to update
+        :param library: library_id of the library to update
         :param solr_docs: solr docs from the bigquery response
 
         :return: dictionary with details of files modified
@@ -234,43 +237,45 @@ class LibraryView(BaseView):
                     {i: doc['bibcode'] for i in doc['alternate_bibcode']}
                 )
 
-        for bibcode in library.bibcode:
+        with current_app.session_scope() as session:
+            library = session.query(Library).filter(Library.id == library_id).one()
+            for bibcode in library.bibcode:
 
-            # Skip if its already canonical
-            if bibcode in canonical_bibcodes:
-                new_bibcode[bibcode] = library.bibcode[bibcode]
-                continue
+                # Skip if its already canonical
+                if bibcode in canonical_bibcodes:
+                    new_bibcode[bibcode] = library.bibcode[bibcode]
+                    continue
 
-            # Update if its an alternate
-            if bibcode in alternate_bibcodes.keys():
-                update = True
-                num_updated += 1
-                update_list.append({bibcode: alternate_bibcodes[bibcode]})
+                # Update if its an alternate
+                if bibcode in alternate_bibcodes.keys():
+                    update = True
+                    num_updated += 1
+                    update_list.append({bibcode: alternate_bibcodes[bibcode]})
 
-                # Only add the bibcode if it is not there
-                if alternate_bibcodes[bibcode] not in new_bibcode:
-                    new_bibcode[alternate_bibcodes[bibcode]] = \
-                        library.bibcode[bibcode]
-                else:
-                    duplicates_removed += 1
+                    # Only add the bibcode if it is not there
+                    if alternate_bibcodes[bibcode] not in new_bibcode:
+                        new_bibcode[alternate_bibcodes[bibcode]] = \
+                            library.bibcode[bibcode]
+                    else:
+                        duplicates_removed += 1
 
-            elif bibcode not in canonical_bibcodes and\
-                    bibcode not in alternate_bibcodes.keys():
-                new_bibcode[bibcode] = library.bibcode[bibcode]
+                elif bibcode not in canonical_bibcodes and\
+                        bibcode not in alternate_bibcodes.keys():
+                    new_bibcode[bibcode] = library.bibcode[bibcode]
 
-        if update:
-            # Update the database
-            library.bibcode = new_bibcode
-            db.session.add(library)
-            db.session.commit()
+            if update:
+                # Update the database
+                library.bibcode = new_bibcode
+                session.add(library)
+                session.commit()
 
-        updates = dict(
-            num_updated=num_updated,
-            duplicates_removed=duplicates_removed,
-            update_list=update_list
-        )
+            updates = dict(
+                num_updated=num_updated,
+                duplicates_removed=duplicates_removed,
+                update_list=update_list
+            )
 
-        return updates
+            return updates
 
     # Methods
     def get(self, library):
@@ -398,7 +403,7 @@ class LibraryView(BaseView):
             if solr.get('response'):
                 # Update bibcodes based on solrs response
                 updates = self.solr_update_library(
-                    library=library,
+                    library_id=library.id,
                     solr_docs=solr['response']['docs']
                 )
 

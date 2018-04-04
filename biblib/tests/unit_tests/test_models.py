@@ -3,7 +3,7 @@ Tests the underlying models of the database
 """
 
 import unittest
-from biblib.models import db, User, Library, Permissions, MutableDict
+from biblib.models import User, Library, Permissions, MutableDict
 from biblib.tests.base import TestCaseDatabase
 
 class TestLibraryModel(TestCaseDatabase):
@@ -15,10 +15,11 @@ class TestLibraryModel(TestCaseDatabase):
         Checks that the get_bibcodes method works as expected
         """
         lib = Library(bibcode={'1': {}, '2': {}, '3': {}})
-        db.session.add(lib)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(lib)
+            session.commit()
 
-        self.assertUnsortedEqual(lib.get_bibcodes(), ['1', '2', '3'])
+            self.assertUnsortedEqual(lib.get_bibcodes(), ['1', '2', '3'])
 
     def test_adding_bibcodes_to_library(self):
         """
@@ -30,14 +31,15 @@ class TestLibraryModel(TestCaseDatabase):
         expected_bibcode_output = ['1', '2', '3', '4']
 
         lib = Library(bibcode=bibcodes_list_1)
-        db.session.add(lib)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(lib)
+            session.commit()
 
-        lib.add_bibcodes(bibcodes_list_2)
-        db.session.add(lib)
-        db.session.commit()
+            lib.add_bibcodes(bibcodes_list_2)
+            session.add(lib)
+            session.commit()
 
-        self.assertUnsortedEqual(lib.get_bibcodes(), expected_bibcode_output)
+            self.assertUnsortedEqual(lib.get_bibcodes(), expected_bibcode_output)
 
     def test_adding_bibcode_if_not_commited_to_library(self):
         """
@@ -48,11 +50,12 @@ class TestLibraryModel(TestCaseDatabase):
 
         lib = Library()
         lib.add_bibcodes(bibcodes_list)
-        db.session.add(lib)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(lib)
+            session.commit()
 
-        self.assertEqual(lib.bibcode, {k: {} for k in bibcodes_list})
-        self.assertUnsortedEqual(lib.get_bibcodes(), bibcodes_list)
+            self.assertEqual(lib.bibcode, {k: {} for k in bibcodes_list})
+            self.assertUnsortedEqual(lib.get_bibcodes(), bibcodes_list)
 
     def test_removing_bibcodes_from_library(self):
         """
@@ -63,14 +66,15 @@ class TestLibraryModel(TestCaseDatabase):
         expected_list = ['2', '3']
 
         lib = Library(bibcode=bibcodes_list_1)
-        db.session.add(lib)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(lib)
+            session.commit()
 
-        lib.remove_bibcodes(['1'])
-        db.session.add(lib)
-        db.session.commit()
+            lib.remove_bibcodes(['1'])
+            session.add(lib)
+            session.commit()
 
-        self.assertUnsortedEqual(lib.get_bibcodes(), expected_list)
+            self.assertUnsortedEqual(lib.get_bibcodes(), expected_list)
 
     def test_coerce(self):
         """

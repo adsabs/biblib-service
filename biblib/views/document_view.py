@@ -3,7 +3,7 @@ Document view
 """
 
 from ..utils import err, get_post_data
-from ..models import db, Library, Permissions
+from ..models import Library, Permissions
 from base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
@@ -36,24 +36,26 @@ class DocumentView(BaseView):
         """
         current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
                                 .format(document_data, library_id))
-        # Find the specified library
-        library = Library.query.filter(Library.id == library_id).one()
 
-        start_length = len(library.bibcode)
+        with current_app.session_scope() as session:
+            # Find the specified library
+            library = session.query(Library).filter_by(id=library_id).one()
 
-        library.add_bibcodes(document_data['bibcode'])
+            start_length = len(library.bibcode)
 
-        db.session.add(library)
-        db.session.commit()
+            library.add_bibcodes(document_data['bibcode'])
 
-        current_app.logger.info('Added: {0} is now {1}'.format(
-            document_data['bibcode'],
-            library.bibcode)
-        )
+            session.add(library)
+            session.commit()
 
-        end_length = len(library.bibcode)
+            current_app.logger.info('Added: {0} is now {1}'.format(
+                document_data['bibcode'],
+                library.bibcode)
+            )
 
-        return end_length - start_length
+            end_length = len(library.bibcode)
+
+            return end_length - start_length
 
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):
@@ -67,18 +69,19 @@ class DocumentView(BaseView):
         """
         current_app.logger.info('Removing a document: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
-        library = Library.query.filter(Library.id == library_id).one()
-        start_length = len(library.bibcode)
+        with current_app.session_scope() as session:
+            library = session.query(Library).filter_by(id=library_id).one()
+            start_length = len(library.bibcode)
 
-        library.remove_bibcodes(document_data['bibcode'])
+            library.remove_bibcodes(document_data['bibcode'])
 
-        db.session.add(library)
-        db.session.commit()
-        current_app.logger.info('Removed document successfully: {0}'
-                                .format(library.bibcode))
-        end_length = len(library.bibcode)
+            session.add(library)
+            session.commit()
+            current_app.logger.info('Removed document successfully: {0}'
+                                    .format(library.bibcode))
+            end_length = len(library.bibcode)
 
-        return start_length - end_length
+            return start_length - end_length
 
     @staticmethod
     def update_library(library_id, library_data):
@@ -92,16 +95,17 @@ class DocumentView(BaseView):
         updateable = ['name', 'description', 'public']
         updated = {}
 
-        library = Library.query.filter(Library.id == library_id).one()
+        with current_app.session_scope() as session:
+            library = session.query(Library).filter_by(id=library_id).one()
 
-        for key in library_data:
-            if key not in updateable:
-                continue
-            setattr(library, key, library_data[key])
-            updated[key] = library_data[key]
+            for key in library_data:
+                if key not in updateable:
+                    continue
+                setattr(library, key, library_data[key])
+                updated[key] = library_data[key]
 
-        db.session.add(library)
-        db.session.commit()
+            session.add(library)
+            session.commit()
 
         return updated
 
@@ -114,9 +118,10 @@ class DocumentView(BaseView):
         :return: no return
         """
 
-        library = Library.query.filter(Library.id == library_id).one()
-        db.session.delete(library)
-        db.session.commit()
+        with current_app.session_scope() as session:
+            library = session.query(Library).filter_by(id=library_id).one()
+            session.delete(library)
+            session.commit()
 
     @classmethod
     def update_access(cls, service_uid, library_id):
@@ -184,10 +189,11 @@ class DocumentView(BaseView):
         :return: True (exists), False (does not exist)
         """
 
-        library_names = \
-            [i.library.name for i in
-             Permissions.query.filter(Permissions.user_id == service_uid,
-                                      Permissions.owner == True).all()]
+        with current_app.session_scope() as session:
+            library_names = \
+                [i.library.name for i in
+                 session.query(Permissions).filter_by(user_id = service_uid,
+                                                      owner = True).all()]
 
         if library_name in library_names:
             current_app.logger.error('Name supplied for the library already '

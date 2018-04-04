@@ -7,8 +7,8 @@ import json
 from flask import current_app
 from flask.ext.testing import TestCase
 from biblib import app
+from biblib.models import Base
 from httpretty import HTTPretty
-from biblib.models import db
 from biblib.utils import assert_unsorted_equal
 import testing.postgresql
 
@@ -291,9 +291,14 @@ class TestCaseDatabase(TestCase):
 
         :return: application instance
         """
-        app_ = app.create_app()
-        app_.config['SQLALCHEMY_BINDS']['libraries'] = \
-            TestCaseDatabase.postgresql_url
+        app_ = app.create_app(**{
+               'SQLALCHEMY_DATABASE_URI': self.postgresql_url,
+               'SQLALCHEMY_ECHO': True,
+               'TESTING': True,
+               'PROPAGATE_EXCEPTIONS': True,
+               'TRAP_BAD_REQUEST_ERRORS': True,
+               'VAULT_BUMBLEBEE_OPTIONS': {'foo': 'bar'}
+            })
         return app_
 
     @classmethod
@@ -314,7 +319,7 @@ class TestCaseDatabase(TestCase):
 
         current_app.logger.info('Setting up db on: {0}'
                                 .format(current_app.config['SQLALCHEMY_BINDS']))
-        db.create_all()
+        Base.metadata.create_all(bind=self.app.db.engine)
 
     def tearDown(self):
         """
@@ -322,8 +327,9 @@ class TestCaseDatabase(TestCase):
 
         :return: no return
         """
-        db.session.remove()
-        db.drop_all()
+        self.app.db.session.remove()
+        Base.metadata.drop_all(bind=self.app.db.engine)
+        #self.app.db.drop_all()
 
     def assertUnsortedEqual(self, hashable_1, hashable_2):
         """

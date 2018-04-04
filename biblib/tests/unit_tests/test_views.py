@@ -4,7 +4,7 @@ Tests Views of the application
 
 import unittest
 import uuid
-from biblib.models import db, User, Library, Permissions, MutableDict
+from biblib.models import User, Library, Permissions, MutableDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
@@ -124,18 +124,19 @@ class TestUserViews(TestCaseDatabase):
         :return: no return
         """
 
-        # Create a user using the function
-        self.user_view.create_user(absolute_uid=self.stub_user_1.absolute_uid)
-        # Create another use so that we know it returns a single record
-        self.user_view.create_user(absolute_uid=self.stub_user_2.absolute_uid)
+        with self.app.session_scope() as session:
+            # Create a user using the function
+            self.user_view.create_user(absolute_uid=self.stub_user_1.absolute_uid)
+            # Create another use so that we know it returns a single record
+            self.user_view.create_user(absolute_uid=self.stub_user_2.absolute_uid)
 
-        # Check if it really exists in the database
-        result = User.query.filter(
-            User.absolute_uid == self.stub_user_1.absolute_uid
-        ).all()
+            # Check if it really exists in the database
+            result = session.query(User).filter(
+                User.absolute_uid == self.stub_user_1.absolute_uid
+            ).all()
 
-        # Should contain one result
-        self.assertTrue(len(result) == 1)
+            # Should contain one result
+            self.assertTrue(len(result) == 1)
 
     def test_user_creation_raises_exception_if_exists(self):
         """
@@ -147,15 +148,16 @@ class TestUserViews(TestCaseDatabase):
 
         # Add the user to the database with the uid we do not want repeated
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Now try to add a user with the same uid from the API, it should raise
-        # an error
-        with self.assertRaises(IntegrityError):
-            self.user_view.create_user(
-                absolute_uid=self.stub_user.absolute_uid
-            )
+            # Now try to add a user with the same uid from the API, it should raise
+            # an error
+            with self.assertRaises(IntegrityError):
+                self.user_view.create_user(
+                    absolute_uid=self.stub_user.absolute_uid
+                )
 
     def test_user_creation_if_exists(self):
         """
@@ -173,14 +175,15 @@ class TestUserViews(TestCaseDatabase):
 
         # Add the user with the given UID to the database
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Check that the user exists in the database
-        exists = self.user_view.helper_user_exists(
-            absolute_uid=self.stub_user.absolute_uid
-        )
-        self.assertTrue(exists)
+            # Check that the user exists in the database
+            exists = self.user_view.helper_user_exists(
+                absolute_uid=self.stub_user.absolute_uid
+            )
+            self.assertTrue(exists)
 
     def test_user_can_create_a_library(self):
         """
@@ -191,27 +194,29 @@ class TestUserViews(TestCaseDatabase):
 
         # Make the user we want the library to be associated with
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Create the library for the user we created
-        library = self.user_view.create_library(
-            service_uid=user.id,
-            library_data=self.stub_library.user_view_post_data
-        )
+            # Create the library for the user we created
+            library = self.user_view.create_library(
+                service_uid=user.id,
+                library_data=self.stub_library.user_view_post_data
+            )
 
-        self.assertEqual({}, library.bibcode)
+            with self.assertRaises(KeyError):
+                library['bibcode']
 
-        # Check that the library was created with the correct permissions
-        result = Permissions.query\
-            .filter(User.id == Permissions.user_id)\
-            .filter(library.id == Permissions.library_id)\
-            .all()
+            # Check that the library was created with the correct permissions
+            result = session.query(Permissions)\
+                .filter(User.id == Permissions.user_id)\
+                .filter(BaseView.helper_slug_to_uuid(library['id']) == Permissions.library_id)\
+                .all()
 
-        with self.assertRaises(AttributeError):
-            result.library.bibcode
+            with self.assertRaises(AttributeError):
+                result.library.bibcode
 
-        self.assertTrue(len(result) == 1)
+            self.assertTrue(len(result) == 1)
 
     def test_user_can_create_a_library_passing_bibcodes(self):
         """
@@ -227,27 +232,28 @@ class TestUserViews(TestCaseDatabase):
 
         # Make the user we want the library to be associated with
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Create the library for the user we created
-        library = self.user_view.create_library(
-            service_uid=user.id,
-            library_data=stub_library.user_view_post_data
-        )
+            # Create the library for the user we created
+            library = self.user_view.create_library(
+                service_uid=user.id,
+                library_data=stub_library.user_view_post_data
+            )
 
-        # Check that the library was created with the correct permissions
-        result = Permissions.query\
-            .filter(User.id == Permissions.user_id)\
-            .filter(library.id == Permissions.library_id)\
-            .all()
+            # Check that the library was created with the correct permissions
+            result = session.query(Permissions)\
+                .filter(User.id == Permissions.user_id)\
+                .filter(BaseView.helper_slug_to_uuid(library['id']) == Permissions.library_id)\
+                .all()
 
-        library = result[0].library
-        self.assertIs(MutableDict, type(library.bibcode), type(library.bibcode))
-        self.assertTrue(
-            len(library.bibcode) == len(stub_library.bibcode)
-        )
-        self.assertTrue(len(result) == 1)
+            library = result[0].library
+            self.assertIs(MutableDict, type(library.bibcode), type(library.bibcode))
+            self.assertTrue(
+                len(library.bibcode) == len(stub_library.bibcode)
+            )
+            self.assertTrue(len(result) == 1)
 
     def test_user_cannot_create_a_library_passing_wrong_bibcode_type(self):
         """
@@ -261,17 +267,19 @@ class TestUserViews(TestCaseDatabase):
 
         # Make the user we want the library to be associated with
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
 
         library_data = stub_library.user_view_post_data
 
         for bib_type in ['string', int(3), float(3.0), dict(test='test')]:
-
             with self.assertRaises(TypeError):
                 library_data['bibcode'] = bib_type
                 # Create the library for the user we created
-                lib=self.user_view.create_library(
+                lib = self.user_view.create_library(
                     service_uid=user.id,
                     library_data=library_data
                 )
@@ -285,8 +293,11 @@ class TestUserViews(TestCaseDatabase):
 
         # To make a library we need an actual user
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
 
         # Make a library that ensures we get one back
         number_of_libs = 2
@@ -315,8 +326,11 @@ class TestUserViews(TestCaseDatabase):
         # To make a library we need an actual user
         stub_user = UserShop(name='fail')
         user = User(absolute_uid=stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
 
         # Make a library that ensures we get one back
         self.user_view.create_library(
@@ -347,8 +361,13 @@ class TestUserViews(TestCaseDatabase):
         # To make a library we need an actual user
         user = User(absolute_uid=stub_user_1.absolute_uid)
         user_other = User(absolute_uid=stub_user_2.absolute_uid)
-        db.session.add_all([user, user_other])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user, user_other])
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
+            session.refresh(user_other)
+            session.expunge(user_other)
 
         # The random user has a library
         self.user_view.create_library(
@@ -368,7 +387,7 @@ class TestUserViews(TestCaseDatabase):
             libs.append(stub_library)
 
         # Give random permission to the random user
-        self.permission_view.add_permission(library_id=_lib.id,
+        self.permission_view.add_permission(library_id=BaseView.helper_slug_to_uuid(_lib['id']),
                                             service_uid=user_other.id,
                                             permission='read',
                                             value=True)
@@ -392,8 +411,7 @@ class TestUserViews(TestCaseDatabase):
 
             self.assertEqual(libraries[i]['num_documents'], 0)
 
-            if libraries[i]['id'] == \
-                    self.user_view.helper_uuid_to_slug(_lib.id):
+            if libraries[i]['id'] == _lib['id']:
                 self.assertEqual(libraries[i]['num_users'], 2)
             else:
                 self.assertEqual(libraries[i]['num_users'], 1)
@@ -418,26 +436,34 @@ class TestUserViews(TestCaseDatabase):
 
         # To make a library we need an actual user
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
 
         # Make a library that ensures we get one back
         stub_library = LibraryShop()
-        library = self.user_view.create_library(
+        library_dict = self.user_view.create_library(
             service_uid=user.id,
             library_data=stub_library.user_view_post_data
         )
+        with self.app.session_scope() as session:
+            library_1 = session.query(Library).filter(Library.id == BaseView.helper_slug_to_uuid(library_dict['id'])).one()
+            session.expunge(library_1)
+
 
         self.document_view.update_library(
-            library_id=library.id,
+            library_id=BaseView.helper_slug_to_uuid(library_dict['id']),
             library_data=dict(public=True)
         )
 
-        library_2 = Library.query.filter(Library.id == library.id).one()
+        with self.app.session_scope() as session:
+            library_2 = session.query(Library).filter(Library.id == BaseView.helper_slug_to_uuid(library_dict['id'])).one()
 
-        self.assertEqual(library.date_created, library_2.date_created)
-        self.assertNotEqual(library.date_created,
-                            library_2.date_last_modified)
+            self.assertEqual(library_1.date_created, library_2.date_created)
+            self.assertNotEqual(library_1.date_created,
+                                library_2.date_last_modified)
 
     def test_returned_permissions_are_right(self):
         """
@@ -452,8 +478,13 @@ class TestUserViews(TestCaseDatabase):
         # To make a library we need an actual user
         user = User(absolute_uid=self.stub_user.absolute_uid)
         user_other = User(absolute_uid=stub_user_other.absolute_uid)
-        db.session.add_all([user, user_other])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user, user_other])
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
+            session.refresh(user_other)
+            session.expunge(user_other)
 
         # Make a library to make sure things work properly
         stub_library = LibraryShop()
@@ -464,7 +495,7 @@ class TestUserViews(TestCaseDatabase):
 
         stub_permissions = [['read', True], ['write', True], ['admin', True]]
         for permission, value in stub_permissions:
-            self.permission_view.add_permission(library_id=library.id,
+            self.permission_view.add_permission(library_id=BaseView.helper_slug_to_uuid(library['id']),
                                                 service_uid=user_other.id,
                                                 permission=permission,
                                                 value=value)
@@ -495,9 +526,14 @@ class TestUserViews(TestCaseDatabase):
         user_admin.permissions.append(permission_admin)
         user_owner.permissions.append(permission_owner)
 
-        db.session.add_all([user_owner, user_admin, library, permission_admin,
-                            permission_owner])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_owner, user_admin, library, permission_admin,
+                                permission_owner])
+            session.commit()
+            for obj in [user_owner, user_admin, library, permission_admin,
+                        permission_owner]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Get the library created
         # For user admin
@@ -534,9 +570,14 @@ class TestUserViews(TestCaseDatabase):
         user_read.permissions.append(permission_read)
         user_write.permissions.append(permission_write)
 
-        db.session.add_all([user_read, user_write, library, permission_read,
-                            permission_write])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_read, user_write, library, permission_read,
+                             permission_write])
+            session.commit()
+            for obj in [user_read, user_write, library, permission_read,
+                             permission_write]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Get the library created
         # For user read
@@ -564,8 +605,11 @@ class TestUserViews(TestCaseDatabase):
 
         # To make a library we need an actual user
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
 
         # Make the first library
         self.user_view.create_library(
@@ -593,8 +637,11 @@ class TestUserViews(TestCaseDatabase):
 
         # To make a library we need an actual user
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
 
         # Make the first library
         for i in range(2):
@@ -608,7 +655,7 @@ class TestUserViews(TestCaseDatabase):
                 library_data=stub_library.user_view_post_data
             )
 
-            lib = Library.query.filter(Library.id == library.id).one()
+            lib = session.query(Library).filter(Library.id == BaseView.helper_slug_to_uuid(library['id'])).one()
             self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1),
                             lib.name)
             self.assertTrue(lib.description == DEFAULT_LIBRARY_DESCRIPTION)
@@ -639,8 +686,11 @@ class TestUserViews(TestCaseDatabase):
 
         # To make a library we need an actual user
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
 
         # Make the first library
         for i in range(2):
@@ -649,10 +699,11 @@ class TestUserViews(TestCaseDatabase):
                 library_data=stub_library.user_view_post_data
             )
 
-            lib = Library.query.filter(Library.id == library.id).one()
-            self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1),
-                            lib.name)
-            self.assertTrue(lib.description == DEFAULT_LIBRARY_DESCRIPTION)
+            with self.app.session_scope() as session:
+                lib = session.query(Library).filter(Library.id == BaseView.helper_slug_to_uuid(library['id'])).one()
+                self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1),
+                                lib.name)
+                self.assertTrue(lib.description == DEFAULT_LIBRARY_DESCRIPTION)
 
 
 class TestLibraryViews(TestCaseDatabase):
@@ -688,25 +739,30 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(owner=True,
-                                 read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(owner=True,
+                                     read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Retrieve the bibcodes using the web services
         response_library, meta_data = \
@@ -725,23 +781,28 @@ class TestLibraryViews(TestCaseDatabase):
         """
         # Stub data
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(owner=True)
+            # Give the user and library permissions
+            permission = Permissions(owner=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         with MockEmailService(self.stub_user, end_type='uid'):
             library, metadata = self.library_view.get_documents_from_library(
@@ -762,23 +823,28 @@ class TestLibraryViews(TestCaseDatabase):
         # Stub data
         user = User(absolute_uid=self.stub_user.absolute_uid)
         user_random = User(absolute_uid=self.stub_user_2.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=False,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=False,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(owner=True)
+            # Give the user and library permissions
+            permission = Permissions(owner=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user, user_random])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user, user_random])
+            session.commit()
+            for obj in [library, permission, user, user_random]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         with MockEmailService(self.stub_user, end_type='uid'):
             library, metadata = self.library_view.get_documents_from_library(
@@ -801,24 +867,29 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Retrieve the bibcodes using the web services
         with MockSolrBigqueryService():
@@ -837,33 +908,38 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        original_bibcodes = ['test1', 'test2', 'arXivtest3', 'test4']
-        canonical_bibcodes = ['test1', 'test2', 'test3', 'test4']
-        solr_docs = [
-            {'bibcode': 'test1'},
-            {'bibcode': 'test2'},
-            {'bibcode': 'test3', 'alternate_bibcode': ['arXivtest3']},
-            {'bibcode': 'test4'}
-        ]
+            original_bibcodes = ['test1', 'test2', 'arXivtest3', 'test4']
+            canonical_bibcodes = ['test1', 'test2', 'test3', 'test4']
+            solr_docs = [
+                {'bibcode': 'test1'},
+                {'bibcode': 'test2'},
+                {'bibcode': 'test3', 'alternate_bibcode': ['arXivtest3']},
+                {'bibcode': 'test4'}
+            ]
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode={k: {} for k in original_bibcodes})
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={k: {} for k in original_bibcodes})
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Retrieve the bibcodes using the web services
         with MockSolrBigqueryService(solr_docs=solr_docs):
@@ -874,7 +950,7 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Now check solr updates the records correctly
         solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library=library,
+        updates = self.library_view.solr_update_library(library_id=library.id,
                                                         solr_docs=solr_docs)
 
         # Check the data returned is correct on what files were updated and why
@@ -884,12 +960,13 @@ class TestLibraryViews(TestCaseDatabase):
         self.assertEqual(update_list[0]['arXivtest3'],
                          'test3')
 
-        library = Library.query.filter(Library.id == library.id).one()
+        with self.app.session_scope() as session:
+            library = session.query(Library).filter(Library.id == library.id).one()
 
-        self.assertUnsortedNotEqual(library.get_bibcodes(),
-                                    original_bibcodes)
-        self.assertUnsortedEqual(library.get_bibcodes(),
-                                 canonical_bibcodes)
+            self.assertUnsortedNotEqual(library.get_bibcodes(),
+                                        original_bibcodes)
+            self.assertUnsortedEqual(library.get_bibcodes(),
+                                     canonical_bibcodes)
 
     def test_that_solr_updates_canonical_bibcodes_with_multi_alternates(self):
         """
@@ -903,33 +980,38 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        original_bibcodes = ['test1', 'test2', 'arXivtest3', 'conftest3']
-        canonical_bibcodes = ['test1', 'test2', 'test3']
-        solr_docs = [
-            {'bibcode': 'test1'},
-            {'bibcode': 'test2'},
-            {'bibcode': 'test3', 'alternate_bibcode': ['arXivtest3',
-                                                       'conftest3']},
-        ]
+            original_bibcodes = ['test1', 'test2', 'arXivtest3', 'conftest3']
+            canonical_bibcodes = ['test1', 'test2', 'test3']
+            solr_docs = [
+                {'bibcode': 'test1'},
+                {'bibcode': 'test2'},
+                {'bibcode': 'test3', 'alternate_bibcode': ['arXivtest3',
+                                                           'conftest3']},
+            ]
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode={k: {} for k in original_bibcodes})
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={k: {} for k in original_bibcodes})
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Retrieve the bibcodes using the web services
         with MockSolrBigqueryService(solr_docs=solr_docs):
@@ -940,7 +1022,7 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Now check solr updates the records correctly
         solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library=library,
+        updates = self.library_view.solr_update_library(library_id=library.id,
                                                         solr_docs=solr_docs)
 
         self.assertEqual(updates['num_updated'], 2)
@@ -956,12 +1038,13 @@ class TestLibraryViews(TestCaseDatabase):
             'test3'
         )
 
-        library = Library.query.filter(Library.id == library.id).one()
+        with self.app.session_scope() as session:
+            library = session.query(Library).filter(Library.id == library.id).one()
 
-        self.assertUnsortedNotEqual(library.get_bibcodes(),
-                                    original_bibcodes)
-        self.assertUnsortedEqual(library.get_bibcodes(),
-                                 canonical_bibcodes)
+            self.assertUnsortedNotEqual(library.get_bibcodes(),
+                                        original_bibcodes)
+            self.assertUnsortedEqual(library.get_bibcodes(),
+                                     canonical_bibcodes)
 
     def test_that_solr_updates_canonical_bibcodes_paginate(self):
         """
@@ -973,33 +1056,38 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        original_bibcodes = ['test1', 'arXivtest2', 'test3', 'test4']
-        canonical_bibcodes = ['test1', 'test2', 'test3', 'test4']
+            original_bibcodes = ['test1', 'arXivtest2', 'test3', 'test4']
+            canonical_bibcodes = ['test1', 'test2', 'test3', 'test4']
 
-        # We will paginate with 2, so solr will only return 2 documents
-        solr_docs = [
-            {'bibcode': 'test1'},
-            {'bibcode': 'test2', 'alternate_bibcode': ['arXivtest2']},
-        ]
+            # We will paginate with 2, so solr will only return 2 documents
+            solr_docs = [
+                {'bibcode': 'test1'},
+                {'bibcode': 'test2', 'alternate_bibcode': ['arXivtest2']},
+            ]
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode={k: {} for k in original_bibcodes})
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={k: {} for k in original_bibcodes})
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Retrieve the bibcodes using the web services
         with MockSolrBigqueryService(solr_docs=solr_docs):
@@ -1010,7 +1098,7 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Now check solr updates the records correctly
         solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library=library,
+        updates = self.library_view.solr_update_library(library_id=library.id,
                                                         solr_docs=solr_docs)
 
         # Check the data returned is correct on what files were updated and why
@@ -1020,12 +1108,13 @@ class TestLibraryViews(TestCaseDatabase):
         self.assertEqual(update_list[0]['arXivtest2'],
                          'test2')
 
-        library = Library.query.filter(Library.id == library.id).one()
+        with self.app.session_scope() as session:
+            library = session.query(Library).filter(Library.id == library.id).one()
 
-        self.assertUnsortedNotEqual(library.get_bibcodes(),
-                                    original_bibcodes)
-        self.assertUnsortedEqual(library.get_bibcodes(),
-                                 canonical_bibcodes)
+            self.assertUnsortedNotEqual(library.get_bibcodes(),
+                                        original_bibcodes)
+            self.assertUnsortedEqual(library.get_bibcodes(),
+                                     canonical_bibcodes)
 
     def test_user_without_permission_cannot_access_private_library(self):
         """
@@ -1039,24 +1128,28 @@ class TestLibraryViews(TestCaseDatabase):
         # Make a fake user and library
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user_1.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Make sure the second user is denied access
         # add 1 to the UID to represent a random user
@@ -1078,17 +1171,21 @@ class TestLibraryViews(TestCaseDatabase):
                           description='My library',
                           public=True,
                           bibcode=self.stub_library.bibcode)
-        db.session.add(library)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(library)
+            session.commit()
+            session.refresh(library)
+            session.expunge(library)
 
         exists = self.library_view.helper_library_exists(library_id=library.id)
         self.assertTrue(exists)
 
-        db.session.delete(library)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.delete(library)
+            session.commit()
 
-        exists = self.library_view.helper_library_exists(library_id=library.id)
-        self.assertFalse(exists)
+            exists = self.library_view.helper_library_exists(library_id=library.id)
+            self.assertFalse(exists)
 
 
 
@@ -1128,32 +1225,33 @@ class TestDocumentViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
 
-        library = Library.query.filter(Library.id == library.id).one()
-        self.assertIsInstance(library, Library)
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
 
-        self.document_view.delete_library(library_id=library.id)
+            self.document_view.delete_library(library_id=library.id)
 
-        with self.assertRaises(NoResultFound):
-            Library.query.filter(Library.id == library.id).one()
+            with self.assertRaises(NoResultFound):
+                session.query(Library).filter(Library.id == library.id).one()
 
     def test_user_cannot_delete_a_library_if_not_owner(self):
         """
@@ -1166,29 +1264,30 @@ class TestDocumentViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(read=True, owner=False)
+            # Give the user and library permissions
+            permission = Permissions(read=True, owner=False)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
-        library = Library.query.filter(Library.id == library.id).one()
-        self.assertIsInstance(library, Library)
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
 
-        access = self.document_view.delete_access(service_uid=user.id,
-                                                  library_id=library.id)
-        self.assertFalse(access)
+            access = self.document_view.delete_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertFalse(access)
 
     def test_user_can_delete_a_library_if_owner(self):
         """
@@ -1201,29 +1300,30 @@ class TestDocumentViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(read=False, owner=True)
+            # Give the user and library permissions
+            permission = Permissions(read=False, owner=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
-        library = Library.query.filter(Library.id == library.id).one()
-        self.assertIsInstance(library, Library)
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
 
-        access = self.document_view.delete_access(service_uid=user.id,
-                                                  library_id=library.id)
-        self.assertTrue(access)
+            access = self.document_view.delete_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertTrue(access)
 
     def test_when_delete_library_it_removes_permissions(self):
         """
@@ -1236,59 +1336,60 @@ class TestDocumentViews(TestCaseDatabase):
         # Make the user, library, and permissions
         user = User(absolute_uid=self.stub_user.absolute_uid)
         user_2 = User(absolute_uid=self.stub_user_2.absolute_uid)
-        db.session.add_all([user, user_2])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user, user_2])
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(owner=True)
-        permission_2 = Permissions(owner=False, read=True)
+            # Give the user and library permissions
+            permission = Permissions(owner=True)
+            permission_2 = Permissions(owner=False, read=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        user_2.permissions.append(permission_2)
+            # Commit the stub data
+            user.permissions.append(permission)
+            user_2.permissions.append(permission_2)
 
-        library.permissions.append(permission)
-        library.permissions.append(permission_2)
+            library.permissions.append(permission)
+            library.permissions.append(permission_2)
 
-        db.session.add_all([library, permission, user, user_2, permission_2])
-        db.session.commit()
+            session.add_all([library, permission, user, user_2, permission_2])
+            session.commit()
 
-        search_library = Library.query.filter(
-            Library.id == library.id
-        ).one()
-        search_permission = Permissions.query.filter(
-            Permissions.id == permission.id
-        ).all()
-        self.assertIsInstance(search_library, Library)
-        self.assertTrue(len(search_permission), 2)
-
-        self.document_view.delete_library(library_id=library.id)
-
-        with self.assertRaises(NoResultFound):
-            Library.query.filter(
+            search_library = session.query(Library).filter(
                 Library.id == library.id
             ).one()
-
-        with self.assertRaises(NoResultFound):
-            Permissions.query.filter(
+            search_permission = session.query(Permissions).filter(
                 Permissions.id == permission.id
-            ).one()
+            ).all()
+            self.assertIsInstance(search_library, Library)
+            self.assertTrue(len(search_permission), 2)
 
-        with self.assertRaises(NoResultFound):
-            Permissions.query.filter(
-                Permissions.id == permission_2.id
-            ).one()
+            self.document_view.delete_library(library_id=library.id)
 
-        with self.assertRaises(NoResultFound):
-            Permissions.query.filter(
-                Permissions.library_id == library.id
-            ).one()
+            with self.assertRaises(NoResultFound):
+                session.query(Library).filter(
+                    Library.id == library.id
+                ).one()
+
+            with self.assertRaises(NoResultFound):
+                session.query(Permissions).filter(
+                    Permissions.id == permission.id
+                ).one()
+
+            with self.assertRaises(NoResultFound):
+                session.query(Permissions).filter(
+                    Permissions.id == permission_2.id
+                ).one()
+
+            with self.assertRaises(NoResultFound):
+                session.query(Permissions).filter(
+                    Permissions.library_id == library.id
+                ).one()
 
     def test_user_can_add_to_library(self):
         """
@@ -1299,51 +1400,52 @@ class TestDocumentViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True)
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
 
-        library_id = library.id
+            library_id = library.id
 
-        # Get stub data for the document
+            # Get stub data for the document
 
-        # Add a document to the library
-        number_added = self.document_view.add_document_to_library(
-            library_id=library_id,
-            document_data=self.stub_library.document_view_post_data('add')
-        )
-        self.assertEqual(number_added, len(self.stub_library.bibcode))
+            # Add a document to the library
+            number_added = self.document_view.add_document_to_library(
+                library_id=library_id,
+                document_data=self.stub_library.document_view_post_data('add')
+            )
+            self.assertEqual(number_added, len(self.stub_library.bibcode))
 
-        # Check that the document is in the library
-        library = Library.query.filter(Library.id == library_id).all()
-        for _lib in library:
-            self.assertIn(self.stub_library.bibcode.keys()[0], _lib.bibcode)
+            # Check that the document is in the library
+            library = session.query(Library).filter(Library.id == library_id).all()
+            for _lib in library:
+                self.assertIn(self.stub_library.bibcode.keys()[0], _lib.bibcode)
 
-        # Add a different document to the library
-        number_added = self.document_view.add_document_to_library(
-            library_id=library_id,
-            document_data=self.stub_library_2.document_view_post_data('add')
-        )
-        self.assertEqual(number_added, len(self.stub_library.bibcode))
+            # Add a different document to the library
+            number_added = self.document_view.add_document_to_library(
+                library_id=library_id,
+                document_data=self.stub_library_2.document_view_post_data('add')
+            )
+            self.assertEqual(number_added, len(self.stub_library.bibcode))
 
-        # Check that the document is in the library
-        library = Library.query.filter(Library.id == library_id).all()
-        for _lib in library:
-            self.assertIn(self.stub_library_2.bibcode.keys()[0], _lib.bibcode)
+            # Check that the document is in the library
+            library = session.query(Library).filter(Library.id == library_id).all()
+            for _lib in library:
+                self.assertIn(self.stub_library_2.bibcode.keys()[0], _lib.bibcode)
 
     def test_user_cannot_duplicate_same_document_in_library(self):
         """
@@ -1354,41 +1456,42 @@ class TestDocumentViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True)
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
 
-        library_id = library.id
+            library_id = library.id
 
-        # Get stub data for the document
+            # Get stub data for the document
 
-        # Add a document to the library
-        number_added = self.document_view.add_document_to_library(
-            library_id=library_id,
-            document_data=self.stub_library.document_view_post_data('add')
-        )
-        self.assertEqual(number_added, len(self.stub_library.bibcode))
+            # Add a document to the library
+            number_added = self.document_view.add_document_to_library(
+                library_id=library_id,
+                document_data=self.stub_library.document_view_post_data('add')
+            )
+            self.assertEqual(number_added, len(self.stub_library.bibcode))
 
-        # Shouldn't add the same document again
-        number_added = self.document_view.add_document_to_library(
-            library_id=library_id,
-            document_data=self.stub_library.document_view_post_data('add')
-        )
-        self.assertEqual(0, number_added)
+            # Shouldn't add the same document again
+            number_added = self.document_view.add_document_to_library(
+                library_id=library_id,
+                document_data=self.stub_library.document_view_post_data('add')
+            )
+            self.assertEqual(0, number_added)
 
     def test_user_can_remove_document_from_library(self):
         """
@@ -1399,24 +1502,26 @@ class TestDocumentViews(TestCaseDatabase):
 
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            session.refresh(library)
+            session.expunge(library)
 
         # Remove the bibcode from the library
         number_removed = self.document_view.remove_documents_from_library(
@@ -1426,7 +1531,7 @@ class TestDocumentViews(TestCaseDatabase):
         self.assertEqual(number_removed, len(self.stub_library.bibcode))
 
         # Check it worked
-        library = Library.query.filter(Library.id == library.id).one()
+        library = session.query(Library).filter(Library.id == library.id).one()
 
         self.assertTrue(
             len(library.bibcode) == 0,
@@ -1445,32 +1550,33 @@ class TestDocumentViews(TestCaseDatabase):
         # Make a fake user and library
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission = Permissions(read=True,
-                                 write=True)
+            # Give the user and library permissions
+            permission = Permissions(read=True,
+                                     write=True)
 
-        # Commit the stub data
-        user.permissions.append(permission)
-        library.permissions.append(permission)
-        db.session.add_all([library, permission, user])
-        db.session.commit()
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
 
-        # add 1 to the UID to represent a random user
-        access = self.document_view.write_access(
-            service_uid=self.stub_user_2.absolute_uid,
-            library_id=library.id
-        )
-        self.assertIsNotNone(access)
-        self.assertFalse(access)
+            # add 1 to the UID to represent a random user
+            access = self.document_view.write_access(
+                service_uid=self.stub_user_2.absolute_uid,
+                library_id=library.id
+            )
+            self.assertIsNotNone(access)
+            self.assertFalse(access)
 
     def test_can_update_libraries_details(self):
         """
@@ -1483,17 +1589,20 @@ class TestDocumentViews(TestCaseDatabase):
         # Make a fake user and library
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        db.session.add(library)
-        db.session.commit()
+            session.add(library)
+            session.commit()
+            session.refresh(library)
+            session.expunge(library)
 
         new_name = 'New name'
         new_description = 'New description'
@@ -1564,7 +1673,7 @@ class TestDocumentViews(TestCaseDatabase):
         self.assertEqual(return_data['description'], new_description)
         self.assertEqual(return_data['public'], new_publicity)
 
-        new_library = Library.query.filter(Library.id == library.id).one()
+        new_library = session.query(Library).filter(Library.id == library.id).one()
         self.assertEqual(new_library.name, new_name)
         self.assertEqual(new_library.description, new_description)
         with self.assertRaises(AttributeError):
@@ -1582,28 +1691,32 @@ class TestDocumentViews(TestCaseDatabase):
         # Ensure a user exists
         user_owner = User(absolute_uid=self.stub_user_1.absolute_uid)
         user_admin = User(absolute_uid=self.stub_user_2.absolute_uid)
-        db.session.add_all([user_owner, user_admin])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_owner, user_admin])
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission_owner = Permissions(owner=True)
-        permission_admin = Permissions(admin=True, owner=False)
+            # Give the user and library permissions
+            permission_owner = Permissions(owner=True)
+            permission_admin = Permissions(admin=True, owner=False)
 
-        # Commit the stub data
-        user_owner.permissions.append(permission_owner)
-        user_admin.permissions.append(permission_admin)
+            # Commit the stub data
+            user_owner.permissions.append(permission_owner)
+            user_admin.permissions.append(permission_admin)
 
-        library.permissions.append(permission_owner)
-        library.permissions.append(permission_admin)
-        db.session.add_all([library, permission_owner, permission_admin,
-                            user_admin, user_owner])
-        db.session.commit()
+            library.permissions.append(permission_owner)
+            library.permissions.append(permission_admin)
+            session.add_all([library, permission_owner, permission_admin,
+                             user_admin, user_owner])
+            session.commit()
+            for obj in (library, user_owner, user_admin):
+                session.refresh(obj)
+                session.expunge(obj)
 
         for user in [user_owner, user_admin]:
             access = self.document_view.update_access(
@@ -1626,28 +1739,32 @@ class TestDocumentViews(TestCaseDatabase):
         user_write = User(absolute_uid=self.stub_user_2.absolute_uid)
         user_random = User(absolute_uid=1)
 
-        db.session.add_all([user_random, user_read, user_write])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_random, user_read, user_write])
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        # Give the user and library permissions
-        permission_read = Permissions(read=True, owner=False)
-        permission_write = Permissions(write=True, owner=False)
+            # Give the user and library permissions
+            permission_read = Permissions(read=True, owner=False)
+            permission_write = Permissions(write=True, owner=False)
 
-        # Commit the stub data
-        user_read.permissions.append(permission_read)
-        user_write.permissions.append(permission_write)
+            # Commit the stub data
+            user_read.permissions.append(permission_read)
+            user_write.permissions.append(permission_write)
 
-        library.permissions.append(permission_read)
-        library.permissions.append(permission_write)
-        db.session.add_all([library, permission_read, permission_write,
-                            user_read, user_write])
-        db.session.commit()
+            library.permissions.append(permission_read)
+            library.permissions.append(permission_write)
+            session.add_all([library, permission_read, permission_write,
+                             user_read, user_write])
+            session.commit()
+            for obj in (library, user_random, user_read, user_write):
+                session.refresh(obj)
+                session.expunge(obj)
 
         for user in [user_random, user_read, user_write]:
             access = self.document_view.update_access(
@@ -1692,35 +1809,40 @@ class TestPermissionViews(TestCaseDatabase):
         # Make a fake user and library
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        db.session.add_all([user, library])
-        db.session.commit()
+            session.add_all([user, library])
+            session.commit()
+            for obj in [user, library]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         self.permission_view.add_permission(service_uid=user.id,
                                             library_id=library.id,
                                             permission='read',
                                             value=True)
 
-        try:
-            permission = Permissions.query.filter(
-                Permissions.user_id == user.id,
-                Permissions.library_id == library.id
-            ).one()
-        except Exception as error:
-            self.fail('No permissions were created, most likely the code has '
-                      'not been implemented. [{0}]'.format(error))
+        with self.app.session_scope() as session:
+            try:
+                permission = session.query(Permissions).filter(
+                    Permissions.user_id == user.id,
+                    Permissions.library_id == library.id
+                ).one()
+            except Exception as error:
+                self.fail('No permissions were created, most likely the code has '
+                          'not been implemented. [{0}]'.format(error))
 
-        self.assertTrue(permission.read)
-        self.assertFalse(permission.write)
-        self.assertFalse(permission.owner)
+            self.assertTrue(permission.read)
+            self.assertFalse(permission.write)
+            self.assertFalse(permission.owner)
 
     def test_that_permissions_are_removed_if_the_user_has_none_left(self):
         """
@@ -1733,17 +1855,21 @@ class TestPermissionViews(TestCaseDatabase):
         # Make a fake user and library
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        db.session.add_all([user, library])
-        db.session.commit()
+            session.add_all([user, library])
+            session.commit()
+            for obj in [user, library]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Add the permission
         self.permission_view.add_permission(service_uid=user.id,
@@ -1754,13 +1880,15 @@ class TestPermissionViews(TestCaseDatabase):
                                             library_id=library.id,
                                             permission='write',
                                             value=True)
-        # Check the permission was added
-        permission = Permissions.query.filter(
-            Permissions.user_id == user.id,
-            Permissions.library_id == library.id
-        ).one()
-        self.assertTrue(permission.read)
-        self.assertTrue(permission.write)
+
+        with self.app.session_scope() as session:
+            # Check the permission was added
+            permission = session.query(Permissions).filter(
+                Permissions.user_id == user.id,
+                Permissions.library_id == library.id
+            ).one()
+            self.assertTrue(permission.read)
+            self.assertTrue(permission.write)
 
         # Remove the permission
         self.permission_view.add_permission(service_uid=user.id,
@@ -1768,13 +1896,14 @@ class TestPermissionViews(TestCaseDatabase):
                                             permission='write',
                                             value=False)
 
-        # Check the permission was removed
-        permission = Permissions.query.filter(
-            Permissions.user_id == user.id,
-            Permissions.library_id == library.id
-        ).one()
-        self.assertTrue(permission.read)
-        self.assertFalse(permission.write)
+        with self.app.session_scope() as session:
+            # Check the permission was removed
+            permission = session.query(Permissions).filter(
+                Permissions.user_id == user.id,
+                Permissions.library_id == library.id
+            ).one()
+            self.assertTrue(permission.read)
+            self.assertFalse(permission.write)
 
         # Remove the permission
         self.permission_view.add_permission(service_uid=user.id,
@@ -1782,12 +1911,13 @@ class TestPermissionViews(TestCaseDatabase):
                                             permission='read',
                                             value=False)
 
-        # Check the permission is not available
-        with self.assertRaises(NoResultFound):
-            Permissions.query.filter(
-                Permissions.user_id == user.id,
-                Permissions.library_id == library.id
-            ).one()
+        with self.app.session_scope() as session:
+            # Check the permission is not available
+            with self.assertRaises(NoResultFound):
+                session.query(Permissions).filter(
+                    Permissions.user_id == user.id,
+                    Permissions.library_id == library.id
+                ).one()
 
     def test_a_user_without_permissions_cannot_modify_permissions(self):
         """
@@ -1812,16 +1942,17 @@ class TestPermissionViews(TestCaseDatabase):
         user_1.permissions.append(permission)
         library.permissions.append(permission)
 
-        db.session.add_all([user_1, user_2, library])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_1, user_2, library])
+            session.commit()
 
-        result = self.permission_view.has_permission(
-            service_uid_editor=user_2.id,
-            service_uid_modify=user_1.id,
-            library_id=library.id
-        )
+            result = self.permission_view.has_permission(
+                service_uid_editor=user_2.id,
+                service_uid_modify=user_1.id,
+                library_id=library.id
+            )
 
-        self.assertFalse(result)
+            self.assertFalse(result)
 
     def test_a_user_with_owner_permissions_can_edit_permissions(self):
         """
@@ -1846,8 +1977,12 @@ class TestPermissionViews(TestCaseDatabase):
         user_2.permissions.append(permission)
         library.permissions.append(permission)
 
-        db.session.add_all([user_1, user_2, library])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_1, user_2, library])
+            session.commit()
+            for obj in [user_1, user_2, library]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         result = self.permission_view.has_permission(
             service_uid_editor=user_2.id,
@@ -1887,16 +2022,17 @@ class TestPermissionViews(TestCaseDatabase):
         user_2.permissions.append(permission_2)
         library.permissions.append(permission_2)
 
-        db.session.add_all([user_1, user_2, library])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_1, user_2, library])
+            session.commit()
 
-        result = self.permission_view.has_permission(
-            service_uid_editor=user_2.id,
-            service_uid_modify=user_1.id,
-            library_id=library.id
-        )
+            result = self.permission_view.has_permission(
+                service_uid_editor=user_2.id,
+                service_uid_modify=user_1.id,
+                library_id=library.id
+            )
 
-        self.assertTrue(result)
+            self.assertTrue(result)
 
     def test_a_user_with_editing_permissions_cannot_edit_owner(self):
         """
@@ -1927,8 +2063,12 @@ class TestPermissionViews(TestCaseDatabase):
         user_2.permissions.append(permission_2)
         library.permissions.append(permission_2)
 
-        db.session.add_all([user_1, user_2, library])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_1, user_2, library])
+            session.commit()
+            for obj in [user_1, user_2, library]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         result = self.permission_view.has_permission(
             service_uid_editor=user_2.id,
@@ -1967,8 +2107,12 @@ class TestPermissionViews(TestCaseDatabase):
         user_read_only.permissions.append(permission_read_only)
         library.permissions.append(permission_read_only)
 
-        db.session.add_all([user_admin, user_read_only, library])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_admin, user_read_only, library])
+            session.commit()
+            for obj in [user_admin, user_read_only, library]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         result = self.permission_view.has_permission(
             service_uid_editor=user_read_only.id,
@@ -1989,8 +2133,11 @@ class TestPermissionViews(TestCaseDatabase):
         # Make a fake user and library
         # Ensure a user exists
         user_owner = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user_owner)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user_owner)
+            session.commit()
+            session.refresh(user_owner)
+            session.expunge(user_owner)
 
         # Ensure a library exists
         library = self.user_view.create_library(
@@ -1998,18 +2145,19 @@ class TestPermissionViews(TestCaseDatabase):
             library_data=self.stub_library.user_view_post_data
         )
 
-        # Check our user has owner permissions
-        permission = Permissions.query.filter(
-            Permissions.library_id == library.id,
-            Permissions.user_id == user_owner.id
-        ).one()
-        self.assertTrue(permission.owner)
+        with self.app.session_scope() as session:
+            # Check our user has owner permissions
+            permission = session.query(Permissions).filter(
+                Permissions.library_id == BaseView.helper_slug_to_uuid(library['id']),
+                Permissions.user_id == user_owner.id
+            ).one()
+            self.assertTrue(permission.owner)
 
         # Check that the owner cannot mess with the owner's permissions
         result = self.permission_view.has_permission(
             service_uid_editor=user_owner.id,
             service_uid_modify=user_owner.id,
-            library_id=library.id
+            library_id=library['id']
         )
         self.assertFalse(result)
 
@@ -2026,8 +2174,12 @@ class TestPermissionViews(TestCaseDatabase):
         user_admin = User(absolute_uid=self.stub_user_2.absolute_uid)
         user_random = User(absolute_uid=self.stub_user_3.absolute_uid)
 
-        db.session.add_all([user_owner, user_admin, user_random])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_owner, user_admin, user_random])
+            session.commit()
+            for obj in [user_owner, user_admin, user_random]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Ensure a library exists
         library = self.user_view.create_library(
@@ -2035,40 +2187,43 @@ class TestPermissionViews(TestCaseDatabase):
             library_data=self.stub_library.user_view_post_data
         )
 
-        # Check our user has owner permissions
-        permission = Permissions.query.filter(
-            Permissions.library_id == library.id,
-            Permissions.user_id == user_owner.id
-        ).one()
-        self.assertTrue(permission.owner)
+        with self.app.session_scope() as session:
+            # Check our user has owner permissions
+            permission = session.query(Permissions).filter(
+                Permissions.library_id == BaseView.helper_slug_to_uuid(library['id']),
+                Permissions.user_id == user_owner.id
+            ).one()
+            self.assertTrue(permission.owner)
 
         # Give the second user, admin permissions
         self.permission_view.add_permission(service_uid=user_admin.id,
-                                            library_id=library.id,
+                                            library_id=BaseView.helper_slug_to_uuid(library['id']),
                                             permission='admin',
                                             value=True)
 
-        # Check our user has owner permissions
-        permission = Permissions.query.filter(
-            Permissions.library_id == library.id,
-            Permissions.user_id == user_admin.id
-        ).one()
-        self.assertTrue(permission.admin)
-        self.assertFalse(permission.owner)
+        with self.app.session_scope() as session:
+            # Check our user has owner permissions
+            permission = session.query(Permissions).filter(
+                Permissions.library_id == BaseView.helper_slug_to_uuid(library['id']),
+                Permissions.user_id == user_admin.id
+            ).one()
+            self.assertTrue(permission.admin)
+            self.assertFalse(permission.owner)
 
         # Check that the admin cannot modify the owner status of random user
         with self.assertRaises(PermissionDeniedError):
             self.permission_view.add_permission(service_uid=user_random.id,
-                                                library_id=library.id,
+                                                library_id=BaseView.helper_slug_to_uuid(library['id']),
                                                 permission='owner',
                                                 value=True)
 
-        # Check our user has owner permissions
-        with self.assertRaises(NoResultFound):
-            Permissions.query.filter(
-                Permissions.library_id == library.id,
-                Permissions.user_id == user_random.id
-            ).one()
+        with self.app.session_scope() as session:
+            # Check our user has owner permissions
+            with self.assertRaises(NoResultFound):
+                session.query(Permissions).filter(
+                    Permissions.library_id == BaseView.helper_slug_to_uuid(library['id']),
+                    Permissions.user_id == user_random.id
+                ).one()
 
     def test_can_get_permissions_for_a_user(self):
         """
@@ -2078,30 +2233,31 @@ class TestPermissionViews(TestCaseDatabase):
 
         # Make a fake user and library
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        permission = Permissions(owner=True)
-        user.permissions.append(permission)
-        library.permissions.append(permission)
+            permission = Permissions(owner=True)
+            user.permissions.append(permission)
+            library.permissions.append(permission)
 
-        db.session.add_all([user, library, permission])
-        db.session.commit()
+            session.add_all([user, library, permission])
+            session.commit()
 
-        with MockEmailService(self.stub_user, end_type='uid'):
-            permissions = self.permission_view.get_permissions(
-                library_id=library.id
-            )
+            with MockEmailService(self.stub_user, end_type='uid'):
+                permissions = self.permission_view.get_permissions(
+                    library_id=library.id
+                )
 
-        self.assertIsInstance(permissions, list)
-        self.assertIn(self.stub_user.email, permissions[0])
-        self.assertIn('owner', permissions[0][self.stub_user.email])
+            self.assertIsInstance(permissions, list)
+            self.assertIn(self.stub_user.email, permissions[0])
+            self.assertIn('owner', permissions[0][self.stub_user.email])
 
     def test_cannot_get_permissions_for_non_user_and_owner(self):
         """
@@ -2114,26 +2270,31 @@ class TestPermissionViews(TestCaseDatabase):
         # Make a fake user and library
         user_read = User(absolute_uid=self.stub_user_1.absolute_uid)
         user_write = User(absolute_uid=self.stub_user_2.absolute_uid)
-        db.session.add_all([user_read, user_write])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_read, user_write])
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        permission_read = Permissions(read=True)
-        permission_write = Permissions(write=True)
-        user_read.permissions.append(permission_read)
-        user_write.permissions.append(permission_write)
+            permission_read = Permissions(read=True)
+            permission_write = Permissions(write=True)
+            user_read.permissions.append(permission_read)
+            user_write.permissions.append(permission_write)
 
-        library.permissions.append(permission_read)
-        library.permissions.append(permission_write)
+            library.permissions.append(permission_read)
+            library.permissions.append(permission_write)
 
-        db.session.add_all([user_read, user_write, library, permission_read,
-                            permission_write])
-        db.session.commit()
+            session.add_all([user_read, user_write, library, permission_read,
+                             permission_write])
+            session.commit()
+            for obj in[user_read, user_write, library, permission_read,
+                             permission_write]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         for user in [user_read, user_write]:
             allowed = self.permission_view.read_access(
@@ -2154,26 +2315,31 @@ class TestPermissionViews(TestCaseDatabase):
         # Make a fake user and library
         user_admin = User(absolute_uid=self.stub_user_1.absolute_uid)
         user_owner = User(absolute_uid=self.stub_user_2.absolute_uid)
-        db.session.add_all([user_owner, user_admin])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_owner, user_admin])
+            session.commit()
 
-        # Ensure a library exists
-        library = Library(name='MyLibrary',
-                          description='My library',
-                          public=True,
-                          bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
 
-        permission_owner = Permissions(owner=True)
-        permission_admin = Permissions(admin=True)
-        user_owner.permissions.append(permission_owner)
-        user_admin.permissions.append(permission_admin)
+            permission_owner = Permissions(owner=True)
+            permission_admin = Permissions(admin=True)
+            user_owner.permissions.append(permission_owner)
+            user_admin.permissions.append(permission_admin)
 
-        library.permissions.append(permission_owner)
-        library.permissions.append(permission_admin)
+            library.permissions.append(permission_owner)
+            library.permissions.append(permission_admin)
 
-        db.session.add_all([user_owner, user_admin, library, permission_owner,
-                            permission_admin])
-        db.session.commit()
+            session.add_all([user_owner, user_admin, library, permission_owner,
+                             permission_admin])
+            session.commit()
+            for obj in [user_owner, user_admin, library, permission_owner,
+                             permission_admin]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         for user in [user_admin, user_owner]:
             allowed = self.permission_view.read_access(
@@ -2192,31 +2358,36 @@ class TestPermissionViews(TestCaseDatabase):
         # Make a fake user and library
         user_1 = User(absolute_uid=self.stub_user_1.absolute_uid)
         user_2 = User(absolute_uid=self.stub_user_2.absolute_uid)
-        db.session.add_all([user_1, user_2])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_1, user_2])
+            session.commit()
 
-        # Ensure a library exists
-        library_1 = Library(name='MyLibrary',
-                            description='My library',
-                            public=True,
-                            bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            library_1 = Library(name='MyLibrary',
+                                description='My library',
+                                public=True,
+                                bibcode=self.stub_library.bibcode)
 
-        library_2 = Library(name='MyLibrary',
-                            description='My library',
-                            public=True,
-                            bibcode=self.stub_library.bibcode)
+            library_2 = Library(name='MyLibrary',
+                                description='My library',
+                                public=True,
+                                bibcode=self.stub_library.bibcode)
 
-        permission_1 = Permissions(owner=True)
-        permission_2 = Permissions(admin=True)
-        user_1.permissions.append(permission_1)
-        user_2.permissions.append(permission_2)
+            permission_1 = Permissions(owner=True)
+            permission_2 = Permissions(admin=True)
+            user_1.permissions.append(permission_1)
+            user_2.permissions.append(permission_2)
 
-        library_1.permissions.append(permission_1)
-        library_2.permissions.append(permission_2)
+            library_1.permissions.append(permission_1)
+            library_2.permissions.append(permission_2)
 
-        db.session.add_all([user_1, user_2, library_1, library_2,
-                            permission_1, permission_2])
-        db.session.commit()
+            session.add_all([user_1, user_2, library_1, library_2,
+                             permission_1, permission_2])
+            session.commit()
+            for obj in [user_1, user_2, library_1, library_2,
+                             permission_1, permission_2]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         with MockEmailService(self.stub_user_1, end_type='uid'):
             return_1 = self.permission_view.get_permissions(
@@ -2274,31 +2445,38 @@ class TestTransferViews(TestCaseDatabase):
         user_read = User(absolute_uid=self.stub_user_2.absolute_uid)
         user_write = User(absolute_uid=self.stub_user_3.absolute_uid)
         user_admin = User(absolute_uid=self.stub_user_4.absolute_uid)
-        db.session.add_all([user_none, user_read, user_write, user_admin])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_none, user_read, user_write, user_admin])
+            session.commit()
 
-        # Ensure a library exists
-        stub_library = Library(name='MyLibrary',
-                               description='My library',
-                               public=True,
-                               bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            stub_library = Library(name='MyLibrary',
+                                   description='My library',
+                                   public=True,
+                                   bibcode=self.stub_library.bibcode)
 
-        permissions_read = Permissions(admin=True)
-        permissions_write = Permissions(write=True)
-        permissions_admin = Permissions(admin=True)
+            permissions_read = Permissions(admin=True)
+            permissions_write = Permissions(write=True)
+            permissions_admin = Permissions(admin=True)
 
-        user_read.permissions.append(permissions_read)
-        user_write.permissions.append(permissions_write)
-        user_admin.permissions.append(permissions_admin)
+            user_read.permissions.append(permissions_read)
+            user_write.permissions.append(permissions_write)
+            user_admin.permissions.append(permissions_admin)
 
-        stub_library.permissions.append(permissions_read)
-        stub_library.permissions.append(permissions_write)
-        stub_library.permissions.append(permissions_admin)
+            stub_library.permissions.append(permissions_read)
+            stub_library.permissions.append(permissions_write)
+            stub_library.permissions.append(permissions_admin)
 
-        db.session.add_all([permissions_read, permissions_write,
-                            permissions_admin, user_read, user_write,
-                            user_admin, stub_library])
-        db.session.commit()
+            session.add_all([permissions_read, permissions_write,
+                             permissions_admin, user_read, user_write,
+                             user_admin, stub_library])
+            session.commit()
+            for obj in [user_none, user_read, user_write, user_admin] \
+                        + [permissions_read, permissions_write, \
+                             permissions_admin, \
+                             stub_library]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         for stub_user in [user_none, user_read, user_write, user_admin]:
             access = self.transfer_view.write_access(
@@ -2317,39 +2495,44 @@ class TestTransferViews(TestCaseDatabase):
         user_owner = User(absolute_uid=self.stub_user_1.absolute_uid)
         user_new_owner = User(absolute_uid=self.stub_user_2.absolute_uid)
 
-        db.session.add_all([user_owner, user_new_owner])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_owner, user_new_owner])
+            session.commit()
 
-        # Ensure a library exists
-        stub_library = Library(name='MyLibrary',
-                               description='My library',
-                               public=True,
-                               bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            stub_library = Library(name='MyLibrary',
+                                   description='My library',
+                                   public=True,
+                                   bibcode=self.stub_library.bibcode)
 
-        permissions = Permissions(owner=True)
-        user_owner.permissions.append(permissions)
-        stub_library.permissions.append(permissions)
+            permissions = Permissions(owner=True)
+            user_owner.permissions.append(permissions)
+            stub_library.permissions.append(permissions)
 
-        db.session.add_all([permissions, user_owner, stub_library])
-        db.session.commit()
+            session.add_all([permissions, user_owner, stub_library])
+            session.commit()
+            for obj in [user_owner, user_new_owner] + [permissions, stub_library]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         self.transfer_view.transfer_ownership(current_owner_uid=user_owner.id,
                                               new_owner_uid=user_new_owner.id,
                                               library_id=stub_library.id)
 
-        permission = Permissions.query.filter(
-            Permissions.user_id == user_new_owner.id
-        ).filter(
-            Permissions.library_id == stub_library.id
-        ).one()
-        self.assertTrue(permission.owner)
-
-        with self.assertRaises(NoResultFound):
-            Permissions.query.filter(
-                Permissions.user_id == user_owner.id
+        with self.app.session_scope() as session:
+            permission = session.query(Permissions).filter(
+                Permissions.user_id == user_new_owner.id
             ).filter(
                 Permissions.library_id == stub_library.id
             ).one()
+            self.assertTrue(permission.owner)
+
+            with self.assertRaises(NoResultFound):
+                session.query(Permissions).filter(
+                    Permissions.user_id == user_owner.id
+                ).filter(
+                    Permissions.library_id == stub_library.id
+                ).one()
 
     def test_can_transfer_a_library_for_a_reader(self):
         """
@@ -2361,45 +2544,51 @@ class TestTransferViews(TestCaseDatabase):
         user_owner = User(absolute_uid=self.stub_user_1.absolute_uid)
         user_new_owner = User(absolute_uid=self.stub_user_2.absolute_uid)
 
-        db.session.add_all([user_owner, user_new_owner])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_owner, user_new_owner])
+            session.commit()
 
-        # Ensure a library exists
-        stub_library = Library(name='MyLibrary',
-                               description='My library',
-                               public=True,
-                               bibcode=self.stub_library.bibcode)
+            # Ensure a library exists
+            stub_library = Library(name='MyLibrary',
+                                   description='My library',
+                                   public=True,
+                                   bibcode=self.stub_library.bibcode)
 
-        permissions = Permissions(owner=True)
-        permissions_read = Permissions(read=True)
-        user_owner.permissions.append(permissions)
-        user_new_owner.permissions.append(permissions_read)
-        stub_library.permissions.append(permissions)
-        stub_library.permissions.append(permissions_read)
+            permissions = Permissions(owner=True)
+            permissions_read = Permissions(read=True)
+            user_owner.permissions.append(permissions)
+            user_new_owner.permissions.append(permissions_read)
+            stub_library.permissions.append(permissions)
+            stub_library.permissions.append(permissions_read)
 
-        db.session.add_all([permissions, user_owner, stub_library,
-                            permissions_read, user_new_owner])
-        db.session.commit()
+            session.add_all([permissions, user_owner, stub_library,
+                             permissions_read, user_new_owner])
+            session.commit()
+            for obj in [user_owner, user_new_owner] + [permissions, stub_library, \
+                             permissions_read]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         self.transfer_view.transfer_ownership(current_owner_uid=user_owner.id,
                                               new_owner_uid=user_new_owner.id,
                                               library_id=stub_library.id)
 
-        permission = Permissions.query.filter(
-            Permissions.user_id == user_new_owner.id
-        ).filter(
-            Permissions.library_id == stub_library.id
-        ).all()
-        self.assertTrue(len(permission) == 1)
-        self.assertTrue(permission[0].owner)
-        self.assertTrue(permission[0].read)
-
-        with self.assertRaises(NoResultFound):
-            Permissions.query.filter(
-                Permissions.user_id == user_owner.id
+        with self.app.session_scope() as session:
+            permission = session.query(Permissions).filter(
+                Permissions.user_id == user_new_owner.id
             ).filter(
                 Permissions.library_id == stub_library.id
-            ).one()
+            ).all()
+            self.assertTrue(len(permission) == 1)
+            self.assertTrue(permission[0].owner)
+            self.assertTrue(permission[0].read)
+
+            with self.assertRaises(NoResultFound):
+                session.query(Permissions).filter(
+                    Permissions.user_id == user_owner.id
+                ).filter(
+                    Permissions.library_id == stub_library.id
+                ).one()
 
     def test_transfer_query_when_mutliple_libraries(self):
         """
@@ -2412,50 +2601,56 @@ class TestTransferViews(TestCaseDatabase):
         user_owner = User(absolute_uid=self.stub_user_1.absolute_uid)
         user_random = User(absolute_uid=self.stub_user_2.absolute_uid)
         user_new_owner = User(absolute_uid=self.stub_user_3.absolute_uid)
-        db.session.add_all([user_owner, user_new_owner, user_random])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([user_owner, user_new_owner, user_random])
+            session.commit()
 
-        # Ensure a library exists
-        stub_library_1 = Library(
-            name='MyLibrary',
-            description='My library',
-            public=True,
-            bibcode=self.stub_library.bibcode
-        )
-        stub_library_2 = Library(
-            name='MyLibrary',
-            description='My library',
-            public=True,
-            bibcode=self.stub_library.bibcode
-        )
-        db.session.add_all([
-            stub_library_1,
-            stub_library_2
-        ])
-        db.session.commit()
+            # Ensure a library exists
+            stub_library_1 = Library(
+                name='MyLibrary',
+                description='My library',
+                public=True,
+                bibcode=self.stub_library.bibcode
+            )
+            stub_library_2 = Library(
+                name='MyLibrary',
+                description='My library',
+                public=True,
+                bibcode=self.stub_library.bibcode
+            )
+            session.add_all([
+                stub_library_1,
+                stub_library_2
+            ])
+            session.commit()
 
-        # Generate and add permissions
-        permission_owner = Permissions(
-            owner=True,
-            library_id=stub_library_1.id,
-            user_id=user_owner.id
-        )
-        permission_random_library_1 = Permissions(
-            read=True,
-            library_id=stub_library_1.id,
-            user_id=user_random.id
-        )
-        permission_random_library_2 = Permissions(
-            owner=True,
-            library_id=stub_library_2.id,
-            user_id=user_random.id
-        )
-        db.session.add_all([
-            permission_owner,
-            permission_random_library_1,
-            permission_random_library_2
-        ])
-        db.session.commit()
+            # Generate and add permissions
+            permission_owner = Permissions(
+                owner=True,
+                library_id=stub_library_1.id,
+                user_id=user_owner.id
+            )
+            permission_random_library_1 = Permissions(
+                read=True,
+                library_id=stub_library_1.id,
+                user_id=user_random.id
+            )
+            permission_random_library_2 = Permissions(
+                owner=True,
+                library_id=stub_library_2.id,
+                user_id=user_random.id
+            )
+            session.add_all([
+                permission_owner,
+                permission_random_library_1,
+                permission_random_library_2
+            ])
+            session.commit()
+            for obj in [user_owner, user_new_owner, user_random] \
+                        + [ stub_library_1, stub_library_2 ] \
+                        + [ permission_owner, permission_random_library_1, permission_random_library_2 ]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         # Transfer the ownership of library 1
         self.transfer_view.transfer_ownership(current_owner_uid=user_owner.id,
@@ -2464,37 +2659,38 @@ class TestTransferViews(TestCaseDatabase):
 
         # Check that the permissions changed properly
         # New user owner has owner permissions
-        permission = Permissions.query.filter(
-            Permissions.user_id == user_new_owner.id
-        ).filter(
-            Permissions.library_id == stub_library_1.id
-        ).one()
-        self.assertTrue(permission.owner)
-
-        # Old owner no longer has permissions
-        with self.assertRaises(NoResultFound):
-            Permissions.query.filter(
-                Permissions.user_id == user_owner.id
+        with self.app.session_scope() as session:
+            permission = session.query(Permissions).filter(
+                Permissions.user_id == user_new_owner.id
             ).filter(
                 Permissions.library_id == stub_library_1.id
             ).one()
+            self.assertTrue(permission.owner)
 
-        # Check the random user did not change
-        # Random owns library 2
-        permission = Permissions.query.filter(
-            Permissions.user_id == user_random.id
-        ).filter(
-            Permissions.library_id == stub_library_2.id
-        ).one()
-        self.assertTrue(permission.owner)
+            # Old owner no longer has permissions
+            with self.assertRaises(NoResultFound):
+                session.query(Permissions).filter(
+                    Permissions.user_id == user_owner.id
+                ).filter(
+                    Permissions.library_id == stub_library_1.id
+                ).one()
 
-        # Random reads library 1
-        permission = Permissions.query.filter(
-            Permissions.user_id == user_random.id
-        ).filter(
-            Permissions.library_id == stub_library_1.id
-        ).one()
-        self.assertTrue(permission.read)
+            # Check the random user did not change
+            # Random owns library 2
+            permission = session.query(Permissions).filter(
+                Permissions.user_id == user_random.id
+            ).filter(
+                Permissions.library_id == stub_library_2.id
+            ).one()
+            self.assertTrue(permission.owner)
+
+            # Random reads library 1
+            permission = session.query(Permissions).filter(
+                Permissions.user_id == user_random.id
+            ).filter(
+                Permissions.library_id == stub_library_1.id
+            ).one()
+            self.assertTrue(permission.read)
 
 
 class TestClassicViews(TestCaseDatabase):
@@ -2526,16 +2722,20 @@ class TestClassicViews(TestCaseDatabase):
         are no matching bibcodes
         """
         user = User(absolute_uid=self.stub_user.absolute_uid)
-        db.session.add(user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
 
         self.classic_view.upsert_library(
             service_uid=user.id,
             library=self.stub_library.classic_view_data()
         )
 
-        library = Library.query.filter(Library.name == self.stub_library.name).one()
-        self.assertEqual(library.bibcode, self.stub_library.bibcode)
+        with self.app.session_scope() as session:
+            library = session.query(Library).filter(Library.name == self.stub_library.name).one()
+            self.assertEqual(library.bibcode, self.stub_library.bibcode)
 
     def test_can_upsert_a_library_when_the_names_match(self):
         """
@@ -2552,8 +2752,12 @@ class TestClassicViews(TestCaseDatabase):
         stub_user.permissions.append(stub_permission)
         stub_library.permissions.append(stub_permission)
 
-        db.session.add_all([stub_user, stub_library, stub_permission])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([stub_user, stub_library, stub_permission])
+            session.commit()
+            for obj in [stub_user, stub_library, stub_permission]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         stub_library_new = self.stub_library.classic_view_data().copy()
         stub_library_new['documents'].append('new bibcode')
@@ -2563,20 +2767,21 @@ class TestClassicViews(TestCaseDatabase):
             library=stub_library_new
         )
 
-        library = Library.query.filter(Library.name == stub_library_new['name']).all()
-        self.assertEqual(
-            len(library),
-            1,
-            msg='There should only be one library with this name: {}'.format(library)
-        )
+        with self.app.session_scope() as session:
+            library = session.query(Library).filter(Library.name == stub_library_new['name']).all()
+            self.assertEqual(
+                len(library),
+                1,
+                msg='There should only be one library with this name: {}'.format(library)
+            )
 
-        library = library[0]
-        first_list = library.get_bibcodes()
-        second_list = stub_library_new['documents']
-        first_list.sort()
-        second_list.sort()
-        self.assertEqual(first_list, second_list)
-        self.assertNotEqual(library.get_bibcodes(), self.stub_library.get_bibcodes())
+            library = library[0]
+            first_list = library.get_bibcodes()
+            second_list = stub_library_new['documents']
+            first_list.sort()
+            second_list.sort()
+            self.assertEqual(first_list, second_list)
+            self.assertNotEqual(library.get_bibcodes(), self.stub_library.get_bibcodes())
 
     def test_that_it_does_not_modify_another_library_with_the_same_name(self):
         """
@@ -2585,39 +2790,45 @@ class TestClassicViews(TestCaseDatabase):
         """
         stub_user_1 = User(absolute_uid=self.stub_user_1.absolute_uid)
         stub_user_2 = User(absolute_uid=self.stub_user_2.absolute_uid)
-        db.session.add_all([stub_user_1, stub_user_2])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([stub_user_1, stub_user_2])
+            session.commit()
 
-        # Ensure a library exists
-        stub_library_1 = Library(
-            name=self.stub_library.name,
-            description=self.stub_library.description,
-            bibcode=self.stub_library.bibcode
-        )
-        stub_library_2 = Library(
-            name=self.stub_library.name,
-            description=self.stub_library.description,
-            bibcode=self.stub_library.bibcode
-        )
-        db.session.add_all([
-            stub_library_1,
-            stub_library_2
-        ])
-        db.session.commit()
+            # Ensure a library exists
+            stub_library_1 = Library(
+                name=self.stub_library.name,
+                description=self.stub_library.description,
+                bibcode=self.stub_library.bibcode
+            )
+            stub_library_2 = Library(
+                name=self.stub_library.name,
+                description=self.stub_library.description,
+                bibcode=self.stub_library.bibcode
+            )
+            session.add_all([
+                stub_library_1,
+                stub_library_2
+            ])
+            session.commit()
 
-        # Generate and add permissions
-        permission_user_1 = Permissions(
-            owner=True,
-            library_id=stub_library_1.id,
-            user_id=stub_user_1.id
-        )
-        permission_user_2 = Permissions(
-            owner=True,
-            library_id=stub_library_2.id,
-            user_id=stub_user_2.id
-        )
-        db.session.add_all([permission_user_1, permission_user_2])
-        db.session.commit()
+            # Generate and add permissions
+            permission_user_1 = Permissions(
+                owner=True,
+                library_id=stub_library_1.id,
+                user_id=stub_user_1.id
+            )
+            permission_user_2 = Permissions(
+                owner=True,
+                library_id=stub_library_2.id,
+                user_id=stub_user_2.id
+            )
+            session.add_all([permission_user_1, permission_user_2])
+            session.commit()
+            for obj in [stub_user_1, stub_user_2] \
+                        + [ stub_library_1, stub_library_2 ] \
+                        + [permission_user_1, permission_user_2]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         stub_library_new = self.stub_library.classic_view_data().copy()
         stub_library_new['documents'].append('new bibcode')
@@ -2629,12 +2840,13 @@ class TestClassicViews(TestCaseDatabase):
             library=stub_library_new
         )
 
-        library_1 = Library.query.filter(Library.id == stub_library_1.id).one()
-        library_2 = Library.query.filter(Library.id == stub_library_2.id).one()
+        with self.app.session_scope() as session:
+            library_1 = session.query(Library).filter(Library.id == stub_library_1.id).one()
+            library_2 = session.query(Library).filter(Library.id == stub_library_2.id).one()
 
-        self.assertUnsortedEqual(library_1.get_bibcodes(), stub_library_new['documents'])
-        self.assertUnsortedEqual(library_2.get_bibcodes(), self.stub_library.get_bibcodes())
-        self.assertNotEqual(library_1.get_bibcodes(), library_2.get_bibcodes())
+            self.assertUnsortedEqual(library_1.get_bibcodes(), stub_library_new['documents'])
+            self.assertUnsortedEqual(library_2.get_bibcodes(), self.stub_library.get_bibcodes())
+            self.assertNotEqual(library_1.get_bibcodes(), library_2.get_bibcodes())
 
     def test_it_does_nothing_if_the_same_library_name_exists(self):
         """
@@ -2643,28 +2855,33 @@ class TestClassicViews(TestCaseDatabase):
         """
         stub_user_1 = User(absolute_uid=self.stub_user_1.absolute_uid)
         stub_user_2 = User(absolute_uid=self.stub_user_2.absolute_uid)
-        db.session.add_all([stub_user_1, stub_user_2])
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add_all([stub_user_1, stub_user_2])
+            session.commit()
 
-        # Ensure a library exists
-        stub_library = Library(
-            name=self.stub_library.name,
-            description=self.stub_library.description,
-            bibcode=self.stub_library.bibcode
-        )
-        db.session.add_all([
-            stub_library
-        ])
-        db.session.commit()
+            # Ensure a library exists
+            stub_library = Library(
+                name=self.stub_library.name,
+                description=self.stub_library.description,
+                bibcode=self.stub_library.bibcode
+            )
+            session.add_all([
+                stub_library
+            ])
+            session.commit()
 
-        # Generate and add permissions
-        permission_user_2 = Permissions(
-            owner=True,
-            library_id=stub_library.id,
-            user_id=stub_user_2.id
-        )
-        db.session.add(permission_user_2)
-        db.session.commit()
+            # Generate and add permissions
+            permission_user_2 = Permissions(
+                owner=True,
+                library_id=stub_library.id,
+                user_id=stub_user_2.id
+            )
+            session.add(permission_user_2)
+            session.commit()
+            for obj in [stub_user_1, stub_user_2] \
+                        + [stub_library, permission_user_2]:
+                session.refresh(obj)
+                session.expunge(obj)
 
         stub_library_new = self.stub_library.classic_view_data().copy()
         stub_library_new['documents'].append('new bibcode')
@@ -2675,58 +2892,63 @@ class TestClassicViews(TestCaseDatabase):
         )
         lib_id = BaseView.helper_slug_to_uuid(lib['library_id'])
 
-        library_1 = Library.query.filter(Library.id == lib_id).one()
-        library_2 = Library.query.filter(Library.id == stub_library.id).one()
+        with self.app.session_scope() as session:
+            library_1 = session.query(Library).filter(Library.id == lib_id).one()
+            library_2 = session.query(Library).filter(Library.id == stub_library.id).one()
 
-        self.assertUnsortedEqual(library_1.get_bibcodes(), stub_library_new['documents'])
-        self.assertUnsortedEqual(library_2.get_bibcodes(), self.stub_library.get_bibcodes())
-        self.assertNotEqual(library_1.get_bibcodes(), library_2.get_bibcodes())
-        self.assertNotIn('new bibcode', library_2.get_bibcodes())
+            self.assertUnsortedEqual(library_1.get_bibcodes(), stub_library_new['documents'])
+            self.assertUnsortedEqual(library_2.get_bibcodes(), self.stub_library.get_bibcodes())
+            self.assertNotEqual(library_1.get_bibcodes(), library_2.get_bibcodes())
+            self.assertNotIn('new bibcode', library_2.get_bibcodes())
 
     def test_it_does_not_work_if_the_permission_is_not_owner(self):
         # Stub user
         stub_user = User(absolute_uid=self.stub_user_1.absolute_uid)
-        db.session.add(stub_user)
-        db.session.commit()
+        with self.app.session_scope() as session:
+            session.add(stub_user)
+            session.commit()
 
-        # Ensure a library exists
-        stub_library = Library(
-            name=self.stub_library.name,
-            description=self.stub_library.description,
-            bibcode=self.stub_library.bibcode
-        )
-        db.session.add(stub_library)
-        db.session.commit()
+            # Ensure a library exists
+            stub_library = Library(
+                name=self.stub_library.name,
+                description=self.stub_library.description,
+                bibcode=self.stub_library.bibcode
+            )
+            session.add(stub_library)
+            session.commit()
 
-        # Some permissions
-        permission_user = Permissions(
-            read=True,
-            library_id=stub_library.id,
-            user_id=stub_user.id
-        )
-        db.session.add(permission_user)
-        db.session.commit()
+            # Some permissions
+            permission_user = Permissions(
+                read=True,
+                library_id=stub_library.id,
+                user_id=stub_user.id
+            )
+            session.add(permission_user)
+            session.commit()
+            for obj in (stub_library, stub_user, permission_user):
+                session.refresh(obj)
+                session.expunge(obj)
 
         stub_library_new = self.stub_library.classic_view_data().copy()
         stub_library_new['documents'].append('new bibcode')
 
-        for access in ['read', 'write', 'admin']:
+        with self.app.session_scope() as session:
+            for access in ['read', 'write', 'admin']:
+                permission = session.query(Permissions).filter(Permissions.library_id == stub_library.id).one()
+                permission.read = False
+                permission.write = False
+                permission.admin = False
+                permission.owner = False
+                setattr(permission, access, True)
+                session.add(permission)
+                session.commit()
 
-            permission = Permissions.query.filter(Permissions.library_id == stub_library.id).one()
-            permission.read = False
-            permission.write = False
-            permission.admin = False
-            permission.owner = False
-            setattr(permission, access, True)
-            db.session.add(permission)
-            db.session.commit()
+                self.classic_view.upsert_library(
+                    service_uid=stub_user.id,
+                    library=stub_library_new
+                )
 
-            self.classic_view.upsert_library(
-                service_uid=stub_user.id,
-                library=stub_library_new
-            )
-
-        self.assertNotIn('new bibcode', stub_library.get_bibcodes())
+            self.assertNotIn('new bibcode', stub_library.get_bibcodes())
 
 
 if __name__ == '__main__':

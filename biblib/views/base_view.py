@@ -8,7 +8,7 @@ from ..views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
     USER_ID_KEYWORD
 from flask import request, current_app
 from flask_restful import Resource
-from ..models import db, User, Library, Permissions
+from ..models import User, Library, Permissions
 from ..client import client
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
@@ -90,24 +90,23 @@ class BaseView(Resource):
         Creates a user in the database with a UID from the API
         :param absolute_uid: UID from the API
 
-        :return: SQLAlchemy User instance
+        :return: None
         """
 
-        try:
-            user = User(absolute_uid=absolute_uid)
-            db.session.add(user)
-            db.session.commit()
+        with current_app.session_scope() as session:
+            try:
+                user = User(absolute_uid=absolute_uid)
+                session.add(user)
+                session.commit()
 
-            current_app.logger.info('Successfully created user: {0} [API] as '
-                                    '{1} [Microservice]'
-                                    .format(absolute_uid, user.id))
-            return user
-
-        except IntegrityError as error:
-            current_app.logger.error('IntegrityError. User: {0:d} was not'
-                                     'added. Full traceback: {1}'
-                                     .format(absolute_uid, error))
-            raise
+                current_app.logger.info('Successfully created user: {0} [API] as '
+                                        '{1} [Microservice]'
+                                        .format(absolute_uid, user.id))
+            except IntegrityError as error:
+                current_app.logger.error('IntegrityError. User: {0:d} was not'
+                                         'added. Full traceback: {1}'
+                                         .format(absolute_uid, error))
+                raise
 
     @staticmethod
     def helper_user_exists(absolute_uid):
@@ -118,16 +117,17 @@ class BaseView(Resource):
         :return: boolean for if the user exists
         """
 
-        user_count = User.query.filter(User.absolute_uid == absolute_uid).all()
-        user_count = len(user_count)
-        if user_count == 1:
-            current_app.logger.info('User exists in database: {0} [API]'
-                                    .format(absolute_uid))
-            return True
-        elif user_count == 0:
-            current_app.logger.warning('User does not exist in database: {0} '
-                                       '[API]'.format(absolute_uid))
-            return False
+        with current_app.session_scope() as session:
+            user_count = session.query(User).filter_by(absolute_uid = absolute_uid).all()
+            user_count = len(user_count)
+            if user_count == 1:
+                current_app.logger.info('User exists in database: {0} [API]'
+                                        .format(absolute_uid))
+                return True
+            elif user_count == 0:
+                current_app.logger.warning('User does not exist in database: {0} '
+                                           '[API]'.format(absolute_uid))
+                return False
 
     @staticmethod
     def helper_absolute_uid_to_service_uid(absolute_uid):
@@ -142,12 +142,13 @@ class BaseView(Resource):
 
         if not BaseView.helper_user_exists(absolute_uid=absolute_uid):
             user = BaseView.helper_create_user(absolute_uid=absolute_uid)
-        else:
-            user = User.query.filter(User.absolute_uid == absolute_uid).one()
-        current_app.logger.info('User found: {0} -> {1}'
-                                .format(absolute_uid, user.id))
 
-        return user.id
+        with current_app.session_scope() as session:
+            user = session.query(User).filter_by(absolute_uid = absolute_uid).one()
+            current_app.logger.info('User found: {0} -> {1}'
+                                    .format(absolute_uid, user.id))
+
+            return user.id
 
     @staticmethod
     def helper_email_to_api_uid(permission_data):
@@ -192,20 +193,21 @@ class BaseView(Resource):
 
         :return: boolean, access (True), no access (False)
         """
-        try:
-            permissions = Permissions.query.filter(
-                Permissions.library_id == library_id,
-                Permissions.user_id == service_uid
-            ).one()
+        with current_app.session_scope() as session:
+            try:
+                permissions = session.query(Permissions).filter_by(
+                    library_id = library_id,
+                    user_id = service_uid
+                ).one()
 
-            return getattr(permissions, access_type)
+                return getattr(permissions, access_type)
 
-        except NoResultFound as error:
-            current_app.logger.error('No permissions for '
-                                     'user: {0}, library: {1}, permission: {2}'
-                                     ' [{3}]'.format(service_uid, library_id,
-                                                     access_type, error))
-            return False
+            except NoResultFound as error:
+                current_app.logger.error('No permissions for '
+                                         'user: {0}, library: {1}, permission: {2}'
+                                         ' [{3}]'.format(service_uid, library_id,
+                                                         access_type, error))
+                return False
 
     @staticmethod
     def helper_library_exists(library_id):
@@ -216,11 +218,12 @@ class BaseView(Resource):
 
         :return: bool for exists (True) or does not (False)
         """
-        try:
-            Library.query.filter(Library.id == library_id).one()
-            return True
-        except NoResultFound:
-            return False
+        with current_app.session_scope() as session:
+            try:
+                session.query(Library).filter_by(id = library_id).one()
+                return True
+            except NoResultFound:
+                return False
 
     @staticmethod
     def helper_validate_library_data(service_uid, library_data):
@@ -245,10 +248,11 @@ class BaseView(Resource):
         # We want to ensure that the users have unique library names. However,
         # it should be possible that they have access to other libraries from
         # other people, that have the same name
-        library_names = \
-            [i.library.name for i in
-             Permissions.query.filter(Permissions.user_id == service_uid,
-                                      Permissions.owner == True).all()]
+        with current_app.session_scope() as session:
+            library_names = \
+                [i.library.name for i in
+                 session.query(Permissions).filter_by(user_id = service_uid,
+                                                      owner = True).all()]
 
         matches = [name for name in library_names if name == _name]
         if matches:

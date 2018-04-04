@@ -18,9 +18,14 @@ To load and enter the VM: `vagrant up && vagrant ssh`
 
 ### tests
 
-Run the tests using `nosetests` or `py.test`:
+Run the tests using `py.test`:
 ```bash
-pip install -r dev-requirements.txt ; nosetests biblib/tests/
+docker run --name some-postgres -e POSTGRES_PASSWORD= -d -p 1234:5432 postgres
+virtualenv python
+source python/bin/activate
+pip install -r requirements.txt
+pip install -r dev-requirements.txt
+py.tests biblib/tests/
 ```
 
 ### Layout

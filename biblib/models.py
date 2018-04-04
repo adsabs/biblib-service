@@ -7,13 +7,15 @@ to be passed to the app creator within the Flask blueprint.
 
 import uuid
 from datetime import datetime
-from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.ext.mutable import Mutable
-from sqlalchemy.types import TypeDecorator, CHAR, String
+from sqlalchemy.types import TypeDecorator, CHAR, String as StringType
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
+from sqlalchemy.orm import relationship
 
 
-db = SQLAlchemy()
+Base = declarative_base()
 
 
 class GUID(TypeDecorator):
@@ -27,7 +29,7 @@ class GUID(TypeDecorator):
     ?highlight=guid#backend-agnostic-guid-type
 
     Does not work if you simply do the following:
-    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     as Flask cannot serialise UUIDs correctly.
 
@@ -96,7 +98,7 @@ class GUID(TypeDecorator):
         if dialect.name == 'postgresql':
             return isinstance(conn_type, UUID)
         else:
-            return isinstance(conn_type, String)
+            return isinstance(conn_type, StringType)
 
 
 class MutableDict(Mutable, dict):
@@ -154,17 +156,16 @@ class MutableDict(Mutable, dict):
         self.changed()
 
 
-class User(db.Model):
+class User(Base):
     """
     User table
     Foreign-key absolute_uid is the primary key of the user in the user
     database microservice.
     """
-    __bind_key__ = 'libraries'
     __tablename__ = 'user'
-    id = db.Column(db.Integer, primary_key=True)
-    absolute_uid = db.Column(db.Integer, unique=True)
-    permissions = db.relationship('Permissions',
+    id = Column(Integer, primary_key=True)
+    absolute_uid = Column(Integer, unique=True)
+    permissions = relationship('Permissions',
                                   backref='user')
 
     def __repr__(self):
@@ -172,31 +173,30 @@ class User(db.Model):
             .format(self.id, self.absolute_uid)
 
 
-class Library(db.Model):
+class Library(Base):
     """
     Library table
     This represents a collection of bibcodes, a biblist, and can be thought of
     much like a bibtex file.
     """
-    __bind_key__ = 'libraries'
     __tablename__ = 'library'
-    id = db.Column(GUID, primary_key=True, default=uuid.uuid4)
-    name = db.Column(db.String(50))
-    description = db.Column(db.String(200))
-    public = db.Column(db.Boolean)
-    bibcode = db.Column(MutableDict.as_mutable(JSON), default={})
-    date_created = db.Column(
-        db.DateTime,
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    name = Column(String(50))
+    description = Column(String(200))
+    public = Column(Boolean)
+    bibcode = Column(MutableDict.as_mutable(JSON), default={})
+    date_created = Column(
+        DateTime,
         nullable=False,
         default=datetime.utcnow
     )
-    date_last_modified = db.Column(
-        db.DateTime,
+    date_last_modified = Column(
+        DateTime,
         nullable=False,
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
-    permissions = db.relationship('Permissions',
+    permissions = relationship('Permissions',
                                   backref='library',
                                   cascade='delete')
 
@@ -245,7 +245,7 @@ class Library(db.Model):
         [self.bibcode.pop(key, None) for key in bibcodes]
 
 
-class Permissions(db.Model):
+class Permissions(Base):
     """
     Permissions table
 
@@ -255,16 +255,15 @@ class Permissions(db.Model):
     User (1) to Permissions (Many)
     Library (1) to Permissions (Many)
     """
-    __bind_key__ = 'libraries'
     __tablename__ = 'permissions'
-    id = db.Column(db.Integer, primary_key=True)
-    read = db.Column(db.Boolean, default=False)
-    write = db.Column(db.Boolean, default=False)
-    admin = db.Column(db.Boolean, default=False)
-    owner = db.Column(db.Boolean, default=False)
+    id = Column(Integer, primary_key=True)
+    read = Column(Boolean, default=False)
+    write = Column(Boolean, default=False)
+    admin = Column(Boolean, default=False)
+    owner = Column(Boolean, default=False)
 
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    library_id = db.Column(GUID, db.ForeignKey('library.id'))
+    user_id = Column(Integer, ForeignKey('user.id'))
+    library_id = Column(GUID, ForeignKey('library.id'))
 
     def __repr__(self):
         return '<Permissions, user_id: {0}, library_id: {1}, read: {2}, '\

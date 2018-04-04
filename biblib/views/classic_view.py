@@ -3,7 +3,7 @@ User view
 """
 
 from ..utils import err
-from ..models import db, User, Library, Permissions
+from ..models import User, Library, Permissions
 from ..client import client
 from base_view import BaseView
 from flask import current_app
@@ -36,76 +36,77 @@ class HarbourView(BaseView):
 
         :return: boolean for success
         """
-        # Make the permissions
-        user = User.query.filter(User.id == service_uid).one()
 
-        try:
-            # we are passed the library from classic
-            #   and need to find the corresponding library in bumblebee
-            # the corresponding library is the one with
-            #   the same name and the same owner
+        with current_app.session_scope() as session:
+            # Make the permissions
+            user = session.query(User).filter_by(id = service_uid).one()
+            try:
+                # we are passed the library from classic
+                #   and need to find the corresponding library in bumblebee
+                # the corresponding library is the one with
+                #   the same name and the same owner
 
-            # in raw sql, this is essentially
-            # q = "select library.id from library,permissions where library.name='{}' and permissions.library_id=library.id and permissions.user_id={} and permissions.owner=True"
-            # q = q.format(library['name'], user.id)
+                # in raw sql, this is essentially
+                # q = "select library.id from library,permissions where library.name='{}' and permissions.library_id=library.id and permissions.user_id={} and permissions.owner=True"
+                # q = q.format(library['name'], user.id)
 
-            # but, this must be done via the orm api
-            q = db.session.query(Library).join(Permissions).filter(Library.id == Permissions.library_id)\
-                .filter(Permissions.user_id == user.id).filter(Permissions.owner == True).filter(Library.name == library['name'])
-            lib = q.all()
+                # but, this must be done via the orm api
+                q = session.query(Library).join(Permissions).filter(Library.id == Permissions.library_id)\
+                    .filter(Permissions.user_id == user.id).filter(Permissions.owner == True).filter(Library.name == library['name'])
+                lib = q.all()
 
 
-            # Raise if there is not exactly one, it should be 1 or 0, but if
-            # multiple are returned, there is some problem
-            if len(lib) == 0:
-                raise NoResultFound
-                current_app.logger.info(
-                    'User does not have a library with this name'
+                # Raise if there is not exactly one, it should be 1 or 0, but if
+                # multiple are returned, there is some problem
+                if len(lib) == 0:
+                    raise NoResultFound
+                    current_app.logger.info(
+                        'User does not have a library with this name'
+                    )
+                elif len(lib) > 1:
+                    current_app.logger.warning(
+                        'More than 1 library has the same name,'
+                        ' this should not happen: {}'.format(lib)
+                    )
+                    raise IntegrityError
+
+                # Get the single record returned, as names are considered unique in
+                # the workflow of creating libraries
+                lib = lib[0]
+
+                bibcode_before = len(lib.get_bibcodes())
+                lib.add_bibcodes(library['documents'])
+                bibcode_added = len(lib.get_bibcodes()) - bibcode_before
+                action = 'updated'
+                session.add(lib)
+
+            except NoResultFound:
+                current_app.logger.info('Creating library from scratch: {}'
+                                        .format(library))
+                permission = Permissions(owner=True)
+                lib = Library(
+                    name=library['name'][0:50],
+                    description=library['description'][0:200],
                 )
-            elif len(lib) > 1:
-                current_app.logger.warning(
-                    'More than 1 library has the same name,'
-                    ' this should not happen: {}'.format(lib)
-                )
-                raise IntegrityError
+                lib.add_bibcodes(library['documents'])
 
-            # Get the single record returned, as names are considered unique in
-            # the workflow of creating libraries
-            lib = lib[0]
+                lib.permissions.append(permission)
+                user.permissions.append(permission)
 
-            bibcode_before = len(lib.get_bibcodes())
-            lib.add_bibcodes(library['documents'])
-            bibcode_added = len(lib.get_bibcodes()) - bibcode_before
-            action = 'updated'
-            db.session.add(lib)
+                session.add_all([lib, permission, user])
 
-        except NoResultFound:
-            current_app.logger.info('Creating library from scratch: {}'
-                                    .format(library))
-            permission = Permissions(owner=True)
-            lib = Library(
-                name=library['name'][0:50],
-                description=library['description'][0:200],
-            )
-            lib.add_bibcodes(library['documents'])
+                bibcode_added = len(lib.get_bibcodes())
+                action = 'created'
 
-            lib.permissions.append(permission)
-            user.permissions.append(permission)
+            session.commit()
 
-            db.session.add_all([lib, permission, user])
-
-            bibcode_added = len(lib.get_bibcodes())
-            action = 'created'
-
-        db.session.commit()
-
-        return {
-            'library_id': BaseView.helper_uuid_to_slug(lib.id),
-            'name': lib.name,
-            'description': lib.description,
-            'num_added': bibcode_added,
-            'action': action
-        }
+            return {
+                'library_id': BaseView.helper_uuid_to_slug(lib.id),
+                'name': lib.name,
+                'description': lib.description,
+                'num_added': bibcode_added,
+                'action': action
+            }
 
     # Methods
     def get(self):
