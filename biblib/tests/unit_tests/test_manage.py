@@ -13,7 +13,6 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.tests.base import TestCaseDatabase
 
-#class TestManagePy(unittest.TestCase):
 class TestManagePy(TestCaseDatabase):
     """
     Class for testing the behaviour of the custom manage scripts

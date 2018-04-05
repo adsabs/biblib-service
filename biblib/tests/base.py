@@ -329,7 +329,6 @@ class TestCaseDatabase(TestCase):
         """
         self.app.db.session.remove()
         Base.metadata.drop_all(bind=self.app.db.engine)
-        #self.app.db.drop_all()
 
     def assertUnsortedEqual(self, hashable_1, hashable_2):
         """
