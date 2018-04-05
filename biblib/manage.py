@@ -9,7 +9,7 @@ sys.path.append(PROJECT_HOME)
 from flask import current_app
 from flask.ext.script import Manager, Command, Option
 from flask.ext.migrate import Migrate, MigrateCommand
-from models import db, User, Permissions, Library
+from models import Base, User, Permissions, Library
 from biblib.app import create_app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -28,9 +28,7 @@ class CreateDatabase(Command):
         Creates the database in the application context
         :return: no return
         """
-        with app.app_context():
-            db.create_all()
-            db.session.commit()
+        Base.metadata.create_all(bind=app.db.engine)
 
 
 class DestroyDatabase(Command):
@@ -43,9 +41,8 @@ class DestroyDatabase(Command):
         Creates the database in the application context
         :return: no return
         """
-        with app.app_context():
-            db.drop_all()
-            # db.session.remove()
+        app.db.session.remove()
+        Base.metadata.drop_all(bind=app.db.engine)
 
 
 class DeleteStaleUsers(Command):
@@ -61,49 +58,41 @@ class DeleteStaleUsers(Command):
         Carries out the deletion of the stale content
         """
         with app.app_context():
+            with current_app.session_scope() as session:
+                # Obtain the list of API users
+                postgres_search_text = 'SELECT id FROM users;'
+                result = session.execute(postgres_search_text).fetchall()
+                list_of_api_users = [int(r[0]) for r in result]
 
-            # Obtain the list of API users
-            api_engine = create_engine(
-                current_app.config['BIBLIB_ADSWS_API_DB_URI']
-            )
-            api_session_maker = scoped_session(sessionmaker(bind=api_engine))
-            api_session = api_session_maker()
+                # Loop through every use in the service database
+                removal_list = []
+                for service_user in session.query(User).all():
+                    if service_user.absolute_uid not in list_of_api_users:
+                        try:
+                            # Obtain the libraries that should be deleted
+                            permissions = session.query(Permissions).filter(Permissions.user_id == service_user.id).all()
+                            libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.owner]
 
-            postgres_search_text = 'SELECT id FROM users;'
-            result = api_session.execute(postgres_search_text).fetchall()
-            list_of_api_users = [int(r[0]) for r in result]
+                            # Delete all the libraries found
+                            # By cascade this should delete all the permissions
+                            d = [session.delete(library) for library in libraries]
+                            p = [session.delete(permission) for permission in permissions]
+                            d = len(d)
 
-            api_session.close()
+                            session.delete(service_user)
+                            session.commit()
+                            current_app.logger.info('Removed stale user: {} and {} libraries'.format(service_user, d))
+                            removal_list.append(service_user)
 
-            # Loop through every use in the service database
-            removal_list = []
-            for service_user in User.query.all():
-                if service_user.absolute_uid not in list_of_api_users:
-                    try:
-                        # Obtain the libraries that should be deleted
-                        permissions = Permissions.query.filter(Permissions.user_id == service_user.id).all()
-                        libraries = [Library.query.filter(Library.id == permission.library_id).one() for permission in permissions if permission.owner]
-
-                        # Delete all the libraries found
-                        # By cascade this should delete all the permissions
-                        d = [db.session.delete(library) for library in libraries]
-                        p = [db.session.delete(permission) for permission in permissions]
-                        d = len(d)
-
-                        db.session.delete(service_user)
-                        db.session.commit()
-                        current_app.logger.info('Removed stale user: {} and {} libraries'.format(service_user, d))
-                        removal_list.append(service_user)
-
-                    except Exception as error:
-                        current_app.logger.info('Problem with database, could not remove user {}: {}'
-                                                .format(service_user, error))
-                        db.session.rollback()
-            current_app.logger.info('Deleted {} stale users: {}'.format(len(removal_list), removal_list))
+                        except Exception as error:
+                            current_app.logger.info('Problem with database, could not remove user {}: {}'
+                                                    .format(service_user, error))
+                            session.rollback()
+                current_app.logger.info('Deleted {} stale users: {}'.format(len(removal_list), removal_list))
 
 
 # Set up the alembic migration
-migrate = Migrate(app, db, compare_type=True)
+migrate = Migrate(app, app.db, compare_type=True, directory='migrations')
 
 # Setup the command line arguments using Flask-Script
 manager = Manager(app)

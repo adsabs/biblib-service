@@ -2,7 +2,7 @@
 Transfer view
 """
 from ..utils import err, get_post_data
-from ..models import db, Permissions
+from ..models import Permissions
 from base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
@@ -62,42 +62,43 @@ class TransferView(BaseView):
                                         library_id,
                                         new_owner_uid))
 
-        current_permission = Permissions.query.filter(
-            Permissions.user_id == current_owner_uid
-        ).filter(
-            Permissions.library_id == library_id
-        ).one()
-
-        # Try to get the current user's permissions
-        try:
-            # User already has permissions associated with it
-            new_permission = Permissions.query.filter(
-                Permissions.user_id == new_owner_uid
+        with current_app.session_scope() as session:
+            current_permission = session.query(Permissions).filter(
+                Permissions.user_id == current_owner_uid
             ).filter(
                 Permissions.library_id == library_id
             ).one()
 
-            current_app.logger.info('User: {0} already has permissions for '
-                                    'library {1}: {2}'
-                                    .format(current_owner_uid,
-                                            library_id,
-                                            new_permission))
+            # Try to get the current user's permissions
+            try:
+                # User already has permissions associated with it
+                new_permission = session.query(Permissions).filter(
+                    Permissions.user_id == new_owner_uid
+                ).filter(
+                    Permissions.library_id == library_id
+                ).one()
 
-            new_permission.owner = True
+                current_app.logger.info('User: {0} already has permissions for '
+                                        'library {1}: {2}'
+                                        .format(current_owner_uid,
+                                                library_id,
+                                                new_permission))
 
-        except NoResultFound:
-            # User does not have a permission with the library
-            current_app.logger.info('User {0} does not have permissions, for '
-                                    'library {1} creating fresh ones.'
-                                    .format(new_owner_uid, library_id))
+                new_permission.owner = True
 
-            new_permission = Permissions(user_id=new_owner_uid,
-                                         library_id=library_id,
-                                         owner=True)
+            except NoResultFound:
+                # User does not have a permission with the library
+                current_app.logger.info('User {0} does not have permissions, for '
+                                        'library {1} creating fresh ones.'
+                                        .format(new_owner_uid, library_id))
 
-        db.session.delete(current_permission)
-        db.session.add(new_permission)
-        db.session.commit()
+                new_permission = Permissions(user_id=new_owner_uid,
+                                             library_id=library_id,
+                                             owner=True)
+
+            session.delete(current_permission)
+            session.add(new_permission)
+            session.commit()
 
         current_app.logger.info(
             'Library {0} had ownership transferred '

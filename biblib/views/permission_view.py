@@ -4,7 +4,7 @@ Perimssion view
 
 from flask import request, current_app
 from flask_discoverer import advertise
-from ..models import db, User, Library, Permissions
+from ..models import User, Library, Permissions
 from ..client import client
 from base_view import BaseView
 from sqlalchemy.orm.exc import NoResultFound
@@ -56,45 +56,46 @@ class PermissionView(BaseView):
                                 ))
 
         # Check if the editor has permissions
-        try:
-            editor_permissions = Permissions.query.filter(
-                Permissions.user_id == service_uid_editor,
-                Permissions.library_id == library_id
-            ).one()
-        except NoResultFound as error:
-            current_app.logger.error(
-                'User: {0} has no permissions for this library: {1}'
-                .format(service_uid_editor, error)
-            )
-            return False
+        with current_app.session_scope() as session:
+            try:
+                editor_permissions = session.query(Permissions).filter(
+                    Permissions.user_id == service_uid_editor,
+                    Permissions.library_id == library_id
+                ).one()
+            except NoResultFound as error:
+                current_app.logger.error(
+                    'User: {0} has no permissions for this library: {1}'
+                    .format(service_uid_editor, error)
+                )
+                return False
 
-        if editor_permissions.owner:
-            current_app.logger.info('User: {0} is owner, so is allowed to '
-                                    'change permissions'
-                                    .format(service_uid_editor))
-            return True
-
-        # Check if the user to be modified has permissions
-        try:
-            modify_permissions = Permissions.query.filter(
-                Permissions.user_id == service_uid_modify,
-                Permissions.library_id == library_id
-            ).one()
-        except NoResultFound:
-            modify_permissions = False
-
-        # if the editor is admin, and the modifier has no permissions
-        if editor_permissions.admin:
-
-            # user to be modified has no permissions
-            if not modify_permissions:
+            if editor_permissions.owner:
+                current_app.logger.info('User: {0} is owner, so is allowed to '
+                                        'change permissions'
+                                        .format(service_uid_editor))
                 return True
 
-            # user to be modified is not owner
-            if not modify_permissions.owner:
-                return True
-        else:
-            return False
+            # Check if the user to be modified has permissions
+            try:
+                modify_permissions = session.query(Permissions).filter(
+                    Permissions.user_id == service_uid_modify,
+                    Permissions.library_id == library_id
+                ).one()
+            except NoResultFound:
+                modify_permissions = False
+
+            # if the editor is admin, and the modifier has no permissions
+            if editor_permissions.admin:
+
+                # user to be modified has no permissions
+                if not modify_permissions:
+                    return True
+
+                # user to be modified is not owner
+                if not modify_permissions.owner:
+                    return True
+            else:
+                return False
 
     @staticmethod
     def add_permission(service_uid, library_id, permission, value):
@@ -111,70 +112,71 @@ class PermissionView(BaseView):
         if permission not in ['read', 'write', 'admin']:
             raise PermissionDeniedError('Permission Error')
 
-        try:
-            # If the user has permissions for this already
-            new_permission = Permissions.query.filter(
-                Permissions.user_id == service_uid,
-                Permissions.library_id == library_id
-            ).one()
+        with current_app.session_scope() as session:
+            try:
+                # If the user has permissions for this already
+                new_permission = session.query(Permissions).filter_by(
+                    user_id = service_uid,
+                    library_id = library_id
+                ).one()
 
-            current_app.logger.info(
-                'User: {0} has permissions already for '
-                'library: {1}. Modifying: "{2}" from [{3}] '
-                'to [{4}]'
-                .format(service_uid,
-                        library_id,
-                        permission,
-                        getattr(new_permission, permission),
-                        value)
-            )
+                current_app.logger.info(
+                    'User: {0} has permissions already for '
+                    'library: {1}. Modifying: "{2}" from [{3}] '
+                    'to [{4}]'
+                    .format(service_uid,
+                            library_id,
+                            permission,
+                            getattr(new_permission, permission),
+                            value)
+                )
 
-            setattr(new_permission, permission, value)
+                setattr(new_permission, permission, value)
 
-            # Check if all permissions are False, then remove completely
-            if not (new_permission.read |
-                    new_permission.write |
-                    new_permission.admin |
-                    new_permission.owner):
+                # Check if all permissions are False, then remove completely
+                if not (new_permission.read |
+                        new_permission.write |
+                        new_permission.admin |
+                        new_permission.owner):
 
-                current_app.logger.info('Deleting permissions for {0} and '
-                                        'library {1} as all permissions are '
-                                        'False. {2}'
+                    current_app.logger.info('Deleting permissions for {0} and '
+                                            'library {1} as all permissions are '
+                                            'False. {2}'
+                                            .format(service_uid,
+                                                    library_id,
+                                                    new_permission))
+
+                    session.delete(new_permission)
+                else:
+                    session.add(new_permission)
+
+            except NoResultFound:
+                # If no permissions set yet for user and library
+                current_app.logger.info('No permissions yet set for user: {0} for '
+                                        'library: {1}. Using defaults for setup'
+                                        ' and allocating "{2}" to [{3}]'
                                         .format(service_uid,
                                                 library_id,
-                                                new_permission))
+                                                permission,
+                                                value))
 
-                db.session.delete(new_permission)
-            else:
-                db.session.add(new_permission)
+                user = session.query(User).filter_by(id = service_uid).one()
+                library = session.query(Library).filter_by(id = library_id).one()
 
-        except NoResultFound:
-            # If no permissions set yet for user and library
-            current_app.logger.info('No permissions yet set for user: {0} for '
-                                    'library: {1}. Using defaults for setup'
-                                    ' and allocating "{2}" to [{3}]'
-                                    .format(service_uid,
-                                            library_id,
-                                            permission,
-                                            value))
+                new_permission = Permissions(
+                    read=False,
+                    write=False,
+                    admin=False,
+                    owner=False,
+                )
 
-            user = User.query.filter(User.id == service_uid).one()
-            library = Library.query.filter(Library.id == library_id).one()
+                setattr(new_permission, permission, value)
 
-            new_permission = Permissions(
-                read=False,
-                write=False,
-                admin=False,
-                owner=False,
-            )
+                user.permissions.append(new_permission)
+                library.permissions.append(new_permission)
+                session.add_all([user, library, new_permission])
 
-            setattr(new_permission, permission, value)
-
-            user.permissions.append(new_permission)
-            library.permissions.append(new_permission)
-            db.session.add_all([user, library, new_permission])
-
-        db.session.commit()
+            session.commit()
 
     @staticmethod
     def api_uid_email_lookup(user_info):
@@ -213,30 +215,31 @@ class PermissionView(BaseView):
         :return: list of dictionaries containing the user email and permission
         """
 
-        # Find the permissions for the library
-        result = db.session.query(Permissions, User)\
-            .join(Permissions.user)\
-            .filter(Permissions.library_id == library_id)\
-            .all()
+        with current_app.session_scope() as session:
+            # Find the permissions for the library
+            result = session.query(Permissions, User)\
+                .join(Permissions.user)\
+                .filter(Permissions.library_id == library_id)\
+                .all()
 
-        # Formulate the return content
-        permission_list = []
+            # Formulate the return content
+            permission_list = []
 
-        for permission, user in result:
+            for permission, user in result:
 
-            # Convert the user id into
-            user = cls.api_uid_email_lookup(user_info=user.absolute_uid)
+                # Convert the user id into
+                user = cls.api_uid_email_lookup(user_info=user.absolute_uid)
 
-            all_permissions = filter(
-                lambda key: permission.__dict__[key],
-                ['read', 'write', 'admin', 'owner']
-            )
+                all_permissions = filter(
+                    lambda key: permission.__dict__[key],
+                    ['read', 'write', 'admin', 'owner']
+                )
 
-            permission_list.append(
-                {user: all_permissions}
-            )
+                permission_list.append(
+                    {user: all_permissions}
+                )
 
-        return permission_list
+            return permission_list
 
     @classmethod
     def read_access(cls, service_uid, library_id):
