@@ -11,6 +11,7 @@ LOG_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../')
 )
 LOG_PATH = '{home}/logs/'.format(home=LOG_PATH)
+LOG_STDOUT = True
 
 if not os.path.isdir(LOG_PATH):
     os.mkdir(LOG_PATH)
