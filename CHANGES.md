@@ -1,6 +1,19 @@
 # Change Log
 All notable changes to the config files will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
+
+## [1.0.16] - 2018-08-06
+### Changed
+* Enabled JSON stdout logging and HTTP connection pool
+
+## [1.0.15] - 2018-04-06
+### Changed
+* Added Dockerfile and local config
+
+## [1.0.14] - 2018-04-05
+### Changed
+* Migrated to ADSFlask
+
 ## [1.0.13] - 2017-06-22
 ### Changed
 * Some code cleanup (removal of Consul) and update of requirements.txt
