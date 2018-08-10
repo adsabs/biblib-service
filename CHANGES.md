@@ -2,6 +2,10 @@
 All notable changes to the config files will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.0.17] - 2018-08-10
+### Changed
+* Removed logging setup from config
+
 ## [1.0.16] - 2018-08-06
 ### Changed
 * Enabled JSON stdout logging and HTTP connection pool
