@@ -21,10 +21,6 @@ def create_app(**config):
     app = ADSFlask(__name__, static_folder=None, local_config=config or {})
     app.url_map.strict_slashes = False
 
-    logging.config.dictConfig(
-        app.config['BIBLIB_LOGGING']
-    )
-
     # Register extensions
     api = Api(app)
     Discoverer(app)
