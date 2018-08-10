@@ -21,38 +21,7 @@ SQLALCHEMY_BINDS = {
     'libraries': 'postgresql+psycopg2://postgres:@localhost/testdb'
 }
 
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'staging').lower()
-BIBLIB_LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'default': {
-            'format': '%(levelname)s\t%(process)d '
-                      '[%(asctime)s]:\t%(message)s',
-            'datefmt': '%m/%d/%Y %H:%M:%S',
-        }
-    },
-    'handlers': {
-        'file': {
-            'formatter': 'default',
-            'level': 'INFO',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': '/tmp/biblib.app.{}.log'.format(ENVIRONMENT),
-        },
-        'console': {
-            'formatter': 'default',
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler'
-        }
-    },
-    'loggers': {
-        '': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-    },
-}
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'unset-env').lower()
 
 # These lines are necessary only if the app needs to be a client of the
 # adsws-api
