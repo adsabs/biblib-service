@@ -1,11 +1,9 @@
-git+https://github.com/adsabs/ADSMicroserviceUtils.git@v1.0.6
+git+https://github.com/adsabs/ADSMicroserviceUtils.git@v1.0.10
 ConcurrentLogHandler==0.9.1
-Flask==0.10.1
 Flask-Migrate==1.6.0
-Flask-RESTful==0.3.5
-Flask-SQLAlchemy==2.1
+Flask-RESTful==0.3.6
 Flask-Script==2.0.5
-Flask-Testing==0.6.1
+Flask-Testing==0.6.2
 Jinja2==2.8.1
 Mako==1.0.6
 MarkupSafe==0.23
@@ -19,7 +17,6 @@ coverage==4.3.1
 coveralls==1.1
 dnspython==1.15.0
 docopt==0.6.2
-flask-discoverer==0.0.2
 funcsigs==1.0.2
 futures==3.0.5
 gevent==1.1.2
@@ -36,7 +33,6 @@ psycopg2==2.7.4
 python-dateutil==2.6.0
 python-editor==1.0.3
 pytz==2016.10
-requests==2.8.1
 six==1.5.2
 supervisor==3.3.0
 urllib3==1.7.1
