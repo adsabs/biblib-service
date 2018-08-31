@@ -4,6 +4,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [1.0.19] - 2018-08-30
 ### Changed
+* Removed unnecesary requirements
+
+## [1.0.19] - 2018-08-30
+### Changed
 * Fixed requirement conflicts
 
 ## [1.0.18] - 2018-08-29
