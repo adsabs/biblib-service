@@ -9,7 +9,8 @@ from biblib.views import DEFAULT_LIBRARY_DESCRIPTION, DEFAULT_LIBRARY_NAME_PREFI
 from biblib.views.http_errors import DUPLICATE_LIBRARY_NAME_ERROR, \
     MISSING_LIBRARY_ERROR, MISSING_USERNAME_ERROR, \
     NO_PERMISSION_ERROR, WRONG_TYPE_ERROR, \
-    API_MISSING_USER_EMAIL, SOLR_RESPONSE_MISMATCH_ERROR, NO_CLASSIC_ACCOUNT
+    API_MISSING_USER_EMAIL, SOLR_RESPONSE_MISMATCH_ERROR, NO_CLASSIC_ACCOUNT, \
+    NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR
 from biblib.tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint, MockClassicService
@@ -610,6 +611,87 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
         self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
 
+    def test_operations_view_post_types(self):
+        """
+        Tests that the content passed to the OperationsView POST endpoint has all types checked
+        :return:
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library_1 = LibraryShop()
+        stub_library_2 = LibraryShop()
+
+        # Make the libraries
+        url = url_for('userview')
+        response_1 = self.client.post(
+            url,
+            data=stub_library_1.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        library_id_1 = response_1.json['id']
+
+        response_2 = self.client.post(
+            url,
+            data=stub_library_2.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        library_id_2 = response_2.json['id']
+
+        # Pass an action that is not a string
+        post_data = stub_library_1.operations_view_post_data()
+        post_data['action'] = 1
+
+        # Action type check
+        url = url_for('operationsview', library=library_id_1)
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+        post_data['action'] = 'bad-action'
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 400)
+
+        # bibcode list check
+        post_data['action'] = 'union'
+        post_data['libraries'] = library_id_2
+        url = url_for('operationsview', library=library_id_1)
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
+        self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
+
+        # secondary libraries check
+        post_data = stub_library_1.operations_view_post_data(action='union')
+        url = url_for('operationsview', library=library_id_1)
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, NO_LIBRARY_SPECIFIED_ERROR['number'])
+        self.assertEqual(response.json['error'], NO_LIBRARY_SPECIFIED_ERROR['body'])
+
+        post_data['action'] = 'copy'
+        post_data['libraries'] = ['lib1', 'lib2']
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, TOO_MANY_LIBRARIES_SPECIFIED_ERROR['number'])
+        self.assertEqual(response.json['error'], TOO_MANY_LIBRARIES_SPECIFIED_ERROR['body'])
+
     def test_document_view_put_types(self):
         """
         Tests that the content passed to the UserView POST end point
@@ -860,6 +942,262 @@ class TestWebservices(TestCaseDatabase):
             )
         self.assertTrue(len(response.json['documents']) == 0,
                         response.json['documents'])
+
+    def test_library_union(self):
+        """
+        Test the /libraries/operations/<> endpoint with POST to take the union of libraries
+        :return:
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library_1 = LibraryShop()
+        stub_library_2 = LibraryShop()
+
+        # Make the libraries
+        url = url_for('userview')
+        response_1 = self.client.post(
+            url,
+            data=stub_library_1.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response_1.status_code, 200)
+        library_id_1 = response_1.json['id']
+        resp = self.client.post(
+            url_for('documentview', library=library_id_1),
+            data=stub_library_1.document_view_post_data_json('add'),
+            headers=stub_user.headers
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        response_2 = self.client.post(
+            url,
+            data=stub_library_2.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response_2.status_code, 200)
+        library_id_2 = str(response_2.json['id'])
+        resp = self.client.post(
+            url_for('documentview', library=library_id_2),
+            data=stub_library_2.document_view_post_data_json('add'),
+            headers=stub_user.headers
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # take the union
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(name='Library3',action='union',libraries=[library_id_2])
+        # check the default description
+        post_data.pop('description')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['name'],'Library3')
+        self.assertIn('Union',response.json['description'])
+        self.assertIn('bibcode', response.json)
+
+    def test_library_intersection(self):
+        """
+        Test the /libraries/operations/<> endpoint with POST to take the intersection of libraries
+        :return:
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library_1 = LibraryShop()
+        stub_library_2 = LibraryShop()
+
+        # Make the libraries
+        url = url_for('userview')
+        response_1 = self.client.post(
+            url,
+            data=stub_library_1.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response_1.status_code, 200)
+        library_id_1 = response_1.json['id']
+        resp = self.client.post(
+            url_for('documentview', library=library_id_1),
+            data=json.dumps({'bibcode': ['test1', 'test2'], 'action':'add'}),
+            headers=stub_user.headers
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        response_2 = self.client.post(
+            url,
+            data=stub_library_2.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response_2.status_code, 200)
+        library_id_2 = str(response_2.json['id'])
+        resp = self.client.post(
+            url_for('documentview', library=library_id_2),
+            data=json.dumps({'bibcode': ['test1', 'test3'], 'action':'add'}),
+            headers=stub_user.headers
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # take the intersection
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(name='Library3', action='intersection', libraries=[library_id_2])
+        # check the default description
+        post_data.pop('description')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['name'], 'Library3')
+        self.assertIn('Intersection', response.json['description'])
+        self.assertIn('test1', response.json['bibcode'])
+
+    def test_library_difference(self):
+        """
+        Test the /libraries/operations/<> endpoint with POST to take the difference of libraries
+        :return:
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library_1 = LibraryShop()
+        stub_library_2 = LibraryShop()
+
+        # Make the libraries
+        url = url_for('userview')
+        response_1 = self.client.post(
+            url,
+            data=stub_library_1.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response_1.status_code, 200)
+        library_id_1 = response_1.json['id']
+        resp = self.client.post(
+            url_for('documentview', library=library_id_1),
+            data=json.dumps({'bibcode': ['test1', 'test2'], 'action':'add'}),
+            headers=stub_user.headers
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        response_2 = self.client.post(
+            url,
+            data=stub_library_2.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response_2.status_code, 200)
+        library_id_2 = str(response_2.json['id'])
+        resp = self.client.post(
+            url_for('documentview', library=library_id_2),
+            data=json.dumps({'bibcode': ['test1', 'test3'], 'action':'add'}),
+            headers=stub_user.headers
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # take the difference
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(name='Library3', action='difference', libraries=[library_id_2])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['name'], 'Library3')
+        self.assertIn('test2', response.json['bibcode'])
+
+    def test_library_copy(self):
+        """
+        Test the /libraries/operations/<> endpoint with POST to copy one library to another
+        :return:
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library_1 = LibraryShop()
+        stub_library_2 = LibraryShop()
+
+        # Make the libraries
+        url = url_for('userview')
+        response_1 = self.client.post(
+            url,
+            data=stub_library_1.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response_1.status_code, 200)
+        library_id_1 = response_1.json['id']
+        resp = self.client.post(
+            url_for('documentview', library=library_id_1),
+            data=json.dumps({'bibcode': ['test1', 'test2'], 'action':'add'}),
+            headers=stub_user.headers
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        response_2 = self.client.post(
+            url,
+            data=stub_library_2.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response_2.status_code, 200)
+        library_id_2 = str(response_2.json['id'])
+        lib_name_2 = str(response_2.json['name'])
+        resp = self.client.post(
+            url_for('documentview', library=library_id_2),
+            data=json.dumps({'bibcode': ['test1', 'test3'], 'action':'add'}),
+            headers=stub_user.headers
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # copy one to the other
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(action='copy', libraries=[library_id_2])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['name'], lib_name_2)
+        self.assertIn('test2', response.json['bibcode'])
+
+    def test_library_empty(self):
+        """
+        Test the /libraries/operations/<> endpoint with POST to copy one library to another
+        :return:
+        """
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the libraries
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+        resp = self.client.post(
+            url_for('documentview', library=library_id),
+            data=json.dumps({'bibcode': ['test1', 'test2'], 'action':'add'}),
+            headers=stub_user.headers
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # empty the library
+        url = url_for('operationsview', library=library_id)
+        post_data = stub_library.operations_view_post_data(action='empty')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['bibcode'], [])
 
     def test_cannot_add_library_with_duplicate_names(self):
         """
@@ -1892,7 +2230,7 @@ class TestWebservices(TestCaseDatabase):
 
         get_end_points = ['userview', 'libraryview', 'permissionview']
         post_end_points = ['userview', 'documentview', 'permissionview',
-                           'transferview']
+                           'transferview', 'operationsview']
         put_end_points = ['documentview']
         delete_end_points = ['documentview']
 

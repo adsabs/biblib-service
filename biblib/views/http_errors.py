@@ -50,3 +50,11 @@ NO_CLASSIC_ACCOUNT = dict(
     body='This user has not setup an ADS Classic account',
     number=400
 )
+NO_LIBRARY_SPECIFIED_ERROR = dict(
+    body='You did not specify the secondary libraries needed to perform the operation.',
+    number=400
+)
+TOO_MANY_LIBRARIES_SPECIFIED_ERROR = dict(
+    body='Too many secondary libraries specified; only one secondary library allowed.',
+    number=400
+)

@@ -13,6 +13,7 @@ from ..client import client
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from ..biblib_exceptions import BackendIntegrityError, PermissionDeniedError
+from ..utils import uniquify
 
 class BaseView(Resource):
     """
@@ -278,3 +279,86 @@ class BaseView(Resource):
         library_out['description'] = _description
 
         return library_out
+
+    @classmethod
+    def create_library(cls, service_uid, library_data):
+        """
+        Creates a library for a user
+
+        :param service_uid: the user ID within this microservice
+        :param library_data: content needed to create a library
+
+        :return: library dict
+        """
+
+        library_data = BaseView.helper_validate_library_data(
+            service_uid=service_uid,
+            library_data=library_data
+        )
+        _name = library_data.get('name')
+        _description = library_data.get('description')
+        _public = bool(library_data.get('public', False))
+        _bibcode = library_data.get('bibcode', False)
+
+        with current_app.session_scope() as session:
+            try:
+                # Make the library in the library table
+                library = Library(name=_name,
+                                  description=_description,
+                                  public=_public)
+
+                # If the user supplies bibcodes
+                if _bibcode and isinstance(_bibcode, list):
+
+                    # Ensure unique content
+                    _bibcode = uniquify(_bibcode)
+                    current_app.logger.info('User supplied bibcodes: {0}'
+                                            .format(_bibcode))
+                    library.add_bibcodes(_bibcode)
+                elif _bibcode:
+                    current_app.logger.error('Bibcode supplied not a list: {0}'
+                                             .format(_bibcode))
+                    raise TypeError('Bibcode should be a list.')
+
+                user = session.query(User).filter_by(id=service_uid).one()
+
+                # Make the permissions
+                permission = Permissions(
+                    owner=True,
+                )
+
+                # Use the ORM to link the permissions to the library and user,
+                # so that no commit is required until the complete action is
+                # finished. This means any rollback will not leave a single
+                # library without permissions
+                library.permissions.append(permission)
+                user.permissions.append(permission)
+
+                session.add_all([library, permission, user])
+                session.commit()
+
+                current_app.logger.info('Library: "{0}" made, user_service: {1:d}'
+                                        .format(library.name, user.id))
+
+                library_dict = dict(
+                    name=library.name,
+                    id='{0}'.format(cls.helper_uuid_to_slug(library.id)),
+                    description=library.description,
+                )
+                # If they added bibcodes include in the response
+                if hasattr(library, 'bibcode') and library.bibcode:
+                    library_dict['bibcode'] = library.get_bibcodes()
+                return library_dict
+
+            except IntegrityError as error:
+                # Roll back the changes
+                session.rollback()
+                current_app.logger.error('IntegitryError, database has been rolled'
+                                         'back. Caused by user_service: {0:d}.'
+                                         'Full error: {1}'
+                                         .format(user.id, error))
+                # Log here
+                raise
+            except Exception:
+                session.rollback()
+                raise

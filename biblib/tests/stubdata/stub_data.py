@@ -364,3 +364,53 @@ class LibraryShop(object):
                           'date_created', 'date_last_modified', 'permission',
                           'public', 'num_users', 'owner']
         return expected_types
+
+    def operations_view_post_data(self,
+                                  name='Library 1',
+                                  description='library description 1',
+                                  public=True,
+                                  libraries=None,
+                                  action='union'):
+        """
+        Expected data to be sent in a POST request to OperationsView
+        :param name:
+        :param description:
+        :param libraries:
+        :param public:
+        :param action:
+        :return:
+        """
+        if libraries:
+            post_data = dict(
+                name=name,
+                description=description,
+                public=public,
+                libraries=libraries,
+                action=action
+            )
+        else:
+            post_data = dict(
+                name=name,
+                description=description,
+                public=public,
+                action=action
+            )
+        return post_data
+
+    def operations_view_post_data_json(self,
+                                       name='Library 1',
+                                       description='library description 1',
+                                       public=True,
+                                       libraries=None,
+                                       action='union'):
+        """
+        Expected data to be sent in a POST request to OperationsView
+        :param name:
+        :param description:
+        :param libraries:
+        :param public:
+        :param action:
+        :return:
+        """
+        post_data = self.operations_view_post_data(name, description, public, libraries, action)
+        return json.dumps(post_data)
