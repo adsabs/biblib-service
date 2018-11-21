@@ -943,49 +943,60 @@ class TestWebservices(TestCaseDatabase):
         self.assertTrue(len(response.json['documents']) == 0,
                         response.json['documents'])
 
+    def _create_libraries(self,n=2,lib_data=None):
+        """
+        Create testing libraries
+        :param n: <int> number of libraries to create
+        :param data: <list> bibcode data to insert in libraries
+        :return lib_ids: list of library ids
+                libraries: list of stub_libraries
+                stub_user: stub_user who owns libraries
+        """
+        # Stub data
+        stub_user = UserShop()
+
+        lib_ids = []
+        libraries = []
+        for nl in range(n):
+            stub_library = LibraryShop()
+
+            # Make the libraries
+            url = url_for('userview')
+            response_1 = self.client.post(
+                url,
+                data=stub_library.user_view_post_data_json,
+                headers=stub_user.headers
+            )
+            self.assertEqual(response_1.status_code, 200)
+
+            if not lib_data:
+                data = stub_library.document_view_post_data_json('add')
+            else:
+                data = lib_data[nl]
+
+            library_id = response_1.json['id']
+            response_2 = self.client.post(
+                url_for('documentview', library=library_id),
+                data=data,
+                headers=stub_user.headers
+            )
+            self.assertEqual(response_2.status_code, 200)
+
+            lib_ids.append(library_id)
+            libraries.append(stub_library)
+
+        return lib_ids, libraries, stub_user
+
     def test_library_union(self):
         """
         Test the /libraries/operations/<> endpoint with POST to take the union of libraries
         :return:
         """
-        # Stub data
-        stub_user = UserShop()
-        stub_library_1 = LibraryShop()
-        stub_library_2 = LibraryShop()
-
-        # Make the libraries
-        url = url_for('userview')
-        response_1 = self.client.post(
-            url,
-            data=stub_library_1.user_view_post_data_json,
-            headers=stub_user.headers
-        )
-        self.assertEqual(response_1.status_code, 200)
-        library_id_1 = response_1.json['id']
-        resp = self.client.post(
-            url_for('documentview', library=library_id_1),
-            data=stub_library_1.document_view_post_data_json('add'),
-            headers=stub_user.headers
-        )
-        self.assertEqual(resp.status_code, 200)
-
-        response_2 = self.client.post(
-            url,
-            data=stub_library_2.user_view_post_data_json,
-            headers=stub_user.headers
-        )
-        self.assertEqual(response_2.status_code, 200)
-        library_id_2 = str(response_2.json['id'])
-        resp = self.client.post(
-            url_for('documentview', library=library_id_2),
-            data=stub_library_2.document_view_post_data_json('add'),
-            headers=stub_user.headers
-        )
-        self.assertEqual(resp.status_code, 200)
+        library_ids, stub_libraries, stub_user = self._create_libraries(n=2)
 
         # take the union
-        url = url_for('operationsview', library=library_id_1)
-        post_data = stub_library_1.operations_view_post_data(name='Library3',action='union',libraries=[library_id_2])
+        url = url_for('operationsview', library=library_ids[0])
+        post_data = stub_libraries[0].operations_view_post_data(name='Library3',action='union',libraries=[library_ids[1]])
         # check the default description
         post_data.pop('description')
         response = self.client.post(
@@ -1004,44 +1015,12 @@ class TestWebservices(TestCaseDatabase):
         Test the /libraries/operations/<> endpoint with POST to take the intersection of libraries
         :return:
         """
-        # Stub data
-        stub_user = UserShop()
-        stub_library_1 = LibraryShop()
-        stub_library_2 = LibraryShop()
-
-        # Make the libraries
-        url = url_for('userview')
-        response_1 = self.client.post(
-            url,
-            data=stub_library_1.user_view_post_data_json,
-            headers=stub_user.headers
-        )
-        self.assertEqual(response_1.status_code, 200)
-        library_id_1 = response_1.json['id']
-        resp = self.client.post(
-            url_for('documentview', library=library_id_1),
-            data=json.dumps({'bibcode': ['test1', 'test2'], 'action':'add'}),
-            headers=stub_user.headers
-        )
-        self.assertEqual(resp.status_code, 200)
-
-        response_2 = self.client.post(
-            url,
-            data=stub_library_2.user_view_post_data_json,
-            headers=stub_user.headers
-        )
-        self.assertEqual(response_2.status_code, 200)
-        library_id_2 = str(response_2.json['id'])
-        resp = self.client.post(
-            url_for('documentview', library=library_id_2),
-            data=json.dumps({'bibcode': ['test1', 'test3'], 'action':'add'}),
-            headers=stub_user.headers
-        )
-        self.assertEqual(resp.status_code, 200)
-
+        library_ids, stub_libraries, stub_user = self._create_libraries(n=2,
+                                                                        lib_data=[json.dumps({'bibcode': ['test1', 'test2'], 'action':'add'}),
+                                                                                  json.dumps({'bibcode': ['test1', 'test3'], 'action':'add'})])
         # take the intersection
-        url = url_for('operationsview', library=library_id_1)
-        post_data = stub_library_1.operations_view_post_data(name='Library3', action='intersection', libraries=[library_id_2])
+        url = url_for('operationsview', library=library_ids[0])
+        post_data = stub_libraries[0].operations_view_post_data(name='Library3', action='intersection', libraries=[library_ids[1]])
         # check the default description
         post_data.pop('description')
         response = self.client.post(
@@ -1060,44 +1039,12 @@ class TestWebservices(TestCaseDatabase):
         Test the /libraries/operations/<> endpoint with POST to take the difference of libraries
         :return:
         """
-        # Stub data
-        stub_user = UserShop()
-        stub_library_1 = LibraryShop()
-        stub_library_2 = LibraryShop()
-
-        # Make the libraries
-        url = url_for('userview')
-        response_1 = self.client.post(
-            url,
-            data=stub_library_1.user_view_post_data_json,
-            headers=stub_user.headers
-        )
-        self.assertEqual(response_1.status_code, 200)
-        library_id_1 = response_1.json['id']
-        resp = self.client.post(
-            url_for('documentview', library=library_id_1),
-            data=json.dumps({'bibcode': ['test1', 'test2'], 'action':'add'}),
-            headers=stub_user.headers
-        )
-        self.assertEqual(resp.status_code, 200)
-
-        response_2 = self.client.post(
-            url,
-            data=stub_library_2.user_view_post_data_json,
-            headers=stub_user.headers
-        )
-        self.assertEqual(response_2.status_code, 200)
-        library_id_2 = str(response_2.json['id'])
-        resp = self.client.post(
-            url_for('documentview', library=library_id_2),
-            data=json.dumps({'bibcode': ['test1', 'test3'], 'action':'add'}),
-            headers=stub_user.headers
-        )
-        self.assertEqual(resp.status_code, 200)
-
+        library_ids, stub_libraries, stub_user = self._create_libraries(n=2,
+                                                                        lib_data=[json.dumps({'bibcode': ['test1', 'test2'],'action': 'add'}),
+                                                                                  json.dumps({'bibcode': ['test1', 'test3'],'action': 'add'})])
         # take the difference
-        url = url_for('operationsview', library=library_id_1)
-        post_data = stub_library_1.operations_view_post_data(name='Library3', action='difference', libraries=[library_id_2])
+        url = url_for('operationsview', library=library_ids[0])
+        post_data = stub_libraries[0].operations_view_post_data(name='Library3', action='difference', libraries=[library_ids[1]])
         response = self.client.post(
             url,
             data=json.dumps(post_data),
@@ -1113,45 +1060,12 @@ class TestWebservices(TestCaseDatabase):
         Test the /libraries/operations/<> endpoint with POST to copy one library to another
         :return:
         """
-        # Stub data
-        stub_user = UserShop()
-        stub_library_1 = LibraryShop()
-        stub_library_2 = LibraryShop()
-
-        # Make the libraries
-        url = url_for('userview')
-        response_1 = self.client.post(
-            url,
-            data=stub_library_1.user_view_post_data_json,
-            headers=stub_user.headers
-        )
-        self.assertEqual(response_1.status_code, 200)
-        library_id_1 = response_1.json['id']
-        resp = self.client.post(
-            url_for('documentview', library=library_id_1),
-            data=json.dumps({'bibcode': ['test1', 'test2'], 'action':'add'}),
-            headers=stub_user.headers
-        )
-        self.assertEqual(resp.status_code, 200)
-
-        response_2 = self.client.post(
-            url,
-            data=stub_library_2.user_view_post_data_json,
-            headers=stub_user.headers
-        )
-        self.assertEqual(response_2.status_code, 200)
-        library_id_2 = str(response_2.json['id'])
-        lib_name_2 = str(response_2.json['name'])
-        resp = self.client.post(
-            url_for('documentview', library=library_id_2),
-            data=json.dumps({'bibcode': ['test1', 'test3'], 'action':'add'}),
-            headers=stub_user.headers
-        )
-        self.assertEqual(resp.status_code, 200)
-
+        library_ids, stub_libraries, stub_user = self._create_libraries(n=2,
+                                                                        lib_data=[json.dumps({'bibcode': ['test1', 'test2'],'action': 'add'}),
+                                                                                  json.dumps({'bibcode': ['test1', 'test3'],'action': 'add'})])
         # copy one to the other
-        url = url_for('operationsview', library=library_id_1)
-        post_data = stub_library_1.operations_view_post_data(action='copy', libraries=[library_id_2])
+        url = url_for('operationsview', library=library_ids[0])
+        post_data = stub_libraries[0].operations_view_post_data(action='copy', libraries=[library_ids[1]])
         response = self.client.post(
             url,
             data=json.dumps(post_data),
@@ -1159,7 +1073,7 @@ class TestWebservices(TestCaseDatabase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['name'], lib_name_2)
+        self.assertEqual(response.json['name'], stub_libraries[1].name)
         self.assertIn('test2', response.json['bibcode'])
 
     def test_library_empty(self):
@@ -1167,29 +1081,11 @@ class TestWebservices(TestCaseDatabase):
         Test the /libraries/operations/<> endpoint with POST to copy one library to another
         :return:
         """
-        # Stub data
-        stub_user = UserShop()
-        stub_library = LibraryShop()
-
-        # Make the libraries
-        url = url_for('userview')
-        response = self.client.post(
-            url,
-            data=stub_library.user_view_post_data_json,
-            headers=stub_user.headers
-        )
-        self.assertEqual(response.status_code, 200)
-        library_id = response.json['id']
-        resp = self.client.post(
-            url_for('documentview', library=library_id),
-            data=json.dumps({'bibcode': ['test1', 'test2'], 'action':'add'}),
-            headers=stub_user.headers
-        )
-        self.assertEqual(resp.status_code, 200)
-
+        library_ids, stub_libraries, stub_user = self._create_libraries(n=1,
+                                                                        lib_data=[json.dumps({'bibcode': ['test1', 'test2'],'action': 'add'})])
         # empty the library
-        url = url_for('operationsview', library=library_id)
-        post_data = stub_library.operations_view_post_data(action='empty')
+        url = url_for('operationsview', library=library_ids[0])
+        post_data = stub_libraries[0].operations_view_post_data(action='empty')
         response = self.client.post(
             url,
             data=json.dumps(post_data),

@@ -1796,13 +1796,7 @@ class TestOperationsViews(TestCaseDatabase):
 
         self.stub_library = LibraryShop()
 
-
-
-    def test_library_union(self):
-        """
-        Test that a user with appropriate permissions can take the union of two libraries
-        :return: none
-        """
+    def _create_libraries(self):
         # Ensure a user exists
         user = User(absolute_uid=self.stub_user.absolute_uid)
         with self.app.session_scope() as session:
@@ -1814,9 +1808,9 @@ class TestOperationsViews(TestCaseDatabase):
 
             # Ensure a library exists
             library_1 = Library(name='MyLibrary1',
-                              description='My library 1',
-                              public=True,
-                              bibcode={k: {} for k in bibcodes_1})
+                                description='My library 1',
+                                public=True,
+                                bibcode={k: {} for k in bibcodes_1})
 
             library_2 = Library(name='MyLibrary2',
                                 description='My library 2',
@@ -1843,8 +1837,17 @@ class TestOperationsViews(TestCaseDatabase):
             lib2 = session.query(Library).filter(Library.name == 'MyLibrary2').one()
             id2 = lib2.id
 
+            return id1, id2
+
+    def test_library_union(self):
+        """
+        Test that a user with appropriate permissions can take the union of two libraries
+        :return: none
+        """
+        id1, id2 = self._create_libraries()
+
         lib2_dict = {'libraries': [id2]}
-        union_lib = self.operations_view.union_libraries(id1, lib2_dict)
+        union_lib = self.operations_view.setops_libraries(id1, lib2_dict, operation='union')
 
         expected_union = ['test1', 'test2', 'test3', 'test4']
         self.assertEqual(len(union_lib), len(expected_union))
@@ -1855,48 +1858,10 @@ class TestOperationsViews(TestCaseDatabase):
         Test that a user with appropriate permissions can take the intersection of two libraries
         :return: none
         """
-        # Ensure a user exists
-        user = User(absolute_uid=self.stub_user.absolute_uid)
-        with self.app.session_scope() as session:
-            session.add(user)
-            session.commit()
-
-            bibcodes_1 = ['test1', 'test2', 'test3']
-            bibcodes_2 = ['test1', 'test2', 'test4']
-
-            # Ensure a library exists
-            library_1 = Library(name='MyLibrary1',
-                              description='My library 1',
-                              public=True,
-                              bibcode={k: {} for k in bibcodes_1})
-
-            library_2 = Library(name='MyLibrary2',
-                                description='My library 2',
-                                public=True,
-                                bibcode={k: {} for k in bibcodes_2})
-
-            # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
-
-            # Commit the stub data
-            user.permissions.append(permission)
-            library_1.permissions.append(permission)
-            library_2.permissions.append(permission)
-
-            session.add_all([library_1, library_2, permission, user])
-            session.commit()
-            for obj in [library_1, library_2, permission, user]:
-                session.refresh(obj)
-                session.expunge(obj)
-
-            lib1 = session.query(Library).filter(Library.name == 'MyLibrary1').one()
-            id1 = lib1.id
-            lib2 = session.query(Library).filter(Library.name == 'MyLibrary2').one()
-            id2 = lib2.id
+        id1, id2 = self._create_libraries()
 
         lib2_dict = {'libraries': [id2]}
-        intersect_lib = self.operations_view.intersect_libraries(id1, lib2_dict)
+        intersect_lib = self.operations_view.setops_libraries(id1, lib2_dict, operation='intersection')
 
         expected_intersection = ['test1', 'test2']
         self.assertEqual(len(intersect_lib), len(expected_intersection))
@@ -1907,48 +1872,10 @@ class TestOperationsViews(TestCaseDatabase):
         Test that a user with appropriate permissions can take the difference of two libraries
         :return: none
         """
-        # Ensure a user exists
-        user = User(absolute_uid=self.stub_user.absolute_uid)
-        with self.app.session_scope() as session:
-            session.add(user)
-            session.commit()
-
-            bibcodes_1 = ['test1', 'test2', 'test3']
-            bibcodes_2 = ['test1', 'test2', 'test4']
-
-            # Ensure a library exists
-            library_1 = Library(name='MyLibrary1',
-                              description='My library 1',
-                              public=True,
-                              bibcode={k: {} for k in bibcodes_1})
-
-            library_2 = Library(name='MyLibrary2',
-                                description='My library 2',
-                                public=True,
-                                bibcode={k: {} for k in bibcodes_2})
-
-            # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
-
-            # Commit the stub data
-            user.permissions.append(permission)
-            library_1.permissions.append(permission)
-            library_2.permissions.append(permission)
-
-            session.add_all([library_1, library_2, permission, user])
-            session.commit()
-            for obj in [library_1, library_2, permission, user]:
-                session.refresh(obj)
-                session.expunge(obj)
-
-            lib1 = session.query(Library).filter(Library.name == 'MyLibrary1').one()
-            id1 = lib1.id
-            lib2 = session.query(Library).filter(Library.name == 'MyLibrary2').one()
-            id2 = lib2.id
+        id1, id2 = self._create_libraries()
 
         lib2_dict = {'libraries': [id2]}
-        diff_lib = self.operations_view.diff_libraries(id1, lib2_dict)
+        diff_lib = self.operations_view.setops_libraries(id1, lib2_dict, operation='difference')
 
         expected_diff = ['test3']
         self.assertEqual(len(diff_lib), len(expected_diff))
@@ -1959,45 +1886,7 @@ class TestOperationsViews(TestCaseDatabase):
         Test that a user with appropriate permissions can copy one library into another
         :return: none
         """
-        # Ensure a user exists
-        user = User(absolute_uid=self.stub_user.absolute_uid)
-        with self.app.session_scope() as session:
-            session.add(user)
-            session.commit()
-
-            bibcodes_1 = ['test1', 'test2', 'test3']
-            bibcodes_2 = ['test1', 'test2', 'test4']
-
-            # Ensure a library exists
-            library_1 = Library(name='MyLibrary1',
-                              description='My library 1',
-                              public=True,
-                              bibcode={k: {} for k in bibcodes_1})
-
-            library_2 = Library(name='MyLibrary2',
-                                description='My library 2',
-                                public=True,
-                                bibcode={k: {} for k in bibcodes_2})
-
-            # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
-
-            # Commit the stub data
-            user.permissions.append(permission)
-            library_1.permissions.append(permission)
-            library_2.permissions.append(permission)
-
-            session.add_all([library_1, library_2, permission, user])
-            session.commit()
-            for obj in [library_1, library_2, permission, user]:
-                session.refresh(obj)
-                session.expunge(obj)
-
-            lib1 = session.query(Library).filter(Library.name == 'MyLibrary1').one()
-            id1 = lib1.id
-            lib2 = session.query(Library).filter(Library.name == 'MyLibrary2').one()
-            id2 = lib2.id
+        id1, id2 = self._create_libraries()
 
         lib2_dict = {'libraries': [id2]}
         copy_lib = self.operations_view.copy_library(id1, lib2_dict)
@@ -2019,43 +1908,7 @@ class TestOperationsViews(TestCaseDatabase):
         Test that a user with appropriate permissions can empty a library
         :return: none
         """
-        # Ensure a user exists
-        user = User(absolute_uid=self.stub_user.absolute_uid)
-        with self.app.session_scope() as session:
-            session.add(user)
-            session.commit()
-
-            bibcodes_1 = ['test1', 'test2', 'test3']
-            bibcodes_2 = ['test1', 'test2', 'test4']
-
-            # Ensure a library exists
-            library_1 = Library(name='MyLibrary1',
-                              description='My library 1',
-                              public=True,
-                              bibcode={k: {} for k in bibcodes_1})
-
-            library_2 = Library(name='MyLibrary2',
-                                description='My library 2',
-                                public=True,
-                                bibcode={k: {} for k in bibcodes_2})
-
-            # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
-
-            # Commit the stub data
-            user.permissions.append(permission)
-            library_1.permissions.append(permission)
-            library_2.permissions.append(permission)
-
-            session.add_all([library_1, library_2, permission, user])
-            session.commit()
-            for obj in [library_1, library_2, permission, user]:
-                session.refresh(obj)
-                session.expunge(obj)
-
-            lib2 = session.query(Library).filter(Library.name == 'MyLibrary2').one()
-            id2 = lib2.id
+        id1, id2 = self._create_libraries()
 
         empty_lib = self.operations_view.empty_library(id2)
 

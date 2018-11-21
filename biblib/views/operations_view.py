@@ -46,7 +46,7 @@ class OperationsView(BaseView):
         return False
 
     @classmethod
-    def union_libraries(cls, library_id, document_data):
+    def setops_libraries(cls, library_id, document_data, operation='union'):
         """
         Takes the union of two or more libraries
         :param library_id: the primary library ID
@@ -54,74 +54,32 @@ class OperationsView(BaseView):
 
         :return: list of bibcodes in the union set
         """
-        current_app.logger.info('User requested to take the union of {0} with {1}'
-                                .format(library_id, document_data['libraries']))
+        current_app.logger.info('User requested to take the {0} of {1} with {2}'
+                                .format(operation, library_id, document_data['libraries']))
         with current_app.session_scope() as session:
             # Find the specified library
             primary_library = session.query(Library).filter_by(id=library_id).one()
-            union_lib = set(primary_library.get_bibcodes())
+            out_lib = set(primary_library.get_bibcodes())
 
             for lib in document_data['libraries']:
                 if isinstance(lib, basestring):
                     lib = cls.helper_slug_to_uuid(lib)
                 secondary_library = session.query(Library).filter_by(id=lib).one()
-                union_lib = union_lib.union(set(secondary_library.get_bibcodes()))
+                if operation == 'union':
+                    out_lib = out_lib.union(set(secondary_library.get_bibcodes()))
+                elif operation == 'intersection':
+                    out_lib = out_lib.intersection(set(secondary_library.get_bibcodes()))
+                elif operation == 'difference':
+                    out_lib = out_lib.difference(set(secondary_library.get_bibcodes()))
+                else:
+                    current_app.logger.warning('Requested operation {0} is not allowed.'.format(operation))
+                    return
 
-        return list(union_lib)
+        if len(out_lib) < 1:
+            current_app.logger.info('No records remain after taking the {0} of {1} and {2}'
+                                    .format(operation, library_id, document_data['libraries']))
 
-    @classmethod
-    def intersect_libraries(cls, library_id, document_data):
-        """
-        Takes the intersection of two or more libraries
-        :param library_id: the primary library ID
-        :param document_data: dict containing the list 'libraries' that holds the secondary library IDs
-
-        :return: list of bibcodes in the intersecting set
-        """
-        current_app.logger.info('User requested to take the intersection of {0} with {1}'
-                                .format(library_id, document_data['libraries']))
-        with current_app.session_scope() as session:
-            # Find the specified library
-            primary_library = session.query(Library).filter_by(id=library_id).one()
-            intersect_lib = set(primary_library.get_bibcodes())
-
-            for lib in document_data['libraries']:
-                if isinstance(lib, basestring):
-                    lib = cls.helper_slug_to_uuid(lib)
-                secondary_library = session.query(Library).filter_by(id=lib).one()
-                intersect_lib = intersect_lib.intersection(set(secondary_library.get_bibcodes()))
-
-        if len(intersect_lib) < 1:
-            current_app.logger.info('No records remain after taking the intersection of {0} and {1}'
-                                    .format(library_id, document_data['libraries']))
-        return list(intersect_lib)
-
-    @classmethod
-    def diff_libraries(cls, library_id, document_data):
-        """
-        Takes the difference of two or more libraries
-        :param library_id: the primary library ID
-        :param document_data: dict containing the list 'libraries' that holds the secondary library IDs
-
-        :return: list of bibcodes in the differenced set
-        """
-        current_app.logger.info('User requested to take the difference between {0} with {1}'
-                                .format(library_id, document_data['libraries']))
-        with current_app.session_scope() as session:
-            # Find the specified library
-            primary_library = session.query(Library).filter_by(id=library_id).one()
-            diff_lib = set(primary_library.get_bibcodes())
-
-            for lib in document_data['libraries']:
-                if isinstance(lib, basestring):
-                    lib = cls.helper_slug_to_uuid(lib)
-                secondary_library = session.query(Library).filter_by(id=lib).one()
-                diff_lib = diff_lib.difference(set(secondary_library.get_bibcodes()))
-
-        if len(diff_lib) < 1:
-            current_app.logger.info('No records remain after taking the difference between {0} and {1}'
-                                    .format(library_id, document_data['libraries']))
-        return list(diff_lib)
+        return list(out_lib)
 
     @classmethod
     def copy_library(cls, library_id, document_data):
@@ -272,9 +230,10 @@ class OperationsView(BaseView):
                 data['public'] = False
 
         if data['action'] == 'union':
-            bib_union = self.union_libraries(
+            bib_union = self.setops_libraries(
                 library_id=library,
-                document_data=data
+                document_data=data,
+                operation='union'
             )
             current_app.logger.info('Successfully took the union of {0} with {1}'
                     .format(library, data['libraries']))
@@ -288,9 +247,10 @@ class OperationsView(BaseView):
             return library_dict, 200
 
         elif data['action'] == 'intersection':
-            bib_intersect = self.intersect_libraries(
+            bib_intersect = self.setops_libraries(
                 library_id=library,
-                document_data=data
+                document_data=data,
+                operation='intersection'
             )
             current_app.logger.info('Successfully took the intersection of {0} with {1}'
                                     .format(library, data['libraries']))
@@ -303,9 +263,10 @@ class OperationsView(BaseView):
             return library_dict, 200
 
         elif data['action'] == 'difference':
-            bib_diff = self.diff_libraries(
+            bib_diff = self.setops_libraries(
                 library_id=library,
-                document_data=data
+                document_data=data,
+                operation='difference'
             )
             current_app.logger.info('Successfully took the difference of {0} - (minus) {1}'
                                     .format(library, data['libraries']))

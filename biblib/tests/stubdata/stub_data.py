@@ -380,37 +380,13 @@ class LibraryShop(object):
         :param action:
         :return:
         """
+        post_data = dict(
+            name=name,
+            description=description,
+            public=public,
+            action=action
+        )
         if libraries:
-            post_data = dict(
-                name=name,
-                description=description,
-                public=public,
-                libraries=libraries,
-                action=action
-            )
-        else:
-            post_data = dict(
-                name=name,
-                description=description,
-                public=public,
-                action=action
-            )
-        return post_data
+            post_data['libraries'] = libraries
 
-    def operations_view_post_data_json(self,
-                                       name='Library 1',
-                                       description='library description 1',
-                                       public=True,
-                                       libraries=None,
-                                       action='union'):
-        """
-        Expected data to be sent in a POST request to OperationsView
-        :param name:
-        :param description:
-        :param libraries:
-        :param public:
-        :param action:
-        :return:
-        """
-        post_data = self.operations_view_post_data(name, description, public, libraries, action)
-        return json.dumps(post_data)
+        return post_data
