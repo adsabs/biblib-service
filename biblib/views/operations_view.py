@@ -84,7 +84,8 @@ class OperationsView(BaseView):
     @classmethod
     def copy_library(cls, library_id, document_data):
         """
-        Copies the contents of one library into another
+        Copies the contents of one library into another. Does not empty library first; call
+        empty_library on the target library first to do so
         :param library_id: primary library ID, library to copy
         :param document_data: dict containing the list 'libraries' which holds one secondary library ID; this is
             the library to copy over
@@ -104,7 +105,6 @@ class OperationsView(BaseView):
             good_bib = primary_library.get_bibcodes()
 
             secondary_library = session.query(Library).filter_by(id=secondary_libid).one()
-            secondary_library.remove_bibcodes(secondary_library.get_bibcodes())
             secondary_library.add_bibcodes(good_bib)
 
             metadata['name'] = secondary_library.name

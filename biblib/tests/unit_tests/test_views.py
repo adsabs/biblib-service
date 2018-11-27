@@ -1898,7 +1898,7 @@ class TestOperationsViews(TestCaseDatabase):
         expected_dict = {'name': 'MyLibrary2',
                          'description': 'My library 2',
                          'public': True,
-                         'bibcode': ['test1', 'test2', 'test3']}
+                         'bibcode': ['test1', 'test2', 'test3', 'test4']}
         self.assertEqual(len(copy_lib['bibcode']), len(expected_dict['bibcode']))
         self.assertIn('test3', copy_lib['bibcode'])
         self.assertEqual(copy_lib['name'], expected_dict['name'])
