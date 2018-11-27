@@ -943,7 +943,7 @@ class TestWebservices(TestCaseDatabase):
         self.assertTrue(len(response.json['documents']) == 0,
                         response.json['documents'])
 
-    def _create_libraries(self,n=2,lib_data=None):
+    def _create_libraries(self, n=2, lib_data=None):
         """
         Create testing libraries
         :param n: <int> number of libraries to create
