@@ -7,7 +7,7 @@ import logging.config
 
 from werkzeug.serving import run_simple
 from views import UserView, LibraryView, DocumentView, PermissionView, \
-    TransferView, ClassicView, TwoPointOhView
+    TransferView, ClassicView, TwoPointOhView, OperationsView
 from flask_restful import Api
 from flask_discoverer import Discoverer
 from adsmutils import ADSFlask
@@ -33,6 +33,10 @@ def create_app(**config):
     api.add_resource(LibraryView,
                      '/libraries/<string:library>',
                      methods=['GET'])
+
+    api.add_resource(OperationsView,
+                     '/libraries/operations/<string:library>',
+                     methods=['POST'])
 
     api.add_resource(DocumentView,
                      '/documents/<string:library>',

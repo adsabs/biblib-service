@@ -364,3 +364,29 @@ class LibraryShop(object):
                           'date_created', 'date_last_modified', 'permission',
                           'public', 'num_users', 'owner']
         return expected_types
+
+    def operations_view_post_data(self,
+                                  name='Library 1',
+                                  description='library description 1',
+                                  public=True,
+                                  libraries=None,
+                                  action='union'):
+        """
+        Expected data to be sent in a POST request to OperationsView
+        :param name:
+        :param description:
+        :param libraries:
+        :param public:
+        :param action:
+        :return:
+        """
+        post_data = dict(
+            name=name,
+            description=description,
+            public=public,
+            action=action
+        )
+        if libraries:
+            post_data['libraries'] = libraries
+
+        return post_data
