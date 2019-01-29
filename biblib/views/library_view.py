@@ -352,7 +352,12 @@ class LibraryView(BaseView):
         # Parameters to be forwarded to Solr: pagination, and fields
         try:
             start = int(request.args.get('start', 0))
-            rows = min(int(request.args.get('rows', 20)), 100)
+            max_rows = current_app.config.get('BIBLIB_MAX_ROWS', 100)
+            max_rows *= float(
+                request.headers.get('X-Adsws-Ratelimit-Level', 1.0)
+            )
+            max_rows = int(max_rows)
+            rows = min(int(request.args.get('rows', 20)), max_rows)
         except ValueError:
             start = 0
             rows = 20
