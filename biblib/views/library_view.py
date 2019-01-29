@@ -165,8 +165,6 @@ class LibraryView(BaseView):
         :return: solr bigquery end point response
         """
 
-        rows = min(rows, 100)
-
         bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
 
         # We need atleast bibcode and alternate bibcode for other methods
