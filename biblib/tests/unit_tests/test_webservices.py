@@ -996,7 +996,9 @@ class TestWebservices(TestCaseDatabase):
 
         # take the union
         url = url_for('operationsview', library=library_ids[0])
-        post_data = stub_libraries[0].operations_view_post_data(name='Library3',action='union',libraries=[library_ids[1]])
+        post_data = stub_libraries[0].operations_view_post_data(action='union',libraries=[library_ids[1]])
+        # check the default name
+        post_data.pop('name')
         # check the default description
         post_data.pop('description')
         response = self.client.post(
@@ -1006,7 +1008,7 @@ class TestWebservices(TestCaseDatabase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json['name'],'Library3')
+        self.assertIn('Untitled',response.json['name'])
         self.assertIn('Union',response.json['description'])
         self.assertIn('bibcode', response.json)
 

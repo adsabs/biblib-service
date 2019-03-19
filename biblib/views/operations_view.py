@@ -225,7 +225,7 @@ class OperationsView(BaseView):
             if 'libraries' not in data:
                 return err(NO_LIBRARY_SPECIFIED_ERROR)
             if 'name' not in data:
-                data['name'] = 'Untitled {0}.'.format(get_date.isoformat())
+                data['name'] = 'Untitled {0}.'.format(get_date().isoformat())
             if 'public' not in data:
                 data['public'] = False
 
