@@ -13,7 +13,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
     MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
     WRONG_TYPE_ERROR, NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR
-from ..biblib_exceptions import PermissionDeniedError
+from ..biblib_exceptions import BackendIntegrityError
 
 
 class OperationsView(BaseView):
@@ -242,7 +242,14 @@ class OperationsView(BaseView):
             if 'description' not in data:
                 data['description'] = 'Union of {0} with {1}'.format(library, data['libraries'])
 
-            library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
+            try:
+                library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
+            except BackendIntegrityError as error:
+                current_app.logger.error(error)
+                return err(DUPLICATE_LIBRARY_NAME_ERROR)
+            except TypeError as error:
+                current_app.logger.error(error)
+                return err(WRONG_TYPE_ERROR)
 
             return library_dict, 200
 
@@ -259,7 +266,14 @@ class OperationsView(BaseView):
             if 'description' not in data:
                 data['description'] = 'Intersection of {0} with {1}'.format(library, data['libraries'])
 
-            library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
+            try:
+                library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
+            except BackendIntegrityError as error:
+                current_app.logger.error(error)
+                return err(DUPLICATE_LIBRARY_NAME_ERROR)
+            except TypeError as error:
+                current_app.logger.error(error)
+                return err(WRONG_TYPE_ERROR)
             return library_dict, 200
 
         elif data['action'] == 'difference':
@@ -275,7 +289,14 @@ class OperationsView(BaseView):
             if 'description' not in data:
                 data['description'] = 'Records that are in {0} but not in {1}'.format(library, data['libraries'])
 
-            library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
+            try:
+                library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
+            except BackendIntegrityError as error:
+                current_app.logger.error(error)
+                return err(DUPLICATE_LIBRARY_NAME_ERROR)
+            except TypeError as error:
+                current_app.logger.error(error)
+                return err(WRONG_TYPE_ERROR)
             return library_dict, 200
 
         elif data['action'] == 'copy':
