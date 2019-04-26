@@ -201,14 +201,14 @@ class OperationsView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library = self.helper_slug_to_uuid(library)
+        library_uuid = self.helper_slug_to_uuid(library)
 
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
 
         # Check the permissions of the user
         if not self.write_access(service_uid=user_editing_uid,
-                                 library_id=library):
+                                 library_id=library_uuid):
             return err(NO_PERMISSION_ERROR)
 
         try:
@@ -229,18 +229,36 @@ class OperationsView(BaseView):
             if 'public' not in data:
                 data['public'] = False
 
+        if data['action'] == 'copy':
+            if 'libraries' not in data:
+                return err(NO_LIBRARY_SPECIFIED_ERROR)
+            if len(data['libraries']) > 1:
+                return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
+
+        lib_names = []
+        with current_app.session_scope() as session:
+            primary = session.query(Library).filter_by(id=library_uuid).one()
+            lib_names.append(primary.name)
+            if 'libraries' in data:
+                for lib in data['libraries']:
+                    secondary_uuid = self.helper_slug_to_uuid(lib)
+                    secondary = session.query(Library).filter_by(id=secondary_uuid).one()
+                    lib_names.append(secondary.name)
+
         if data['action'] == 'union':
             bib_union = self.setops_libraries(
-                library_id=library,
+                library_id=library_uuid,
                 document_data=data,
                 operation='union'
             )
-            current_app.logger.info('Successfully took the union of {0} with {1}'
-                    .format(library, data['libraries']))
+
+            current_app.logger.info('Successfully took the union of the libraries {0} (IDs: {1}, {2})'
+                    .format(', '.join(lib_names), library, ', '.join(data['libraries'])))
 
             data['bibcode'] = bib_union
             if 'description' not in data:
-                data['description'] = 'Union of {0} with {1}'.format(library, data['libraries'])
+                data['description'] = 'Union of libraries {0} (IDs: {1}, {2})' \
+                    .format(', '.join(lib_names), library, ', '.join(data['libraries']))
 
             library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
 
@@ -248,48 +266,45 @@ class OperationsView(BaseView):
 
         elif data['action'] == 'intersection':
             bib_intersect = self.setops_libraries(
-                library_id=library,
+                library_id=library_uuid,
                 document_data=data,
                 operation='intersection'
             )
-            current_app.logger.info('Successfully took the intersection of {0} with {1}'
-                                    .format(library, data['libraries']))
+            current_app.logger.info('Successfully took the intersection of the libraries {0} (IDs: {1}, {2})'
+                    .format(', '.join(lib_names), library, ', '.join(data['libraries'])))
 
             data['bibcode'] = bib_intersect
             if 'description' not in data:
-                data['description'] = 'Intersection of {0} with {1}'.format(library, data['libraries'])
+                data['description'] = 'Intersection of {0} (IDs: {1}, {2})' \
+                    .format(', '.join(lib_names), library, ', '.join(data['libraries']))
 
             library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
             return library_dict, 200
 
         elif data['action'] == 'difference':
             bib_diff = self.setops_libraries(
-                library_id=library,
+                library_id=library_uuid,
                 document_data=data,
                 operation='difference'
             )
-            current_app.logger.info('Successfully took the difference of {0} - (minus) {1}'
-                                    .format(library, data['libraries']))
+            current_app.logger.info('Successfully took the difference of {0} (ID {2}) - (minus) {1} (ID {3})'
+                    .format(lib_names[0], ', '.join(lib_names[1:]), library, ', '.join(data['libraries'])))
 
             data['bibcode'] = bib_diff
             if 'description' not in data:
-                data['description'] = 'Records that are in {0} but not in {1}'.format(library, data['libraries'])
+                data['description'] = 'Records that are in {0} (ID {2}) but not in {1} (ID {3})' \
+                    .format(lib_names[0], ', '.join(lib_names[1:]), library, ', '.join(data['libraries']))
 
             library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
             return library_dict, 200
 
         elif data['action'] == 'copy':
-            if 'libraries' not in data:
-                return err(NO_LIBRARY_SPECIFIED_ERROR)
-            if len(data['libraries']) > 1:
-                return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
-
             library_dict = self.copy_library(
-                library_id=library,
+                library_id=library_uuid,
                 document_data=data
             )
-            current_app.logger.info('Successfully copied {0} into {1}'
-                                    .format(library, data['libraries']))
+            current_app.logger.info('Successfully copied {0} (ID {2}) into {1} (ID {3})'
+                                    .format(lib_names[0], lib_names[1], library, data['libraries'][0]))
 
             with current_app.session_scope() as session:
                 libid = self.helper_slug_to_uuid(data['libraries'][0])
@@ -302,13 +317,13 @@ class OperationsView(BaseView):
 
         elif data['action'] == 'empty':
             library_dict = self.empty_library(
-                library_id=library
+                library_id=library_uuid
             )
-            current_app.logger.info('Successfully emptied {0} of all records'
-                                    .format(library))
+            current_app.logger.info('Successfully emptied {0} (ID {1}) of all records'
+                                    .format(lib_names[0], library))
 
             with current_app.session_scope() as session:
-                library = session.query(Library).filter_by(id=library).one()
+                library = session.query(Library).filter_by(id=library_uuid).one()
                 bib = library.get_bibcodes()
 
                 library_dict['bibcode'] = bib
