@@ -8,13 +8,14 @@ from biblib.models import User, Library, Permissions, MutableDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
-    BaseView, TransferView, ClassicView, OperationsView
+    BaseView, TransferView, ClassicView, OperationsView, EmailView
 from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
 from biblib.utils import get_item
 from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
+from biblib.emails import PermissionsChangedEmail
 
 
 class TestBaseViews(TestCaseDatabase):
@@ -1187,6 +1188,27 @@ class TestLibraryViews(TestCaseDatabase):
             exists = self.library_view.helper_library_exists(library_id=library.id)
             self.assertFalse(exists)
 
+    def test_get_library_name(self):
+        """
+        Tests retrieval of a library name
+
+        :return: no return
+        """
+
+        # Make a library
+        library = Library(name='TestLibrary',
+                          description='Test library',
+                          public=True,
+                          bibcode=self.stub_library.bibcode)
+
+        with self.app.session_scope() as session:
+            session.add(library)
+            session.commit()
+            session.refresh(library)
+            session.expunge(library)
+
+        name = self.library_view.helper_library_name(library_id=library.id)
+        self.assertEqual(name, library.name)
 
 
 class TestDocumentViews(TestCaseDatabase):
@@ -3099,6 +3121,19 @@ class TestClassicViews(TestCaseDatabase):
                 )
 
             self.assertNotIn('new bibcode', stub_library.get_bibcodes())
+
+class TestEmailView(TestCaseDatabase):
+    """
+    Base class to test the Email View for POST
+    """
+    def test_send_email(self):
+        email = 'test@email'
+        payload = u'This is a test payload'
+        msg = EmailView.send_email(email_addr=email, email_template=PermissionsChangedEmail, payload=payload)
+
+        self.assertTrue(payload in msg.body)
+        self.assertEqual(msg.subject, PermissionsChangedEmail.subject)
+
 
 
 if __name__ == '__main__':

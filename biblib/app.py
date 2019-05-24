@@ -7,9 +7,10 @@ import logging.config
 
 from werkzeug.serving import run_simple
 from views import UserView, LibraryView, DocumentView, PermissionView, \
-    TransferView, ClassicView, TwoPointOhView, OperationsView
+    TransferView, ClassicView, TwoPointOhView, OperationsView, EmailView
 from flask_restful import Api
 from flask_discoverer import Discoverer
+from flask.ext.mail import Mail
 from adsmutils import ADSFlask
 
 def create_app(**config):
@@ -24,6 +25,7 @@ def create_app(**config):
     # Register extensions
     api = Api(app)
     Discoverer(app)
+    mail = Mail(app)
 
     # Add the end resource end points
     api.add_resource(UserView,
@@ -58,6 +60,11 @@ def create_app(**config):
     api.add_resource(TwoPointOhView,
                      '/twopointoh',
                      methods=['GET']
+                     )
+
+    api.add_resource(EmailView,
+                     '/email',
+                     methods=['POST']
                      )
 
     return app

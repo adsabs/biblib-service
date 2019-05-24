@@ -2337,6 +2337,43 @@ class TestWebservices(TestCaseDatabase):
                 .format(stub_library.bibcode, response.json['documents'])
         )
 
+    def test_permissions_email(self):
+        """
+        Tests the email functionality for permissions change
+
+        :return: No return
+        """
+        user_owner = UserShop()
+        user_new_owner = UserShop()
+        stub_library = LibraryShop()
+
+        # create the library for notifications
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=user_owner.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+
+        data = [{'email': user_new_owner.email,
+                 'library': library_id,
+                 'permission': 'read',
+                 'value': False},
+                {'email': user_new_owner.email,
+                 'library': library_id,
+                 'permission': 'admin',
+                 'value': True}]
+
+        url = url_for('emailview')
+        response = self.client.post(
+            url,
+            data=json.dumps(data),
+            headers=user_owner.headers
+        )
+        self.assertEqual(response.status_code, 200)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

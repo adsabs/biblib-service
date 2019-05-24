@@ -227,6 +227,19 @@ class BaseView(Resource):
                 return False
 
     @staticmethod
+    def helper_library_name(library_id):
+        """
+        Given a library ID, returns the name of the library.
+        :return: library name
+        """
+        with current_app.session_scope() as session:
+            try:
+                library = session.query(Library).filter_by(id=library_id).one()
+                return library.name
+            except NoResultFound:
+                return None
+
+    @staticmethod
     def helper_validate_library_data(service_uid, library_data):
         """
         Validates the library data to ensure the user does not give empty
