@@ -71,7 +71,7 @@ class DeleteStaleUsers(Command):
                         try:
                             # Obtain the libraries that should be deleted
                             permissions = session.query(Permissions).filter(Permissions.user_id == service_user.id).all()
-                            libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.owner]
+                            libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
 
                             # Delete all the libraries found
                             # By cascade this should delete all the permissions

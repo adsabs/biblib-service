@@ -125,24 +125,22 @@ class UserShop(object):
         """
         self.headers = {USER_ID_KEYWORD: self.absolute_uid}
 
-    def permission_view_post_data(self, permission, value):
+    def permission_view_post_data(self, permission):
         """
         Expected data to be sent in a POST request to the PermissionView
         end point, /permissions/<>
-        :param permission: permission to change
-        :param value: value of the permission (boolean)
+        :param permission: dict of permission to change
 
         :return: POST data in dictionary format
         """
         post_data = dict(
             email=self.email,
-            permission=permission,
-            value=value
+            permission=permission
         )
 
         return post_data
 
-    def permission_view_post_data_json(self, permission, value):
+    def permission_view_post_data_json(self, permission):
         """
         Expected data to be sent in a POST request to the PermissionView.
         This has been turned into json format.
@@ -152,7 +150,7 @@ class UserShop(object):
 
         :return: POST data in JSON format
         """
-        post_data = self.permission_view_post_data(permission, value)
+        post_data = self.permission_view_post_data(permission)
         return json.dumps(post_data)
 
     def transfer_view_post_data(self):

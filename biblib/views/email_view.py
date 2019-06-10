@@ -18,34 +18,7 @@ class EmailView(BaseView):
     # TODO decide on rate limits
     rate_limit = [50, 60 * 60 * 24]
 
-    @staticmethod
-    def send_email(email_addr='', email_template=Email, payload=None):
-        """
-        Encrypts a payload using itsDangerous.TimeSerializer, adding it along with a base
-        URL to an email template. Sends an email with this data using the current app's
-        'mail' extension.
 
-        :param email_addr:
-        :type email_addr: basestring
-        :param email_template: emails.Email
-        :param payload
-
-        :return: msg,token
-        :rtype flask.ext.mail.Message, basestring
-        """
-        if payload is None:
-            payload = []
-        if isinstance(payload, (list, tuple)):
-            payload = ' '.join(map(unicode, payload))
-        msg = Message(subject=email_template.subject,
-                      recipients=[email_addr],
-                      body=email_template.msg_plain.format(payload=payload),
-                      html=email_template.msg_html.format(payload=payload.replace('\n','<br>'),email_address=email_addr))
-        # TODO make this async?
-        current_app.extensions['mail'].send(msg)
-
-        current_app.logger.info('Email sent to {0} with payload: {1}'.format(msg.recipients, msg.body))
-        return msg
 
     def post(self):
         """

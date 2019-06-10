@@ -15,4 +15,3 @@ from permission_view import PermissionView
 from transfer_view import TransferView
 from classic_view import ClassicView, TwoPointOhView
 from operations_view import OperationsView
-from email_view import EmailView

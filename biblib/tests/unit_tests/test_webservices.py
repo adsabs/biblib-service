@@ -524,8 +524,7 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
 
         post_data = stub_user_permission.permission_view_post_data(
-            permission='read',
-            value=True
+            permission={'read': True, 'write': False, 'admin': False, 'owner': False}
         )
         post_data['permission'] = 2
 
@@ -539,8 +538,7 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, WRONG_TYPE_ERROR['number'])
         self.assertEqual(response.json['error'], WRONG_TYPE_ERROR['body'])
 
-        post_data['permission'] = 'read'
-        post_data['value'] = -1
+        post_data['permission'] = ['read', -1]
 
         url = url_for('permissionview', library=library_id)
         with MockEmailService(stub_user_permission):
@@ -1291,7 +1289,7 @@ class TestWebservices(TestCaseDatabase):
         with MockEmailService(stub_user_2):
             response = self.client.post(
                 url,
-                data=stub_user_2.permission_view_post_data_json('read', True),
+                data=stub_user_2.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
                 headers=stub_user_1.headers
             )
         self.assertEqual(response.status_code, 200)
@@ -1353,7 +1351,7 @@ class TestWebservices(TestCaseDatabase):
         with MockEmailService(stub_user_1):
             response = self.client.post(
                 url,
-                data=stub_user_1.permission_view_post_data_json('read', True),
+                data=stub_user_1.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
                 headers=stub_user_2.headers
             )
 
@@ -1394,7 +1392,7 @@ class TestWebservices(TestCaseDatabase):
                 response = self.client.post(
                     url,
                     data=stub_user.permission_view_post_data_json(
-                        permission_type, False
+                        {permission_type: False}
                     ),
                     headers=stub_user.headers
                 )
@@ -1440,7 +1438,7 @@ class TestWebservices(TestCaseDatabase):
         with MockEmailService(stub_user_2):
             response = self.client.post(
                 url,
-                data=stub_user_2.permission_view_post_data_json('admin', True),
+                data=stub_user_2.permission_view_post_data_json({'read': False, 'write': False, 'admin': True, 'owner': False}),
                 headers=stub_user_1.headers
             )
         self.assertEqual(response.status_code, 200)
@@ -1452,7 +1450,7 @@ class TestWebservices(TestCaseDatabase):
         with MockEmailService(stub_user_3):
             response = self.client.post(
                 url,
-                data=stub_user_3.permission_view_post_data_json('owner', True),
+                data=stub_user_3.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': True}),
                 headers=stub_user_2.headers
             )
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
@@ -1492,8 +1490,7 @@ class TestWebservices(TestCaseDatabase):
                 response = self.client.post(
                     url,
                     data=stub_user_2.permission_view_post_data_json(
-                        permission_type,
-                        True
+                        {permission_type: True}
                     ),
                     headers=stub_user_1.headers
                 )
@@ -1621,7 +1618,7 @@ class TestWebservices(TestCaseDatabase):
                 response = self.client.post(
                     url,
                     data=stub_user.permission_view_post_data_json(
-                        permission, True
+                        {permission: True}
                     ),
                     headers=stub_owner.headers
                 )
@@ -1819,7 +1816,7 @@ class TestWebservices(TestCaseDatabase):
         with MockEmailService(user_admin):
             response = self.client.post(
                 url,
-                data=user_admin.permission_view_post_data_json('admin', True),
+                data=user_admin.permission_view_post_data_json({'read': False, 'write': False, 'admin': True, 'owner': False}),
                 headers=user_mary.headers
             )
         self.assertEqual(response.status_code, 200)
@@ -1914,8 +1911,7 @@ class TestWebservices(TestCaseDatabase):
         with MockEmailService(stub_random):
             response = self.client.post(
                 url,
-                data=stub_random.permission_view_post_data_json('read',
-                                                              True),
+                data=stub_random.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
                 headers=stub_user.headers
             )
 
@@ -1996,7 +1992,7 @@ class TestWebservices(TestCaseDatabase):
             with MockEmailService(user):
                 response = self.client.post(
                     url,
-                    data=user.permission_view_post_data_json(permission, True),
+                    data=user.permission_view_post_data_json({permission: True}),
                     headers=user_mary.headers
                 )
             self.assertEqual(response.status_code, 200)
@@ -2044,7 +2040,7 @@ class TestWebservices(TestCaseDatabase):
             url = url_for('permissionview', library=library_id)
             response = self.client.post(
                 url,
-                data=user_admin.permission_view_post_data_json('admin', True),
+                data=user_admin.permission_view_post_data_json({'read': False, 'write': False, 'admin': True, 'owner': False}),
                 headers=user_owner.headers
             )
         self.assertEqual(response.status_code, 200)
@@ -2091,7 +2087,7 @@ class TestWebservices(TestCaseDatabase):
             url = url_for('permissionview', library=library_id)
             response = self.client.post(
                 url,
-                data=user_read.permission_view_post_data_json('read', True),
+                data=user_read.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
                 headers=user_owner.headers
             )
         self.assertEqual(response.status_code, 200)
@@ -2100,7 +2096,7 @@ class TestWebservices(TestCaseDatabase):
             url = url_for('permissionview', library=library_id)
             response = self.client.post(
                 url,
-                data=user_write.permission_view_post_data_json('write', True),
+                data=user_write.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
                 headers=user_owner.headers
             )
         self.assertEqual(response.status_code, 200)
@@ -2336,43 +2332,6 @@ class TestWebservices(TestCaseDatabase):
             msg='Bibcodes received do not match: {} != {}'
                 .format(stub_library.bibcode, response.json['documents'])
         )
-
-    def test_permissions_email(self):
-        """
-        Tests the email functionality for permissions change
-
-        :return: No return
-        """
-        user_owner = UserShop()
-        user_new_owner = UserShop()
-        stub_library = LibraryShop()
-
-        # create the library for notifications
-        url = url_for('userview')
-        response = self.client.post(
-            url,
-            data=stub_library.user_view_post_data_json,
-            headers=user_owner.headers
-        )
-        self.assertEqual(response.status_code, 200)
-        library_id = response.json['id']
-
-        data = [{'email': user_new_owner.email,
-                 'library': library_id,
-                 'permission': 'read',
-                 'value': False},
-                {'email': user_new_owner.email,
-                 'library': library_id,
-                 'permission': 'admin',
-                 'value': True}]
-
-        url = url_for('emailview')
-        response = self.client.post(
-            url,
-            data=json.dumps(data),
-            headers=user_owner.headers
-        )
-        self.assertEqual(response.status_code, 200)
 
 
 if __name__ == '__main__':

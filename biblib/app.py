@@ -7,7 +7,7 @@ import logging.config
 
 from werkzeug.serving import run_simple
 from views import UserView, LibraryView, DocumentView, PermissionView, \
-    TransferView, ClassicView, TwoPointOhView, OperationsView, EmailView
+    TransferView, ClassicView, TwoPointOhView, OperationsView
 from flask_restful import Api
 from flask_discoverer import Discoverer
 from flask.ext.mail import Mail
@@ -60,11 +60,6 @@ def create_app(**config):
     api.add_resource(TwoPointOhView,
                      '/twopointoh',
                      methods=['GET']
-                     )
-
-    api.add_resource(EmailView,
-                     '/email',
-                     methods=['POST']
                      )
 
     return app

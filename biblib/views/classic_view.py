@@ -11,6 +11,7 @@ from flask_discoverer import advertise
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from http_errors import MISSING_USERNAME_ERROR
+from sqlalchemy import Boolean
 
 
 class HarbourView(BaseView):
@@ -52,7 +53,7 @@ class HarbourView(BaseView):
 
                 # but, this must be done via the orm api
                 q = session.query(Library).join(Permissions).filter(Library.id == Permissions.library_id)\
-                    .filter(Permissions.user_id == user.id).filter(Permissions.owner == True).filter(Library.name == library['name'])
+                    .filter(Permissions.user_id == user.id).filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True)).filter(Library.name == library['name'])
                 lib = q.all()
 
 
@@ -83,7 +84,7 @@ class HarbourView(BaseView):
             except NoResultFound:
                 current_app.logger.info('Creating library from scratch: {}'
                                         .format(library))
-                permission = Permissions(owner=True)
+                permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
                 lib = Library(
                     name=library['name'][0:50],
                     description=library['description'][0:200],

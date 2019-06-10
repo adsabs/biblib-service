@@ -88,7 +88,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
             response = self.client.post(
                 url,
                 data=user_student.permission_view_post_data_json(
-                    'write', True
+                    {'read': False, 'write': True, 'admin': False, 'owner': False}
                 ),
                 headers=user_mary.headers
             )
@@ -102,7 +102,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
         with MockEmailService(user_mary):
             response = self.client.post(
                 url,
-                data=user_mary.permission_view_post_data_json('admin', True),
+                data=user_mary.permission_view_post_data_json({'read': False, 'write': False, 'admin': True, 'owner': False}),
                 headers=user_dave.headers
             )
         self.assertEqual(response.status_code, 200)
@@ -113,7 +113,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
             response = self.client.post(
                 url,
                 data=user_student.permission_view_post_data_json(
-                    'write', True
+                    {'read': False, 'write': True, 'admin': False, 'owner': False}
                 ),
                 headers=user_mary.headers
             )
@@ -193,7 +193,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
             response = self.client.post(
                 url,
                 data=user_student.permission_view_post_data_json(
-                    'write', False
+                    {'read': False, 'write': False, 'admin': False, 'owner': False}
                 ),
                 headers=user_mary.headers
             )
@@ -219,7 +219,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
             response = self.client.post(
                 url,
                 data=user_student.permission_view_post_data_json(
-                    'owner', True
+                    {'read': False, 'write': False, 'admin': False, 'owner': True}
                 ),
                 headers=user_mary.headers
             )
@@ -242,8 +242,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
                 response = self.client.post(
                     url,
                     data=user_dave.permission_view_post_data_json(
-                        permission_type,
-                        False
+                        {permission_type: False}
                     ),
                     headers=user_mary.headers
                 )
@@ -261,7 +260,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
         with MockEmailService(user_mary):
             response = self.client.post(
                 url,
-                data=user_mary.permission_view_post_data_json('admin', False),
+                data=user_mary.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
                 headers=user_dave.headers
             )
         self.assertEqual(response.status_code, 200)
@@ -272,7 +271,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
             response = self.client.post(
                 url,
                 data=user_student.permission_view_post_data_json(
-                    'write', True
+                    {'read': False, 'write': True, 'admin': False, 'owner': False}
                 ),
                 headers=user_mary.headers
             )

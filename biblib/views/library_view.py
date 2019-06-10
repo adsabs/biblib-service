@@ -8,6 +8,7 @@ from ..client import client
 from base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
+from sqlalchemy import Boolean
 from http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
     MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR
 
@@ -41,8 +42,8 @@ class LibraryView(BaseView):
             # Get the owner of the library
             result = session.query(Permissions, User)\
                 .join(Permissions.user)\
-                .filter(Permissions.library_id == library_id)\
-                .filter(Permissions.owner == True)\
+                .filter(Permissions.library_id == library_id) \
+                .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True))\
                 .one()
             owner_permissions, owner = result
 
@@ -77,13 +78,13 @@ class LibraryView(BaseView):
                         Permissions.library_id == library_id
                     ).one()
 
-                    if permission.owner:
+                    if permission.permissions['owner']:
                         main_permission = 'owner'
-                    elif permission.admin:
+                    elif permission.permissions['admin']:
                         main_permission = 'admin'
-                    elif permission.write:
+                    elif permission.permissions['write']:
                         main_permission = 'write'
-                    elif permission.read:
+                    elif permission.permissions['read']:
                         main_permission = 'read'
                     else:
                         main_permission = 'none'
