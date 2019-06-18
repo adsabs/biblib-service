@@ -2096,7 +2096,7 @@ class TestWebservices(TestCaseDatabase):
             url = url_for('permissionview', library=library_id)
             response = self.client.post(
                 url,
-                data=user_write.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
+                data=user_write.permission_view_post_data_json({'read': False, 'write': True, 'admin': False, 'owner': False}),
                 headers=user_owner.headers
             )
         self.assertEqual(response.status_code, 200)

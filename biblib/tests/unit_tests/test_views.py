@@ -92,7 +92,8 @@ class TestBaseViews(TestCaseDatabase):
     def test_send_email(self):
         """
         Tests that an email message is constructed
-        Nothing is sent in flask testing mode
+        Note: no email is sent in flask testing mode (currently set in inherited class
+        TestCaseDatabase, TESTING=True; https://pythonhosted.org/Flask-Mail)
 
         :return: none
         """

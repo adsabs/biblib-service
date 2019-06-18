@@ -95,6 +95,9 @@ class PermissionView(BaseView):
                 # user to be modified is not owner
                 if not modify_permissions.permissions['owner']:
                     return True
+
+                # otherwise the user to be modified is the owner, so not allowed
+                return False
             else:
                 return False
 
@@ -109,7 +112,7 @@ class PermissionView(BaseView):
         :return: no return
         """
 
-        to_set = [k for k,v in permission.iteritems() if v]
+        to_set = [k for k,v in permission.iteritems() if (type(v)==bool)]
         if not set(to_set).issubset(set(['read', 'write', 'admin'])):
             raise PermissionDeniedError('Permission Error')
 
@@ -172,9 +175,22 @@ class PermissionView(BaseView):
                 for p, value in permission.iteritems():
                     getattr(new_permission, 'permissions')[p] = value
 
-                user.permissions.append(new_permission)
-                library.permissions.append(new_permission)
-                session.add_all([user, library, new_permission])
+                # Check if all permission are False, then remove completely
+                if not (new_permission.permissions['read'] |
+                        new_permission.permissions['write'] |
+                        new_permission.permissions['admin'] |
+                        new_permission.permissions['owner']):
+                    
+                    current_app.logger.info('Not adding permissions for {0} and '
+                                            'library {1} as all permission are '
+                                            'False. {2}'
+                                            .format(service_uid,
+                                                    library_id,
+                                                    new_permission))
+                else:     
+                    user.permissions.append(new_permission)
+                    library.permissions.append(new_permission)
+                    session.add_all([user, library, new_permission])
 
             session.commit()
 
@@ -383,6 +399,12 @@ class PermissionView(BaseView):
             )
         except TypeError as error:
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
+                                     .format(request.data, error))
+            return err(WRONG_TYPE_ERROR)
+
+        bad_vals = [type(v) for k,v in permission_data['permission'].iteritems() if (type(v)!=bool)]
+        if len(bad_vals) > 0:
+            current_app.logger.error('Wrong values passed for permissions for POST: {0} [{1}]'
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
 
