@@ -112,8 +112,8 @@ class PermissionView(BaseView):
         :return: no return
         """
 
-        to_set = [k for k,v in permission.iteritems() if (type(v)==bool)]
-        if not set(to_set).issubset(set(['read', 'write', 'admin'])):
+        to_set = [k for k,v in permission.iteritems() if (type(v) == bool)]
+        if not set(to_set).issubset(set(['read', 'write', 'admin', 'owner'])):
             raise PermissionDeniedError('Permission Error')
 
         with current_app.session_scope() as session:
@@ -123,6 +123,11 @@ class PermissionView(BaseView):
                     user_id = service_uid,
                     library_id = library_id
                 ).one()
+
+                # can't change owner permission this way - must go through TransferView
+                if permission.get('owner') and \
+                        (getattr(new_permission, 'permissions').get('owner',False) != permission['owner']):
+                    raise PermissionDeniedError('Permission Error')
 
                 current_app.logger.info(
                     'User: {0} has permission already for '
@@ -171,6 +176,10 @@ class PermissionView(BaseView):
                                                             'write': False,
                                                             'admin': False,
                                                             'owner': False})
+
+                # can't set owner permission this way
+                if permission.get('owner',False) is not False:
+                    raise PermissionDeniedError('Permission Error')
 
                 for p, value in permission.iteritems():
                     getattr(new_permission, 'permissions')[p] = value
@@ -405,7 +414,7 @@ class PermissionView(BaseView):
         bad_vals = [type(v) for k,v in permission_data['permission'].iteritems() if (type(v)!=bool)]
         if len(bad_vals) > 0:
             current_app.logger.error('Wrong values passed for permissions for POST: {0} [{1}]'
-                                     .format(request.data, error))
+                                     .format(request.data, bad_vals))
             return err(WRONG_TYPE_ERROR)
 
         current_app.logger.info('Requested permission changes for user {0}:'
