@@ -257,16 +257,14 @@ class Permissions(Base):
     """
     __tablename__ = 'permissions'
     id = Column(Integer, primary_key=True)
-    read = Column(Boolean, default=False)
-    write = Column(Boolean, default=False)
-    admin = Column(Boolean, default=False)
-    owner = Column(Boolean, default=False)
+    permissions = Column(MutableDict.as_mutable(JSON),
+                         default={'read': False, 'write': False, 'admin': False, 'owner': False})
 
     user_id = Column(Integer, ForeignKey('user.id'))
     library_id = Column(GUID, ForeignKey('library.id'))
 
     def __repr__(self):
-        return '<Permissions, user_id: {0}, library_id: {1}, read: {2}, '\
-               'write: {3}, admin: {4}, owner: {5}>'\
-            .format(self.user_id, self.library_id, self.read, self.write,
-                    self.admin, self.owner)
+        return '<Permissions, user_id: {0}, library_id: {1}, permissions: {2}>'\
+            .format(self.user_id, self.library_id, self.permissions)
+
+

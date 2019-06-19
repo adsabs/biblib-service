@@ -56,7 +56,7 @@ class TestDeletionAbuseEpic(TestCaseDatabase):
                 response = self.client.post(
                     url,
                     data=stub_user.permission_view_post_data_json(
-                        permission, True
+                        {permission: True}
                     ),
                     headers=stub_owner.headers
                 )

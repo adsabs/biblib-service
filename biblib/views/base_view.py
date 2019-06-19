@@ -8,12 +8,15 @@ from ..views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
     USER_ID_KEYWORD
 from flask import request, current_app
 from flask_restful import Resource
+from flask.ext.mail import Message
 from ..models import User, Library, Permissions
 from ..client import client
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy import Boolean
 from ..biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from ..utils import uniquify
+from ..emails import Email
 
 class BaseView(Resource):
     """
@@ -201,7 +204,7 @@ class BaseView(Resource):
                     user_id = service_uid
                 ).one()
 
-                return getattr(permissions, access_type)
+                return getattr(permissions, 'permissions')[access_type]
 
             except NoResultFound as error:
                 current_app.logger.error('No permissions for '
@@ -225,6 +228,19 @@ class BaseView(Resource):
                 return True
             except NoResultFound:
                 return False
+
+    @staticmethod
+    def helper_library_name(library_id):
+        """
+        Given a library ID, returns the name of the library.
+        :return: library name
+        """
+        with current_app.session_scope() as session:
+            try:
+                library = session.query(Library).filter_by(id=library_id).one()
+                return library.name
+            except NoResultFound:
+                return None
 
     @staticmethod
     def helper_validate_library_data(service_uid, library_data):
@@ -252,8 +268,10 @@ class BaseView(Resource):
         with current_app.session_scope() as session:
             library_names = \
                 [i.library.name for i in
-                 session.query(Permissions).filter_by(user_id = service_uid,
-                                                      owner = True).all()]
+                 session.query(Permissions)\
+                     .filter_by(user_id = service_uid)\
+                     .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True))\
+                     .all()]
 
         matches = [name for name in library_names if name == _name]
         if matches:
@@ -324,7 +342,7 @@ class BaseView(Resource):
 
                 # Make the permissions
                 permission = Permissions(
-                    owner=True,
+                    permissions={'read': False, 'write': False, 'admin': False, 'owner': True},
                 )
 
                 # Use the ORM to link the permissions to the library and user,
@@ -362,3 +380,33 @@ class BaseView(Resource):
             except Exception:
                 session.rollback()
                 raise
+
+    @staticmethod
+    def send_email(email_addr='', email_template=Email, payload=None):
+        """
+        Encrypts a payload using itsDangerous.TimeSerializer, adding it along with a base
+        URL to an email template. Sends an email with this data using the current app's
+        'mail' extension.
+
+        :param email_addr:
+        :type email_addr: basestring
+        :param email_template: emails.Email
+        :param payload
+
+        :return: msg,token
+        :rtype flask.ext.mail.Message, basestring
+        """
+        if payload is None:
+            payload = []
+        if isinstance(payload, (list, tuple)):
+            payload = ' '.join(map(unicode, payload))
+        msg = Message(subject=email_template.subject,
+                      recipients=[email_addr],
+                      body=email_template.msg_plain.format(payload=payload),
+                      html=email_template.msg_html.format(payload=payload.replace('\n', '<br>'),
+                                                          email_address=email_addr))
+        # TODO make this async?
+        current_app.extensions['mail'].send(msg)
+
+        current_app.logger.info('Email sent to {0} with payload: {1}'.format(msg.recipients, msg.body))
+        return msg

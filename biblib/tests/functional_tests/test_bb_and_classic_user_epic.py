@@ -65,7 +65,7 @@ class TestBBClassicUserEpic(TestCaseDatabase):
         with MockEmailService(user_gpa):
             response = self.client.post(
                 url,
-                data=user_gpa.permission_view_post_data_json('read', True),
+                data=user_gpa.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
                 headers=user_mary.headers
             )
         self.assertEqual(response.status_code, 200)

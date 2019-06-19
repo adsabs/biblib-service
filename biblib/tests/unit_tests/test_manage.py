@@ -102,22 +102,22 @@ class TestManagePy(TestCaseDatabase):
                 # User 1 owns library 1 and can read library 2
                 # User 2 owns library 2 and can read library 1
                 permission_user_1_library_1 = Permissions(
-                    owner=True,
+                    permissions={'read': False, 'write': False, 'admin': False, 'owner': True},
                     library_id=library_1.id,
                     user_id=user_1.id
                 )
                 permission_user_1_library_2 = Permissions(
-                    read=True,
+                    permissions={'read': True, 'write': False, 'admin': False, 'owner': False},
                     library_id=library_2.id,
                     user_id=user_1.id
                 )
                 permission_user_2_library_1 = Permissions(
-                    read=True,
+                    permissions={'read': True, 'write': False, 'admin': False, 'owner': False},
                     library_id=library_1.id,
                     user_id=user_2.id
                 )
                 permission_user_2_library_2 = Permissions(
-                    owner=True,
+                    permissions={'read': False, 'write': False, 'admin': False, 'owner': True},
                     library_id=library_2.id,
                     user_id=user_2.id
                 )

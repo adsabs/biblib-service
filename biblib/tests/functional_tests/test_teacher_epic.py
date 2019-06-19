@@ -73,7 +73,7 @@ class TestTeacherEpic(TestCaseDatabase):
             with MockEmailService(user):
                 response = self.client.post(
                     url,
-                    data=user.permission_view_post_data_json('read', True),
+                    data=user.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
                     headers=user_teacher.headers
                 )
             self.assertEqual(response.status_code, 200)
@@ -97,8 +97,7 @@ class TestTeacherEpic(TestCaseDatabase):
         with MockEmailService(user_student_2):
             response = self.client.post(
                 url,
-                data=user_student_2.permission_view_post_data_json('read',
-                                                                   False),
+                data=user_student_2.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
                 headers=user_teacher.headers
             )
         self.assertEqual(response.status_code, 200)

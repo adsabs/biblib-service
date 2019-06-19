@@ -74,18 +74,18 @@ class UserView(BaseView):
                 if library.bibcode:
                     num_documents = len(library.bibcode)
 
-                if permission.owner:
+                if permission.permissions['owner']:
                     main_permission = 'owner'
-                elif permission.admin:
+                elif permission.permissions['admin']:
                     main_permission = 'admin'
-                elif permission.write:
+                elif permission.permissions['write']:
                     main_permission = 'write'
-                elif permission.read:
+                elif permission.permissions['read']:
                     main_permission = 'read'
                 else:
                     main_permission = 'none'
 
-                if permission.owner or permission.admin and not library.public:
+                if permission.permissions['owner'] or permission.permissions['admin'] and not library.public:
                     num_users = len(users)
                 elif library.public:
                     num_users = len(users)

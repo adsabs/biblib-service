@@ -109,7 +109,7 @@ class TestBigShareEpic(TestCaseDatabase):
         with MockEmailService(user_mary):
             response = self.client.post(
                 url,
-                data=user_mary.permission_view_post_data_json('read', True),
+                data=user_mary.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
                 headers=user_dave.headers
             )
         self.assertEqual(response.status_code, 200)
@@ -158,7 +158,7 @@ class TestBigShareEpic(TestCaseDatabase):
         with MockEmailService(user_dave):
             response = self.client.post(
                 url,
-                data=user_dave.permission_view_post_data_json('read', False),
+                data=user_dave.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
                 headers=user_mary.headers
             )
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
@@ -170,7 +170,7 @@ class TestBigShareEpic(TestCaseDatabase):
         with MockEmailService(user_mary):
             response = self.client.post(
                 url,
-                data=user_mary.permission_view_post_data_json('read', False),
+                data=user_mary.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
                 headers=user_dave.headers
             )
         self.assertEqual(response.status_code, 200)

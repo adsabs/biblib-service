@@ -9,6 +9,7 @@ from flask_discoverer import advertise
 from http_errors import MISSING_USERNAME_ERROR, WRONG_TYPE_ERROR, \
     API_MISSING_USER_EMAIL, NO_PERMISSION_ERROR
 from sqlalchemy.orm.exc import NoResultFound
+from ..emails import PermissionsChangedEmail
 
 class TransferView(BaseView):
     """
@@ -84,7 +85,7 @@ class TransferView(BaseView):
                                                 library_id,
                                                 new_permission))
 
-                new_permission.owner = True
+                new_permission.permissions['owner'] = True
 
             except NoResultFound:
                 # User does not have a permission with the library
@@ -94,7 +95,10 @@ class TransferView(BaseView):
 
                 new_permission = Permissions(user_id=new_owner_uid,
                                              library_id=library_id,
-                                             owner=True)
+                                             permissions={'read': False,
+                                                          'write': False,
+                                                          'admin': False,
+                                                          'owner': True})
 
             session.delete(current_permission)
             session.add(new_permission)
@@ -202,5 +206,17 @@ class TransferView(BaseView):
         self.transfer_ownership(current_owner_uid=current_owner_service_uid,
                                 new_owner_uid=new_owner_service_uid,
                                 library_id=library)
+
+        name = self.helper_library_name(library)
+
+        payload = u'Library: {0} \n    Permission: owner \n    Have permission? True'.format(name)
+
+        current_app.logger.info('Sending email to {0} with payload: {1}'.format(transfer_data['email'], payload))
+        try:
+            msg = self.send_email(email_addr=transfer_data['email'],
+                                  email_template=PermissionsChangedEmail,
+                                  payload=payload)
+        except:
+            current_app.logger.warning('Sending email to {0} failed'.format(transfer_data['email']))
 
         return {}, 200

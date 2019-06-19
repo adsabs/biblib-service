@@ -18,7 +18,7 @@ if not os.path.isdir(LOG_PATH):
 
 # For running tests on TravisCI
 SQLALCHEMY_BINDS = {
-    'libraries': 'postgresql+psycopg2://postgres:@localhost/testdb'
+    'libraries': 'postgresql+psycopg2://postgres:postgres@localhost:5432/test_biblib'
 }
 
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'unset-env').lower()
@@ -32,3 +32,5 @@ BIBLIB_USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
 BIBLIB_ADSWS_API_TOKEN = 'this is a secret api token!'
 BIBLIB_ADSWS_API_DB_URI = 'sqlite:////tmp/test.db'
 BIBLIB_MAX_ROWS = 2000
+
+MAIL_DEFAULT_SENDER = 'no-reply@adslabs.org'

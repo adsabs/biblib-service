@@ -15,6 +15,7 @@ from biblib.utils import get_item
 from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
+from biblib.emails import PermissionsChangedEmail
 
 
 class TestBaseViews(TestCaseDatabase):
@@ -64,8 +65,7 @@ class TestBaseViews(TestCaseDatabase):
         with MockEmailService(stub_random):
             email = BaseView.helper_email_to_api_uid(
                 permission_data=stub_random.permission_view_post_data(
-                    'read',
-                    True
+                    {'read': True, 'write': False, 'admin': False, 'owner': False}
                 )
             )
         self.assertEqual(email, stub_random.absolute_uid)
@@ -85,11 +85,24 @@ class TestBaseViews(TestCaseDatabase):
             with MockEmailService(stub_random):
                 BaseView.helper_email_to_api_uid(
                     permission_data=stub_random.permission_view_post_data(
-                        'read',
-                        True
+                        {'read': True, 'write': False, 'admin': False, 'owner': False}
                     )
                 )
 
+    def test_send_email(self):
+        """
+        Tests that an email message is constructed
+        Note: no email is sent in flask testing mode (currently set in inherited class
+        TestCaseDatabase, TESTING=True; https://pythonhosted.org/Flask-Mail)
+
+        :return: none
+        """
+        email = 'test@email'
+        payload = u'This is a test payload'
+        msg = BaseView.send_email(email_addr=email, email_template=PermissionsChangedEmail, payload=payload)
+
+        self.assertTrue(payload in msg.body)
+        self.assertEqual(msg.subject, PermissionsChangedEmail.subject)
 
 class TestUserViews(TestCaseDatabase):
     """
@@ -389,8 +402,7 @@ class TestUserViews(TestCaseDatabase):
         # Give random permission to the random user
         self.permission_view.add_permission(library_id=BaseView.helper_slug_to_uuid(_lib['id']),
                                             service_uid=user_other.id,
-                                            permission='read',
-                                            value=True)
+                                            permission={'read': True})
 
         # Get the library created
         with MockEmailService(stub_user_1, end_type='uid'):
@@ -493,12 +505,11 @@ class TestUserViews(TestCaseDatabase):
             library_data=stub_library.user_view_post_data
         )
 
-        stub_permissions = [['read', True], ['write', True], ['admin', True]]
-        for permission, value in stub_permissions:
+        stub_permissions = [{'read': True}, {'write': True}, {'admin': True}]
+        for permission in stub_permissions:
             self.permission_view.add_permission(library_id=BaseView.helper_slug_to_uuid(library['id']),
                                                 service_uid=user_other.id,
-                                                permission=permission,
-                                                value=value)
+                                                permission=permission)
             # Get the library created
             with MockEmailService(stub_user_other, end_type='uid'):
                 libraries = self.user_view.get_libraries(
@@ -506,7 +517,7 @@ class TestUserViews(TestCaseDatabase):
                     absolute_uid=user_other.absolute_uid
                 )
 
-            self.assertEqual(permission, libraries[0]['permission'])
+            self.assertEqual(permission.keys()[0], libraries[0]['permission'])
 
     def test_can_only_see_number_of_people_with_admin_or_owner(self):
         """
@@ -519,8 +530,8 @@ class TestUserViews(TestCaseDatabase):
         user_admin = User(absolute_uid=self.stub_user_2.absolute_uid)
 
         library = Library()
-        permission_admin = Permissions(admin=True)
-        permission_owner = Permissions(owner=True)
+        permission_admin = Permissions(permissions={'read': False, 'write': False, 'admin': True, 'owner': False})
+        permission_owner = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
         library.permissions.append(permission_admin)
         library.permissions.append(permission_owner)
         user_admin.permissions.append(permission_admin)
@@ -563,8 +574,8 @@ class TestUserViews(TestCaseDatabase):
         user_write = User(absolute_uid=self.stub_user_2.absolute_uid)
 
         library = Library()
-        permission_read = Permissions(read=True)
-        permission_write = Permissions(write=True)
+        permission_read = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+        permission_write = Permissions(permissions={'read': False, 'write': True, 'admin': False, 'owner': False})
         library.permissions.append(permission_read)
         library.permissions.append(permission_write)
         user_read.permissions.append(permission_read)
@@ -656,8 +667,7 @@ class TestUserViews(TestCaseDatabase):
             )
 
             lib = session.query(Library).filter(Library.id == BaseView.helper_slug_to_uuid(library['id'])).one()
-            self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1),
-                            lib.name)
+            self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1))
             self.assertTrue(lib.description == DEFAULT_LIBRARY_DESCRIPTION)
 
     def test_default_name_and_description_given_when_no_content(self):
@@ -701,8 +711,7 @@ class TestUserViews(TestCaseDatabase):
 
             with self.app.session_scope() as session:
                 lib = session.query(Library).filter(Library.id == BaseView.helper_slug_to_uuid(library['id'])).one()
-                self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1),
-                                lib.name)
+                self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1))
                 self.assertTrue(lib.description == DEFAULT_LIBRARY_DESCRIPTION)
 
 
@@ -750,9 +759,7 @@ class TestLibraryViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(owner=True,
-                                     read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': True})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -792,7 +799,7 @@ class TestLibraryViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(owner=True)
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -834,7 +841,7 @@ class TestLibraryViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(owner=True)
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -878,8 +885,7 @@ class TestLibraryViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -928,8 +934,7 @@ class TestLibraryViews(TestCaseDatabase):
                               bibcode={k: {} for k in original_bibcodes})
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1000,8 +1005,7 @@ class TestLibraryViews(TestCaseDatabase):
                               bibcode={k: {} for k in original_bibcodes})
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1076,8 +1080,7 @@ class TestLibraryViews(TestCaseDatabase):
                               bibcode={k: {} for k in original_bibcodes})
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1139,8 +1142,7 @@ class TestLibraryViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1187,6 +1189,27 @@ class TestLibraryViews(TestCaseDatabase):
             exists = self.library_view.helper_library_exists(library_id=library.id)
             self.assertFalse(exists)
 
+    def test_get_library_name(self):
+        """
+        Tests retrieval of a library name
+
+        :return: no return
+        """
+
+        # Make a library
+        library = Library(name='TestLibrary',
+                          description='Test library',
+                          public=True,
+                          bibcode=self.stub_library.bibcode)
+
+        with self.app.session_scope() as session:
+            session.add(library)
+            session.commit()
+            session.refresh(library)
+            session.expunge(library)
+
+        name = self.library_view.helper_library_name(library_id=library.id)
+        self.assertEqual(name, library.name)
 
 
 class TestDocumentViews(TestCaseDatabase):
@@ -1236,8 +1259,7 @@ class TestDocumentViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1275,7 +1297,7 @@ class TestDocumentViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(read=True, owner=False)
+            permission = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1311,7 +1333,7 @@ class TestDocumentViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(read=False, owner=True)
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1347,8 +1369,8 @@ class TestDocumentViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(owner=True)
-            permission_2 = Permissions(owner=False, read=True)
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+            permission_2 = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': True})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1410,8 +1432,7 @@ class TestDocumentViews(TestCaseDatabase):
                               public=True)
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1466,8 +1487,7 @@ class TestDocumentViews(TestCaseDatabase):
                               public=True)
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1512,8 +1532,7 @@ class TestDocumentViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1561,8 +1580,7 @@ class TestDocumentViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1702,8 +1720,8 @@ class TestDocumentViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission_owner = Permissions(owner=True)
-            permission_admin = Permissions(admin=True, owner=False)
+            permission_owner = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+            permission_admin = Permissions(permissions={'read': False, 'write': False, 'admin': True, 'owner': False})
 
             # Commit the stub data
             user_owner.permissions.append(permission_owner)
@@ -1750,8 +1768,8 @@ class TestDocumentViews(TestCaseDatabase):
                               bibcode=self.stub_library.bibcode)
 
             # Give the user and library permissions
-            permission_read = Permissions(read=True, owner=False)
-            permission_write = Permissions(write=True, owner=False)
+            permission_read = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+            permission_write = Permissions(permissions={'read': False, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user_read.permissions.append(permission_read)
@@ -1818,8 +1836,7 @@ class TestOperationsViews(TestCaseDatabase):
                                 bibcode={k: {} for k in bibcodes_2})
 
             # Give the user and library permissions
-            permission = Permissions(read=True,
-                                     write=True)
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
 
             # Commit the stub data
             user.permissions.append(permission)
@@ -1977,8 +1994,7 @@ class TestPermissionViews(TestCaseDatabase):
 
         self.permission_view.add_permission(service_uid=user.id,
                                             library_id=library.id,
-                                            permission='read',
-                                            value=True)
+                                            permission={'read': True})
 
         with self.app.session_scope() as session:
             try:
@@ -1990,9 +2006,9 @@ class TestPermissionViews(TestCaseDatabase):
                 self.fail('No permissions were created, most likely the code has '
                           'not been implemented. [{0}]'.format(error))
 
-            self.assertTrue(permission.read)
-            self.assertFalse(permission.write)
-            self.assertFalse(permission.owner)
+            self.assertTrue(permission.permissions['read'])
+            self.assertFalse(permission.permissions['write'])
+            self.assertFalse(permission.permissions['owner'])
 
     def test_that_permissions_are_removed_if_the_user_has_none_left(self):
         """
@@ -2024,12 +2040,10 @@ class TestPermissionViews(TestCaseDatabase):
         # Add the permission
         self.permission_view.add_permission(service_uid=user.id,
                                             library_id=library.id,
-                                            permission='read',
-                                            value=True)
+                                            permission={'read': True})
         self.permission_view.add_permission(service_uid=user.id,
                                             library_id=library.id,
-                                            permission='write',
-                                            value=True)
+                                            permission={'write': True})
 
         with self.app.session_scope() as session:
             # Check the permission was added
@@ -2037,14 +2051,13 @@ class TestPermissionViews(TestCaseDatabase):
                 Permissions.user_id == user.id,
                 Permissions.library_id == library.id
             ).one()
-            self.assertTrue(permission.read)
-            self.assertTrue(permission.write)
+            self.assertTrue(permission.permissions['read'])
+            self.assertTrue(permission.permissions['write'])
 
         # Remove the permission
         self.permission_view.add_permission(service_uid=user.id,
                                             library_id=library.id,
-                                            permission='write',
-                                            value=False)
+                                            permission={'write': False})
 
         with self.app.session_scope() as session:
             # Check the permission was removed
@@ -2052,14 +2065,13 @@ class TestPermissionViews(TestCaseDatabase):
                 Permissions.user_id == user.id,
                 Permissions.library_id == library.id
             ).one()
-            self.assertTrue(permission.read)
-            self.assertFalse(permission.write)
+            self.assertTrue(permission.permissions['read'])
+            self.assertFalse(permission.permissions['write'])
 
         # Remove the permission
         self.permission_view.add_permission(service_uid=user.id,
                                             library_id=library.id,
-                                            permission='read',
-                                            value=False)
+                                            permission={'read': False})
 
         with self.app.session_scope() as session:
             # Check the permission is not available
@@ -2122,8 +2134,7 @@ class TestPermissionViews(TestCaseDatabase):
                           public=True,
                           bibcode=self.stub_library.bibcode)
 
-        permission = Permissions()
-        permission.owner = True
+        permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
         user_2.permissions.append(permission)
         library.permissions.append(permission)
 
@@ -2161,10 +2172,8 @@ class TestPermissionViews(TestCaseDatabase):
                           public=True,
                           bibcode=self.stub_library.bibcode)
 
-        permission_1 = Permissions()
-        permission_1.admin = True
-        permission_2 = Permissions()
-        permission_2.admin = True
+        permission_1 = Permissions(permissions={'read': False, 'write': False, 'admin': True, 'owner': False})
+        permission_2 = Permissions(permissions={'read': False, 'write': False, 'admin': True, 'owner': False})
 
         user_1.permissions.append(permission_1)
         library.permissions.append(permission_1)
@@ -2202,10 +2211,8 @@ class TestPermissionViews(TestCaseDatabase):
                           public=True,
                           bibcode=self.stub_library.bibcode)
 
-        permission_1 = Permissions()
-        permission_1.owner = True
-        permission_2 = Permissions()
-        permission_2.admin = True
+        permission_1 = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+        permission_2 = Permissions(permissions={'read': False, 'write': False, 'admin': True, 'owner': False})
 
         user_1.permissions.append(permission_1)
         library.permissions.append(permission_1)
@@ -2246,10 +2253,8 @@ class TestPermissionViews(TestCaseDatabase):
                           public=True,
                           bibcode=self.stub_library.bibcode)
 
-        permission_admin = Permissions()
-        permission_admin.admin = True
-        permission_read_only = Permissions()
-        permission_read_only.read = True
+        permission_admin = Permissions(permissions={'read': False, 'write': False, 'admin': True, 'owner': False})
+        permission_read_only = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
 
         user_admin.permissions.append(permission_admin)
         library.permissions.append(permission_admin)
@@ -2301,7 +2306,7 @@ class TestPermissionViews(TestCaseDatabase):
                 Permissions.library_id == BaseView.helper_slug_to_uuid(library['id']),
                 Permissions.user_id == user_owner.id
             ).one()
-            self.assertTrue(permission.owner)
+            self.assertTrue(permission.permissions['owner'])
 
         # Check that the owner cannot mess with the owner's permissions
         result = self.permission_view.has_permission(
@@ -2343,13 +2348,12 @@ class TestPermissionViews(TestCaseDatabase):
                 Permissions.library_id == BaseView.helper_slug_to_uuid(library['id']),
                 Permissions.user_id == user_owner.id
             ).one()
-            self.assertTrue(permission.owner)
+            self.assertTrue(permission.permissions['owner'])
 
         # Give the second user, admin permissions
         self.permission_view.add_permission(service_uid=user_admin.id,
                                             library_id=BaseView.helper_slug_to_uuid(library['id']),
-                                            permission='admin',
-                                            value=True)
+                                            permission={'admin': True})
 
         with self.app.session_scope() as session:
             # Check our user has owner permissions
@@ -2357,15 +2361,14 @@ class TestPermissionViews(TestCaseDatabase):
                 Permissions.library_id == BaseView.helper_slug_to_uuid(library['id']),
                 Permissions.user_id == user_admin.id
             ).one()
-            self.assertTrue(permission.admin)
-            self.assertFalse(permission.owner)
+            self.assertTrue(permission.permissions['admin'])
+            self.assertFalse(permission.permissions['owner'])
 
         # Check that the admin cannot modify the owner status of random user
         with self.assertRaises(PermissionDeniedError):
             self.permission_view.add_permission(service_uid=user_random.id,
                                                 library_id=BaseView.helper_slug_to_uuid(library['id']),
-                                                permission='owner',
-                                                value=True)
+                                                permission={'owner': True})
 
         with self.app.session_scope() as session:
             # Check our user has owner permissions
@@ -2393,7 +2396,7 @@ class TestPermissionViews(TestCaseDatabase):
                               public=True,
                               bibcode=self.stub_library.bibcode)
 
-            permission = Permissions(owner=True)
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
             user.permissions.append(permission)
             library.permissions.append(permission)
 
@@ -2430,8 +2433,8 @@ class TestPermissionViews(TestCaseDatabase):
                               public=True,
                               bibcode=self.stub_library.bibcode)
 
-            permission_read = Permissions(read=True)
-            permission_write = Permissions(write=True)
+            permission_read = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+            permission_write = Permissions(permissions={'read': False, 'write': True, 'admin': False, 'owner': False})
             user_read.permissions.append(permission_read)
             user_write.permissions.append(permission_write)
 
@@ -2475,8 +2478,8 @@ class TestPermissionViews(TestCaseDatabase):
                               public=True,
                               bibcode=self.stub_library.bibcode)
 
-            permission_owner = Permissions(owner=True)
-            permission_admin = Permissions(admin=True)
+            permission_owner = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+            permission_admin = Permissions(permissions={'read': False, 'write': False, 'admin': True, 'owner': False})
             user_owner.permissions.append(permission_owner)
             user_admin.permissions.append(permission_admin)
 
@@ -2523,8 +2526,8 @@ class TestPermissionViews(TestCaseDatabase):
                                 public=True,
                                 bibcode=self.stub_library.bibcode)
 
-            permission_1 = Permissions(owner=True)
-            permission_2 = Permissions(admin=True)
+            permission_1 = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+            permission_2 = Permissions(permissions={'read': False, 'write': False, 'admin': True, 'owner': False})
             user_1.permissions.append(permission_1)
             user_2.permissions.append(permission_2)
 
@@ -2605,9 +2608,9 @@ class TestTransferViews(TestCaseDatabase):
                                    public=True,
                                    bibcode=self.stub_library.bibcode)
 
-            permissions_read = Permissions(admin=True)
-            permissions_write = Permissions(write=True)
-            permissions_admin = Permissions(admin=True)
+            permissions_read = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+            permissions_write = Permissions(permissions={'read': False, 'write': True, 'admin': False, 'owner': False})
+            permissions_admin = Permissions(permissions={'read': False, 'write': False, 'admin': True, 'owner': False})
 
             user_read.permissions.append(permissions_read)
             user_write.permissions.append(permissions_write)
@@ -2655,7 +2658,7 @@ class TestTransferViews(TestCaseDatabase):
                                    public=True,
                                    bibcode=self.stub_library.bibcode)
 
-            permissions = Permissions(owner=True)
+            permissions = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
             user_owner.permissions.append(permissions)
             stub_library.permissions.append(permissions)
 
@@ -2675,7 +2678,7 @@ class TestTransferViews(TestCaseDatabase):
             ).filter(
                 Permissions.library_id == stub_library.id
             ).one()
-            self.assertTrue(permission.owner)
+            self.assertTrue(permission.permissions['owner'])
 
             with self.assertRaises(NoResultFound):
                 session.query(Permissions).filter(
@@ -2704,8 +2707,8 @@ class TestTransferViews(TestCaseDatabase):
                                    public=True,
                                    bibcode=self.stub_library.bibcode)
 
-            permissions = Permissions(owner=True)
-            permissions_read = Permissions(read=True)
+            permissions = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+            permissions_read = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
             user_owner.permissions.append(permissions)
             user_new_owner.permissions.append(permissions_read)
             stub_library.permissions.append(permissions)
@@ -2730,8 +2733,8 @@ class TestTransferViews(TestCaseDatabase):
                 Permissions.library_id == stub_library.id
             ).all()
             self.assertTrue(len(permission) == 1)
-            self.assertTrue(permission[0].owner)
-            self.assertTrue(permission[0].read)
+            self.assertTrue(permission[0].permissions['owner'])
+            self.assertTrue(permission[0].permissions['read'])
 
             with self.assertRaises(NoResultFound):
                 session.query(Permissions).filter(
@@ -2776,17 +2779,17 @@ class TestTransferViews(TestCaseDatabase):
 
             # Generate and add permissions
             permission_owner = Permissions(
-                owner=True,
+                permissions={'read': False, 'write': False, 'admin': False, 'owner': True},
                 library_id=stub_library_1.id,
                 user_id=user_owner.id
             )
             permission_random_library_1 = Permissions(
-                read=True,
+                permissions={'read': True, 'write': False, 'admin': False, 'owner': False},
                 library_id=stub_library_1.id,
                 user_id=user_random.id
             )
             permission_random_library_2 = Permissions(
-                owner=True,
+                permissions={'read': False, 'write': False, 'admin': False, 'owner': True},
                 library_id=stub_library_2.id,
                 user_id=user_random.id
             )
@@ -2815,7 +2818,7 @@ class TestTransferViews(TestCaseDatabase):
             ).filter(
                 Permissions.library_id == stub_library_1.id
             ).one()
-            self.assertTrue(permission.owner)
+            self.assertTrue(permission.permissions['owner'])
 
             # Old owner no longer has permissions
             with self.assertRaises(NoResultFound):
@@ -2832,7 +2835,7 @@ class TestTransferViews(TestCaseDatabase):
             ).filter(
                 Permissions.library_id == stub_library_2.id
             ).one()
-            self.assertTrue(permission.owner)
+            self.assertTrue(permission.permissions['owner'])
 
             # Random reads library 1
             permission = session.query(Permissions).filter(
@@ -2840,7 +2843,7 @@ class TestTransferViews(TestCaseDatabase):
             ).filter(
                 Permissions.library_id == stub_library_1.id
             ).one()
-            self.assertTrue(permission.read)
+            self.assertTrue(permission.permissions['read'])
 
 
 class TestClassicViews(TestCaseDatabase):
@@ -2898,7 +2901,7 @@ class TestClassicViews(TestCaseDatabase):
             description=self.stub_library.description,
             bibcode=self.stub_library.bibcode
         )
-        stub_permission = Permissions(owner=True)
+        stub_permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
         stub_user.permissions.append(stub_permission)
         stub_library.permissions.append(stub_permission)
 
@@ -2963,12 +2966,12 @@ class TestClassicViews(TestCaseDatabase):
 
             # Generate and add permissions
             permission_user_1 = Permissions(
-                owner=True,
+                permissions={'read': False, 'write': False, 'admin': False, 'owner': True},
                 library_id=stub_library_1.id,
                 user_id=stub_user_1.id
             )
             permission_user_2 = Permissions(
-                owner=True,
+                permissions={'read': False, 'write': False, 'admin': False, 'owner': True},
                 library_id=stub_library_2.id,
                 user_id=stub_user_2.id
             )
@@ -3022,7 +3025,7 @@ class TestClassicViews(TestCaseDatabase):
 
             # Generate and add permissions
             permission_user_2 = Permissions(
-                owner=True,
+                permissions={'read': False, 'write': False, 'admin': False, 'owner': True},
                 library_id=stub_library.id,
                 user_id=stub_user_2.id
             )
@@ -3069,7 +3072,7 @@ class TestClassicViews(TestCaseDatabase):
 
             # Some permissions
             permission_user = Permissions(
-                read=True,
+                permissions={'read': True, 'write': False, 'admin': False, 'owner': False},
                 library_id=stub_library.id,
                 user_id=stub_user.id
             )
@@ -3085,10 +3088,7 @@ class TestClassicViews(TestCaseDatabase):
         with self.app.session_scope() as session:
             for access in ['read', 'write', 'admin']:
                 permission = session.query(Permissions).filter(Permissions.library_id == stub_library.id).one()
-                permission.read = False
-                permission.write = False
-                permission.admin = False
-                permission.owner = False
+                permission.permissions = {'read': False, 'write': False, 'admin': False, 'owner': False}
                 setattr(permission, access, True)
                 session.add(permission)
                 session.commit()

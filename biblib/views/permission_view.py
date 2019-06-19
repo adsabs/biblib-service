@@ -12,6 +12,7 @@ from ..utils import get_post_data, err
 from http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
     WRONG_TYPE_ERROR, API_MISSING_USER_EMAIL
 from ..biblib_exceptions import PermissionDeniedError
+from ..emails import PermissionsChangedEmail
 
 class PermissionView(BaseView):
     """
@@ -69,7 +70,7 @@ class PermissionView(BaseView):
                 )
                 return False
 
-            if editor_permissions.owner:
+            if editor_permissions.permissions['owner']:
                 current_app.logger.info('User: {0} is owner, so is allowed to '
                                         'change permissions'
                                         .format(service_uid_editor))
@@ -85,62 +86,71 @@ class PermissionView(BaseView):
                 modify_permissions = False
 
             # if the editor is admin, and the modifier has no permissions
-            if editor_permissions.admin:
+            if editor_permissions.permissions['admin']:
 
                 # user to be modified has no permissions
                 if not modify_permissions:
                     return True
 
                 # user to be modified is not owner
-                if not modify_permissions.owner:
+                if not modify_permissions.permissions['owner']:
                     return True
+
+                # otherwise the user to be modified is the owner, so not allowed
+                return False
             else:
                 return False
 
     @staticmethod
-    def add_permission(service_uid, library_id, permission, value):
+    def add_permission(service_uid, library_id, permission):
         """
         Adds a permission for a user to a specific library
         :param service_uid: the user ID within this microservice
         :param library_id: the library id to update
-        :param permission: the permission to be added
-        :param value: boolean that accompanies the permission
+        :param permission: dict of the permissions to be added/modified
 
         :return: no return
         """
 
-        if permission not in ['read', 'write', 'admin']:
+        to_set = [k for k,v in permission.iteritems() if (type(v) == bool)]
+        if not set(to_set).issubset(set(['read', 'write', 'admin', 'owner'])):
             raise PermissionDeniedError('Permission Error')
 
         with current_app.session_scope() as session:
             try:
-                # If the user has permissions for this already
+                # If the user has permission for this already
                 new_permission = session.query(Permissions).filter_by(
                     user_id = service_uid,
                     library_id = library_id
                 ).one()
 
+                # can't change owner permission this way - must go through TransferView
+                if permission.get('owner') and \
+                        (getattr(new_permission, 'permissions').get('owner',False) != permission['owner']):
+                    raise PermissionDeniedError('Permission Error')
+
                 current_app.logger.info(
-                    'User: {0} has permissions already for '
+                    'User: {0} has permission already for '
                     'library: {1}. Modifying: "{2}" from [{3}] '
                     'to [{4}]'
                     .format(service_uid,
                             library_id,
-                            permission,
-                            getattr(new_permission, permission),
-                            value)
+                            permission.keys(),
+                            getattr(new_permission, 'permissions'),
+                            permission.values())
                 )
 
-                setattr(new_permission, permission, value)
+                for p, value in permission.iteritems():
+                    getattr(new_permission, 'permissions')[p] = value
 
-                # Check if all permissions are False, then remove completely
-                if not (new_permission.read |
-                        new_permission.write |
-                        new_permission.admin |
-                        new_permission.owner):
+                # Check if all permission are False, then remove completely
+                if not (new_permission.permissions['read'] |
+                        new_permission.permissions['write'] |
+                        new_permission.permissions['admin'] |
+                        new_permission.permissions['owner']):
 
-                    current_app.logger.info('Deleting permissions for {0} and '
-                                            'library {1} as all permissions are '
+                    current_app.logger.info('Deleting permission for {0} and '
+                                            'library {1} as all permission are '
                                             'False. {2}'
                                             .format(service_uid,
                                                     library_id,
@@ -151,30 +161,45 @@ class PermissionView(BaseView):
                     session.add(new_permission)
 
             except NoResultFound:
-                # If no permissions set yet for user and library
-                current_app.logger.info('No permissions yet set for user: {0} for '
+                # If no permission set yet for user and library
+                current_app.logger.info('No permission yet set for user: {0} for '
                                         'library: {1}. Using defaults for setup'
-                                        ' and allocating "{2}" to [{3}]'
+                                        ' and allocating "{2}"'
                                         .format(service_uid,
                                                 library_id,
-                                                permission,
-                                                value))
+                                                permission))
 
                 user = session.query(User).filter_by(id = service_uid).one()
                 library = session.query(Library).filter_by(id = library_id).one()
 
-                new_permission = Permissions(
-                    read=False,
-                    write=False,
-                    admin=False,
-                    owner=False,
-                )
+                new_permission = Permissions(permissions = {'read': False,
+                                                            'write': False,
+                                                            'admin': False,
+                                                            'owner': False})
 
-                setattr(new_permission, permission, value)
+                # can't set owner permission this way
+                if permission.get('owner',False) is not False:
+                    raise PermissionDeniedError('Permission Error')
 
-                user.permissions.append(new_permission)
-                library.permissions.append(new_permission)
-                session.add_all([user, library, new_permission])
+                for p, value in permission.iteritems():
+                    getattr(new_permission, 'permissions')[p] = value
+
+                # Check if all permission are False, then remove completely
+                if not (new_permission.permissions['read'] |
+                        new_permission.permissions['write'] |
+                        new_permission.permissions['admin'] |
+                        new_permission.permissions['owner']):
+                    
+                    current_app.logger.info('Not adding permissions for {0} and '
+                                            'library {1} as all permission are '
+                                            'False. {2}'
+                                            .format(service_uid,
+                                                    library_id,
+                                                    new_permission))
+                else:     
+                    user.permissions.append(new_permission)
+                    library.permissions.append(new_permission)
+                    session.add_all([user, library, new_permission])
 
             session.commit()
 
@@ -231,7 +256,7 @@ class PermissionView(BaseView):
                 user = cls.api_uid_email_lookup(user_info=user.absolute_uid)
 
                 all_permissions = filter(
-                    lambda key: permission.__dict__[key],
+                    lambda key: permission.permissions[key],
                     ['read', 'write', 'admin', 'owner']
                 )
 
@@ -331,7 +356,8 @@ class PermissionView(BaseView):
         KEYWORD, VALUE
         email:   <e-mail@address>, specifies which user's permissions to be
                                    modified
-        permission:  read, write,  specifies which permission to change
+        # TODO fix this
+        permissions:  read, write,  specifies which permission to change
                      admin
         value:   boolean,          whether the user has this permission
 
@@ -377,13 +403,18 @@ class PermissionView(BaseView):
                 request,
                 types=dict(
                     email=unicode,
-                    permission=unicode,
-                    value=bool
+                    permission=dict
                 )
             )
         except TypeError as error:
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
                                      .format(request.data, error))
+            return err(WRONG_TYPE_ERROR)
+
+        bad_vals = [type(v) for k,v in permission_data['permission'].iteritems() if (type(v)!=bool)]
+        if len(bad_vals) > 0:
+            current_app.logger.error('Wrong values passed for permissions for POST: {0} [{1}]'
+                                     .format(request.data, bad_vals))
             return err(WRONG_TYPE_ERROR)
 
         current_app.logger.info('Requested permission changes for user {0}:'
@@ -423,8 +454,7 @@ class PermissionView(BaseView):
         try:
             self.add_permission(service_uid=secondary_service_uid,
                                 library_id=library,
-                                permission=permission_data['permission'],
-                                value=permission_data['value'])
+                                permission=permission_data['permission'])
         except PermissionDeniedError:
             current_app.logger.error('User: {0} does not have permissions to '
                                      'modify the value of: {1}'
@@ -433,4 +463,21 @@ class PermissionView(BaseView):
             return err(NO_PERMISSION_ERROR)
 
         current_app.logger.info('...SUCCESS.')
+
+        name = self.helper_library_name(library)
+        info = []
+        for p, value in permission_data['permission'].iteritems():
+            tmp = u'Library: {0} \n    Permission: {1} \n    Have permission? {2} \n'.format(name, p, value)
+            info.append(tmp)
+
+        payload = '\n    '.join(info)
+
+        current_app.logger.info('Sending email to {0} with payload: {1}'.format(permission_data['email'], payload))
+        try:
+            msg = self.send_email(email_addr=permission_data['email'],
+                                  email_template=PermissionsChangedEmail,
+                                  payload=payload)
+        except:
+            current_app.logger.warning('Sending email to {0} failed'.format(permission_data['email']))
+
         return {}, 200

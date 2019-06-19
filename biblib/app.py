@@ -10,6 +10,7 @@ from views import UserView, LibraryView, DocumentView, PermissionView, \
     TransferView, ClassicView, TwoPointOhView, OperationsView
 from flask_restful import Api
 from flask_discoverer import Discoverer
+from flask.ext.mail import Mail
 from adsmutils import ADSFlask
 
 def create_app(**config):
@@ -24,6 +25,7 @@ def create_app(**config):
     # Register extensions
     api = Api(app)
     Discoverer(app)
+    mail = Mail(app)
 
     # Add the end resource end points
     api.add_resource(UserView,
