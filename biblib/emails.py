@@ -75,7 +75,7 @@ class PermissionsChangedEmail(Email):
     
     {payload}
     
-    If this is a mistake, please contact the library owner. 
+    If this is a mistake, please contact ADS Help (adshelp@cfa.harvard.edu). 
     
     - the ADS team
     '''
@@ -86,7 +86,7 @@ class PermissionsChangedEmail(Email):
     
     {open_tag}{payload}</p>
     
-    {open_tag}If this is a mistake, please contact the library owner.</p>
+    {open_tag}If this is a mistake, please contact ADS Help (adshelp@cfa.harvard.edu).</p>
     
     {open_tag}-the ADS team</p>
     '''.format(open_tag=open_tag,payload='''{payload}''')
