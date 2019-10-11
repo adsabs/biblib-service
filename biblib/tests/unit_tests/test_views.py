@@ -714,6 +714,33 @@ class TestUserViews(TestCaseDatabase):
                 self.assertTrue(lib.name == 'Untitled Library {0}'.format(i+1))
                 self.assertTrue(lib.description == DEFAULT_LIBRARY_DESCRIPTION)
 
+    def test_long_description_is_truncated(self):
+        """
+        Test that a user who provides a very long library description has that description
+        truncated appropriately.
+
+        :return: no return
+        """
+
+        # stub data
+        stub_library = LibraryShop(name="Test Library", description="x"*400)
+
+        # make a user
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            session.expunge(user)
+
+        # make the library
+        library = self.user_view.create_library(service_uid=user.id, library_data=stub_library.user_view_post_data)
+
+        # check description length
+        with self.app.session_scope() as session:
+            lib = session.query(Library).filter(Library.id == BaseView.helper_slug_to_uuid(library['id'])).one()
+            self.assertTrue(lib.name == "Test Library")
+            self.assertTrue(len(lib.description) <= 200)
 
 class TestLibraryViews(TestCaseDatabase):
     """
@@ -1808,6 +1835,7 @@ class TestOperationsViews(TestCaseDatabase):
 
         super(TestOperationsViews, self).__init__(*args, **kwargs)
         self.operations_view = OperationsView
+        self.user_view = UserView()
 
         # Stub data
         self.stub_user = UserShop()

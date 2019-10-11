@@ -318,6 +318,9 @@ class BaseView(Resource):
         _public = bool(library_data.get('public', False))
         _bibcode = library_data.get('bibcode', False)
 
+        if len(_description) > 200:
+            _description = _description[:197] + '...'
+
         with current_app.session_scope() as session:
             try:
                 # Make the library in the library table

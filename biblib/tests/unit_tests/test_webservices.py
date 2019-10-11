@@ -1010,6 +1010,27 @@ class TestWebservices(TestCaseDatabase):
         self.assertIn('Union',response.json['description'])
         self.assertIn('bibcode', response.json)
 
+    def test_library_union_many(self):
+        """
+        Test the union with many libraries
+        :return:
+        """
+        library_ids, stub_libraries, stub_user = self._create_libraries(n=10)
+        post_data = stub_libraries[0].operations_view_post_data(action='union', libraries=library_ids[1:])
+        # make sure the default description isn't too long
+        post_data.pop('description')
+
+        url = url_for('operationsview', library=library_ids[0])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEquals(response.status_code, 200)
+        self.assertIn('Union', response.json['description'])
+        self.assertIn('9 other libraries', response.json['description'])
+
     def test_library_intersection(self):
         """
         Test the /libraries/operations/<> endpoint with POST to take the intersection of libraries
@@ -1033,6 +1054,41 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.json['name'], 'Library3')
         self.assertIn('Intersection', response.json['description'])
         self.assertIn('test1', response.json['bibcode'])
+
+    def test_library_intersection_many(self):
+        """
+        Test the intersection of many libraries
+        :return:
+        """
+
+        library_ids, \
+        stub_libraries, \
+        stub_user = self._create_libraries(n=10, lib_data=[json.dumps({'bibcode': ['test1', 'test2'], 'action': 'add'}),
+                                                           json.dumps({'bibcode': ['test1', 'test3'], 'action': 'add'}),
+                                                           json.dumps({'bibcode': ['test1', 'test4'], 'action': 'add'}),
+                                                           json.dumps({'bibcode': ['test1', 'test5'], 'action': 'add'}),
+                                                           json.dumps({'bibcode': ['test1', 'test6'], 'action': 'add'}),
+                                                           json.dumps({'bibcode': ['test1', 'test7'], 'action': 'add'}),
+                                                           json.dumps({'bibcode': ['test1', 'test8'], 'action': 'add'}),
+                                                           json.dumps({'bibcode': ['test1', 'test9'], 'action': 'add'}),
+                                                           json.dumps({'bibcode': ['test1', 'test10'], 'action': 'add'}),
+                                                           json.dumps({'bibcode': ['test1', 'test11'], 'action': 'add'}),])
+
+        # take the intersection
+        url = url_for('operationsview', library=library_ids[0])
+        post_data = stub_libraries[0].operations_view_post_data(name='Library Many', action='intersection',
+                                                                libraries=library_ids[1:])
+        # check the default description
+        post_data.pop('description')
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Intersection', response.json['description'])
+        self.assertIn('9 other libraries', response.json['description'])
 
     def test_library_difference(self):
         """
