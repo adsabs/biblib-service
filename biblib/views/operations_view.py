@@ -257,8 +257,14 @@ class OperationsView(BaseView):
 
             data['bibcode'] = bib_union
             if 'description' not in data:
-                data['description'] = 'Union of libraries {0} (IDs: {1}, {2})' \
+                description = 'Union of libraries {0} (IDs: {1}, {2})' \
                     .format(', '.join(lib_names), library, ', '.join(data['libraries']))
+                # field length capped in model
+                if len(description) > 200:
+                    description = 'Union of library {0} (ID: {1}) with {2} other libraries'\
+                        .format(lib_names[0], library, len(lib_names[1:]))
+
+                data['description'] = description
 
             try:
                 library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
@@ -282,8 +288,13 @@ class OperationsView(BaseView):
 
             data['bibcode'] = bib_intersect
             if 'description' not in data:
-                data['description'] = 'Intersection of {0} (IDs: {1}, {2})' \
+                description = 'Intersection of {0} (IDs: {1}, {2})' \
                     .format(', '.join(lib_names), library, ', '.join(data['libraries']))
+                if len(description) > 200:
+                    description = 'Intersection of {0} (ID: {1}) with {2} other libraries'\
+                        .format(lib_names[0], library, len(lib_names[1:]))
+
+                data['description'] = description
 
             try:
                 library_dict = self.create_library(service_uid=user_editing_uid, library_data=data)
