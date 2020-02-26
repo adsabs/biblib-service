@@ -6,3 +6,4 @@ psycopg2==2.8.3
 Flask-Mail==0.9.1
 Flask-Email==1.4.4
 Jinja2==2.10.1
+Werkzeug==0.16.1
