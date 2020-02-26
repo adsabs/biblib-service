@@ -6,6 +6,7 @@ omit =
     */site-packages/ordereddict.py
     */site-packages/nose/*
     */unittest2/*
+    biblib/tests*
 
 [report]
 exclude_lines =

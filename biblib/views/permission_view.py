@@ -13,6 +13,13 @@ from http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
     WRONG_TYPE_ERROR, API_MISSING_USER_EMAIL
 from ..biblib_exceptions import PermissionDeniedError
 from ..emails import PermissionsChangedEmail
+from jinja2 import Environment, PackageLoader, select_autoescape
+
+env = Environment(
+    loader=PackageLoader('biblib', 'templates'),
+    autoescape=select_autoescape(enabled_extensions=('html', 'xml'),
+                                 default_for_string=True)
+)
 
 class PermissionView(BaseView):
     """
@@ -285,6 +292,60 @@ class PermissionView(BaseView):
 
         return False
 
+    @staticmethod
+    def format_permission_payload(payload_info=None):
+        """
+        Format the permission info into plain text and HTML payloads for the email
+
+        :param payload_info: dict; keys:
+                                    name: library name
+                                    permission_data: dict w/ permissions (keys) and Boolean values
+                                    email: email address of user receiving email
+        :return: payload_plain, payload_html
+        """
+
+        lib_name = payload_info.get('name', None)
+        permission_data = payload_info.get('permission_data', None)
+
+        if not permission_data:
+            current_app.logger.warning('Must pass permission data. Payload info: {0}'.format(payload_info))
+            return None
+
+        readable_permissions = {'read': 'read only',
+                                'write': 'read and write',
+                                'admin': 'admin',
+                                'owner': 'owner'}
+
+        payload_plain_info = []
+        payload_html_info = {}
+        for p, value in permission_data['permission'].iteritems():
+            readable_permission = readable_permissions.get(p, None)
+            if readable_permission:
+                tmp = u'Library: {0} \n    Permission: {1} \n    Have permission? {2} \n'.format(lib_name, readable_permission, value)
+                payload_html_info[readable_permission] = value
+            else:
+                current_app.logger.warning('Permission {0} not allowed; part of payload {1}. Exiting.'.format(p, payload_info))
+                return None
+            payload_plain_info.append(tmp)
+
+        payload_plain = '''
+            Hi,
+            Another user has recently updated your library permissions for the following libraries: 
+
+            {payload}
+
+            If this is a mistake, please contact ADS Help (adshelp@cfa.harvard.edu). 
+
+            - the ADS team
+            '''.format(payload='\n    '.join(payload_plain_info))
+
+        template = env.get_template('permission_email.html')
+        payload_html = template.render(email_address=permission_data['email'],
+                                       payload=payload_html_info,
+                                       lib_name=lib_name)
+
+        return payload_plain, payload_html
+
     # Methods
     def get(self, library):
         """
@@ -465,18 +526,18 @@ class PermissionView(BaseView):
         current_app.logger.info('...SUCCESS.')
 
         name = self.helper_library_name(library)
-        info = []
-        for p, value in permission_data['permission'].iteritems():
-            tmp = u'Library: {0} \n    Permission: {1} \n    Have permission? {2} \n'.format(name, p, value)
-            info.append(tmp)
 
-        payload = '\n    '.join(info)
+        payload_plain, payload_html = self.format_permission_payload({'name': name, 'permission_data': permission_data})
+        if payload_plain is None and payload_html is None:
+            current_app.logger.warning('Missing payload for permission data {0}, library {1}. Not sending email to {2}'.
+                                       format(permission_data, name, permission_data['email']))
 
-        current_app.logger.info('Sending email to {0} with payload: {1}'.format(permission_data['email'], payload))
+        current_app.logger.info('Sending email to {0} with payload: {1}'.format(permission_data['email'], payload_plain))
         try:
             msg = self.send_email(email_addr=permission_data['email'],
                                   email_template=PermissionsChangedEmail,
-                                  payload=payload)
+                                  payload_plain=payload_plain,
+                                  payload_html=payload_html)
         except:
             current_app.logger.warning('Sending email to {0} failed'.format(permission_data['email']))
 
