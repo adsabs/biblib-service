@@ -305,11 +305,24 @@ class PermissionView(BaseView):
         """
 
         lib_name = payload_info.get('name', None)
+        lib_id = payload_info.get('library_id', None)
+
+        if not lib_name or not lib_id:
+            current_app.logger.error('Must pass library info. Payload: {0}'.format(payload_info))
+            raise RuntimeError('No library info passed')
+
         permission_data = payload_info.get('permission_data', None)
 
         if not permission_data:
-            current_app.logger.warning('Must pass permission data. Payload info: {0}'.format(payload_info))
-            return None
+            current_app.logger.error('Must pass permission data. Payload info: {0}'.format(payload_info))
+            raise RuntimeError('No permission data passed')
+
+        email = permission_data.get('email', None)
+        permissions = permission_data.get('permission', None)
+
+        if not email or not permissions:
+            current_app.logger.error('Must pass email and permissions in permission data. Payload info: {0}'.format(payload_info))
+            raise RuntimeError('Insufficient permission data passed')
 
         readable_permissions = {'read': 'read only',
                                 'write': 'read and write',
@@ -318,14 +331,16 @@ class PermissionView(BaseView):
 
         payload_plain_info = []
         payload_html_info = {}
-        for p, value in permission_data['permission'].iteritems():
+        for p, value in permissions.iteritems():
             readable_permission = readable_permissions.get(p, None)
             if readable_permission:
-                tmp = u'Library: {0} \n    Permission: {1} \n    Have permission? {2} \n'.format(lib_name, readable_permission, value)
+                tmp = u'Library: {0} (ID: {1}) \n    Permission: {2} \n    Have permission? {3} \n'.\
+                    format(lib_name, lib_id, readable_permission, value)
                 payload_html_info[readable_permission] = value
             else:
-                current_app.logger.warning('Permission {0} not allowed; part of payload {1}. Exiting.'.format(p, payload_info))
-                return None
+                current_app.logger.error('Permission {0} not allowed; part of payload {1}. Exiting.'.format(p, payload_info))
+                raise ValueError('Wrong permission type passed')
+
             payload_plain_info.append(tmp)
 
         payload_plain = '''
@@ -340,9 +355,10 @@ class PermissionView(BaseView):
             '''.format(payload='\n    '.join(payload_plain_info))
 
         template = env.get_template('permission_email.html')
-        payload_html = template.render(email_address=permission_data['email'],
+        payload_html = template.render(email_address=email,
                                        payload=payload_html_info,
-                                       lib_name=lib_name)
+                                       lib_name=lib_name,
+                                       lib_id=lib_id)
 
         return payload_plain, payload_html
 
@@ -454,7 +470,7 @@ class PermissionView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library = self.helper_slug_to_uuid(library)
+        library_uuid = self.helper_slug_to_uuid(library)
 
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
@@ -482,7 +498,7 @@ class PermissionView(BaseView):
                                 ' {1} for library {2}, by user: {3}'
                                 .format(permission_data['email'],
                                         permission_data,
-                                        library,
+                                        library_uuid,
                                         user_editing_uid)
                                 )
 
@@ -504,17 +520,17 @@ class PermissionView(BaseView):
 
         if not self.has_permission(service_uid_editor=user_editing_uid,
                                    service_uid_modify=secondary_service_uid,
-                                   library_id=library):
+                                   library_id=library_uuid):
 
             current_app.logger.error(
                 'User: {0} does not have permissions to edit: {1}'
-                .format(user_editing_uid, library)
+                .format(user_editing_uid, library_uuid)
             )
             return err(NO_PERMISSION_ERROR)
 
         try:
             self.add_permission(service_uid=secondary_service_uid,
-                                library_id=library,
+                                library_id=library_uuid,
                                 permission=permission_data['permission'])
         except PermissionDeniedError:
             current_app.logger.error('User: {0} does not have permissions to '
@@ -525,20 +541,27 @@ class PermissionView(BaseView):
 
         current_app.logger.info('...SUCCESS.')
 
-        name = self.helper_library_name(library)
+        name = self.helper_library_name(library_uuid)
 
-        payload_plain, payload_html = self.format_permission_payload({'name': name, 'permission_data': permission_data})
-        if payload_plain is None and payload_html is None:
-            current_app.logger.warning('Missing payload for permission data {0}, library {1}. Not sending email to {2}'.
-                                       format(permission_data, name, permission_data['email']))
-
-        current_app.logger.info('Sending email to {0} with payload: {1}'.format(permission_data['email'], payload_plain))
         try:
-            msg = self.send_email(email_addr=permission_data['email'],
-                                  email_template=PermissionsChangedEmail,
-                                  payload_plain=payload_plain,
-                                  payload_html=payload_html)
-        except:
-            current_app.logger.warning('Sending email to {0} failed'.format(permission_data['email']))
+            payload_plain, payload_html = self.format_permission_payload({'name': name,
+                                                                          'library_id': library,
+                                                                          'permission_data': permission_data})
+
+        except (RuntimeError, ValueError) as e:
+            current_app.logger.warning('Error building payload for permission data {0}, library {1}. ' +
+                                       'Error message: {2}. Not sending email to {3}'.
+                                       format(permission_data, name, e, permission_data['email']))
+            payload_plain = None
+
+        if payload_plain:
+            current_app.logger.info('Sending email to {0} with payload: {1}'.format(permission_data['email'], payload_plain))
+            try:
+                msg = self.send_email(email_addr=permission_data['email'],
+                                      email_template=PermissionsChangedEmail,
+                                      payload_plain=payload_plain,
+                                      payload_html=payload_html)
+            except:
+                current_app.logger.warning('Sending email to {0} failed'.format(permission_data['email']))
 
         return {}, 200

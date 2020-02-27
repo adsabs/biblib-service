@@ -16,3 +16,4 @@ venv
 .coverage*
 python
 .cache
+**/.DS_Store

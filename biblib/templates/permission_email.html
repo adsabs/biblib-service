@@ -28,7 +28,7 @@
                                         <td align="left" valign="top">
                                             <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Hi,</p>
                                             <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Another user has recently updated your library permissions:</p>
-                                            <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;"><b>Library: {{ lib_name }}</b></p>
+                                            <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;"><b>Library: <a href="https://ui.adsabs.harvard.edu/user/libraries/{{ lib_id }}">{{ lib_name }}</a></b></p>
                                             {% for p, v in payload.items() %}
                                                 <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Permission: {{ p }}<br>Have permission? {{ v }}</p>
                                             {% endfor %}
