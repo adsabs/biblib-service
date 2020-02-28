@@ -10,6 +10,13 @@ from http_errors import MISSING_USERNAME_ERROR, WRONG_TYPE_ERROR, \
     API_MISSING_USER_EMAIL, NO_PERMISSION_ERROR
 from sqlalchemy.orm.exc import NoResultFound
 from ..emails import PermissionsChangedEmail
+from jinja2 import Environment, PackageLoader, select_autoescape
+
+env = Environment(
+    loader=PackageLoader('biblib', 'templates'),
+    autoescape=select_autoescape(enabled_extensions=('html', 'xml'),
+                                 default_for_string=True)
+)
 
 class TransferView(BaseView):
     """
@@ -150,7 +157,7 @@ class TransferView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library = self.helper_slug_to_uuid(library)
+        library_uuid = self.helper_slug_to_uuid(library)
 
         # Get the internal service user UID
         current_owner_service_uid = self.helper_absolute_uid_to_service_uid(
@@ -189,33 +196,41 @@ class TransferView(BaseView):
                                 .format(new_owner_api, new_owner_service_uid))
         # Check permissions
         if not self.write_access(service_uid=current_owner_service_uid,
-                                 library_id=library):
+                                 library_id=library_uuid):
             current_app.logger.error(
                 'User {0} has the wrong permissions to transfer the ownership'
                 ' for library {1}'
-                .format(current_owner_service_uid, library)
+                .format(current_owner_service_uid, library_uuid)
             )
             return err(NO_PERMISSION_ERROR)
 
         current_app.logger.info('User: {0} has permissions to transfer '
                                 'library {1} to the user {2}. Attempting '
                                 'transfer...'.format(current_owner_service_uid,
-                                                     library,
+                                                     library_uuid,
                                                      new_owner_service_uid))
 
         self.transfer_ownership(current_owner_uid=current_owner_service_uid,
                                 new_owner_uid=new_owner_service_uid,
-                                library_id=library)
+                                library_id=library_uuid)
 
-        name = self.helper_library_name(library)
+        name = self.helper_library_name(library_uuid)
 
-        payload = u'Library: {0} \n    Permission: owner \n    Have permission? True'.format(name)
+        payload_plain = u'Another user has recently transferred ownership of library {0} (ID {1}) to you. ' \
+                        u'\n If this is a mistake, please contact ADS Help (adshelp@cfa.harvard.edu). ' \
+                        u'\n - the ADS team'.format(name, library)
 
-        current_app.logger.info('Sending email to {0} with payload: {1}'.format(transfer_data['email'], payload))
+        current_app.logger.info('Sending email to {0} with payload: {1}'.format(transfer_data['email'], payload_plain))
+
         try:
+            template = env.get_template('transfer_email.html')
+            payload_html = template.render(email_address=transfer_data['email'],
+                                           lib_name=name,
+                                           lib_id=library)
             msg = self.send_email(email_addr=transfer_data['email'],
                                   email_template=PermissionsChangedEmail,
-                                  payload=payload)
+                                  payload_plain=payload_plain,
+                                  payload_html=payload_html)
         except:
             current_app.logger.warning('Sending email to {0} failed'.format(transfer_data['email']))
 

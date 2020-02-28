@@ -314,8 +314,8 @@ class PermissionView(BaseView):
             raise RuntimeError('Insufficient permission data passed')
 
         readable_permissions = {'read': 'read only',
-                                'write': 'read and write',
-                                'admin': 'admin',
+                                'write': 'read and write only',
+                                'admin': 'admin (includes read and write)',
                                 'owner': 'owner'}
 
         payload_plain_info = []
