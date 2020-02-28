@@ -293,35 +293,24 @@ class PermissionView(BaseView):
         return False
 
     @staticmethod
-    def format_permission_payload(payload_info=None):
+    def format_permission_payload(library_name, library_id, permission_data):
         """
         Format the permission info into plain text and HTML payloads for the email
 
-        :param payload_info: dict; keys:
-                                    name: library name
+        :param library_name: string; name of library
+        :param library_id: string; URL-safe version of library ID, used to create link to library
+        :param permission_data: dict; keys:
                                     permission_data: dict w/ permissions (keys) and Boolean values
                                     email: email address of user receiving email
         :return: payload_plain, payload_html
         """
 
-        lib_name = payload_info.get('name', None)
-        lib_id = payload_info.get('library_id', None)
-
-        if not lib_name or not lib_id:
-            current_app.logger.error('Must pass library info. Payload: {0}'.format(payload_info))
-            raise RuntimeError('No library info passed')
-
-        permission_data = payload_info.get('permission_data', None)
-
-        if not permission_data:
-            current_app.logger.error('Must pass permission data. Payload info: {0}'.format(payload_info))
-            raise RuntimeError('No permission data passed')
-
         email = permission_data.get('email', None)
         permissions = permission_data.get('permission', None)
 
         if not email or not permissions:
-            current_app.logger.error('Must pass email and permissions in permission data. Payload info: {0}'.format(payload_info))
+            current_app.logger.error('Must pass email and permissions in permission data. '
+                                     'Library ID: {0}, permission data: {1}'.format(library_id, permission_data))
             raise RuntimeError('Insufficient permission data passed')
 
         readable_permissions = {'read': 'read only',
@@ -335,10 +324,10 @@ class PermissionView(BaseView):
             readable_permission = readable_permissions.get(p, None)
             if readable_permission:
                 tmp = u'Library: {0} (ID: {1}) \n    Permission: {2} \n    Have permission? {3} \n'.\
-                    format(lib_name, lib_id, readable_permission, value)
+                    format(library_name, library_id, readable_permission, value)
                 payload_html_info[readable_permission] = value
             else:
-                current_app.logger.error('Permission {0} not allowed; part of payload {1}. Exiting.'.format(p, payload_info))
+                current_app.logger.error('Permission {0} not allowed; part of payload {1}. Exiting.'.format(p, permission_data))
                 raise ValueError('Wrong permission type passed')
 
             payload_plain_info.append(tmp)
@@ -357,8 +346,8 @@ class PermissionView(BaseView):
         template = env.get_template('permission_email.html')
         payload_html = template.render(email_address=email,
                                        payload=payload_html_info,
-                                       lib_name=lib_name,
-                                       lib_id=lib_id)
+                                       lib_name=library_name,
+                                       lib_id=library_id)
 
         return payload_plain, payload_html
 
@@ -544,9 +533,9 @@ class PermissionView(BaseView):
         name = self.helper_library_name(library_uuid)
 
         try:
-            payload_plain, payload_html = self.format_permission_payload({'name': name,
-                                                                          'library_id': library,
-                                                                          'permission_data': permission_data})
+            payload_plain, payload_html = self.format_permission_payload(library_name=name,
+                                                                         library_id=library,
+                                                                         permission_data=permission_data)
 
         except (RuntimeError, ValueError) as e:
             current_app.logger.warning('Error building payload for permission data {0}, library {1}. ' +

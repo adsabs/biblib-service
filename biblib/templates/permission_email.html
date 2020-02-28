@@ -29,8 +29,13 @@
                                             <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Hi,</p>
                                             <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Another user has recently updated your library permissions:</p>
                                             <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;"><b>Library: <a href="https://ui.adsabs.harvard.edu/user/libraries/{{ lib_id }}">{{ lib_name }}</a></b></p>
-                                            {% for p, v in payload.items() %}
-                                                <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Permission: {{ p }}<br>Have permission? {{ v }}</p>
+                                            <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Permission(s) turned <b>on</b>:</p>
+                                            {% for p, v in payload.items() if v==True %}
+                                                <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 4; Margin-bottom: 15px; Margin-left: 20px;">{{ p }}</p>
+                                            {% endfor %}
+                                            <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Permission(s) turned <b>off</b>:</p>
+                                            {% for p, v in payload.items() if v==False %}
+                                                <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 4; Margin-bottom: 15px; Margin-left: 20px;">{{ p }}</p>
                                             {% endfor %}
                                             <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">If this is a mistake, please contact ADS Help (adshelp@cfa.harvard.edu).</p>
                                             <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">-the ADS team</p>
