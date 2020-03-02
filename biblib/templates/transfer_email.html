@@ -1,0 +1,8 @@
+{% extends "base_email.html" %}
+{% block payload %}
+    <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Hi,</p>
+    <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">Another user has recently transferred ownership of a library to you:</p>
+    <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;"><b>Library: <a href="https://ui.adsabs.harvard.edu/user/libraries/{{ lib_id }}">{{ lib_name }}</a></b></p>
+    <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">If this is a mistake, please contact ADS Help (adshelp@cfa.harvard.edu).</p>
+    <p style="font-family: sans-serif; font-size: 14px; font-weight: normal; margin: 0; Margin-bottom: 15px;">-the ADS team</p>
+{% endblock payload %}
