@@ -99,7 +99,7 @@ class TestBaseViews(TestCaseDatabase):
         """
         email = 'test@email'
         payload = u'This is a test payload'
-        msg = BaseView.send_email(email_addr=email, email_template=PermissionsChangedEmail, payload_plain=payload, payload_html=payload)
+        msg = BaseView.send_email(email_addr=email, payload_plain=payload, payload_html=payload, email_template=PermissionsChangedEmail)
 
         self.assertTrue(payload in msg.body)
         self.assertEqual(msg.subject, PermissionsChangedEmail.subject)

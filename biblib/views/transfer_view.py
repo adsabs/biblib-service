@@ -228,9 +228,9 @@ class TransferView(BaseView):
                                            lib_name=name,
                                            lib_id=library)
             msg = self.send_email(email_addr=transfer_data['email'],
-                                  email_template=PermissionsChangedEmail,
                                   payload_plain=payload_plain,
-                                  payload_html=payload_html)
+                                  payload_html=payload_html,
+                                  email_template=PermissionsChangedEmail)
         except:
             current_app.logger.warning('Sending email to {0} failed'.format(transfer_data['email']))
 

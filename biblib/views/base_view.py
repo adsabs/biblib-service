@@ -385,7 +385,7 @@ class BaseView(Resource):
                 raise
 
     @staticmethod
-    def send_email(email_addr='', email_template=Email, payload_plain=None, payload_html=None):
+    def send_email(email_addr, payload_plain, payload_html, email_template=Email):
         """
         Encrypts a payload using itsDangerous.TimeSerializer, adding it along with a base
         URL to an email template. Sends an email with this data using the current app's
@@ -393,19 +393,13 @@ class BaseView(Resource):
 
         :param email_addr:
         :type email_addr: basestring
-        :param email_template: emails.Email
         :param payload_plain: plain text version of message body
         :param payload_html: HTML-formatted version of message body
+        :param email_template: emails.Email
 
         :return: msg,token
         :rtype flask.ext.mail.Message, basestring
         """
-        if email_addr == '':
-            current_app.logger.warning('No email address passed for payload {0}. Not sending email.'.format(payload_plain))
-            return
-        if payload_plain is None and payload_html is None:
-            current_app.logger.warning('No payload passed for email {0}. Not sending email.'.format(email_addr))
-            return
 
         msg = Message(subject=email_template.subject,
                       recipients=[email_addr],
