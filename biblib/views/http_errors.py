@@ -34,11 +34,11 @@ WRONG_TYPE_ERROR = dict(
     number=400
 )
 API_MISSING_USER_EMAIL = dict(
-    body='User does not exist in the API database',
+    body='User does not have an ADS account',
     number=404
 )
 API_MISSING_USER_UID = dict(
-    body='User does not exist in the API database',
+    body='User does not have an ADS account',
     number=404
 )
 SOLR_RESPONSE_MISMATCH_ERROR = dict(

@@ -8,6 +8,7 @@ from ..client import client
 from base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
+from sqlalchemy import Boolean
 from sqlalchemy.exc import IntegrityError
 from http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
     WRONG_TYPE_ERROR
@@ -92,12 +93,24 @@ class UserView(BaseView):
                 else:
                     num_users = 0
 
+                if main_permission != 'owner':
+                    # get the owner
+                    result = session.query(Permissions, User) \
+                        .join(Permissions.user) \
+                        .filter(Permissions.library_id == library.id) \
+                        .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True)) \
+                        .one()
+                    owner_permissions, owner = result
+                    owner_absolute_uid = owner.absolute_uid
+                else:
+                    owner_absolute_uid = absolute_uid
+
                 service = '{api}/{uid}'.format(
                     api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
-                    uid=absolute_uid
+                    uid=owner_absolute_uid
                 )
                 current_app.logger.info('Obtaining email of user: {0} [API UID]'
-                                        .format(absolute_uid))
+                                        .format(owner_absolute_uid))
                 response = client().get(
                     service
                 )

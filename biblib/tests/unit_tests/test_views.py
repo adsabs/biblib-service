@@ -127,6 +127,7 @@ class TestUserViews(TestCaseDatabase):
         # Stub data
         self.stub_user = self.stub_user_1 = UserShop()
         self.stub_user_2 = UserShop()
+        self.stub_user_3 = UserShop()
 
         self.stub_library = LibraryShop()
 
@@ -572,40 +573,47 @@ class TestUserViews(TestCaseDatabase):
         # To make a library we need an actual user
         user_read = User(absolute_uid=self.stub_user_1.absolute_uid)
         user_write = User(absolute_uid=self.stub_user_2.absolute_uid)
+        user_owner = User(absolute_uid=self.stub_user_3.absolute_uid)
 
         library = Library()
         permission_read = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
         permission_write = Permissions(permissions={'read': False, 'write': True, 'admin': False, 'owner': False})
+        permission_owner = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
         library.permissions.append(permission_read)
         library.permissions.append(permission_write)
+        library.permissions.append(permission_owner)
         user_read.permissions.append(permission_read)
         user_write.permissions.append(permission_write)
+        user_owner.permissions.append(permission_owner)
 
         with self.app.session_scope() as session:
-            session.add_all([user_read, user_write, library, permission_read,
-                             permission_write])
+            session.add_all([user_read, user_write, user_owner, library, permission_read,
+                             permission_write, permission_owner])
             session.commit()
-            for obj in [user_read, user_write, library, permission_read,
-                             permission_write]:
+            for obj in [user_read, user_write, user_owner, library, permission_read,
+                             permission_write, permission_owner]:
                 session.refresh(obj)
                 session.expunge(obj)
 
         # Get the library created
         # For user read
-        with MockEmailService(self.stub_user_1, end_type='uid'):
+        with MockEmailService(self.stub_user_3, end_type='uid'):
             libraries = self.user_view.get_libraries(
                 service_uid=user_read.id,
                 absolute_uid=user_read.absolute_uid
             )[0]
         self.assertTrue(libraries['num_users'] == 0)
+        # make sure the owner is correct
+        self.assertIn(libraries['owner'], self.stub_user_3.email)
 
         # For user write
-        with MockEmailService(self.stub_user_2, end_type='uid'):
+        with MockEmailService(self.stub_user_3, end_type='uid'):
             libraries = self.user_view.get_libraries(
                 service_uid=user_write.id,
                 absolute_uid=user_write.absolute_uid
             )[0]
         self.assertTrue(libraries['num_users'] == 0)
+        self.assertIn(libraries['owner'], self.stub_user_3.email)
 
     def test_user_cannot_add_two_libraries_with_the_same_name(self):
         """
