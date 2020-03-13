@@ -58,3 +58,8 @@ TOO_MANY_LIBRARIES_SPECIFIED_ERROR = dict(
     body='Too many secondary libraries specified; only one secondary library allowed.',
     number=400
 )
+
+BAD_LIBRARY_ID_ERROR = dict(
+    body='Bad library ID was passed',
+    number=400
+)

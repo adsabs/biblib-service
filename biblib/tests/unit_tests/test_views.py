@@ -232,6 +232,33 @@ class TestUserViews(TestCaseDatabase):
 
             self.assertTrue(len(result) == 1)
 
+        user_unicode = User(absolute_uid=self.stub_user_2.absolute_uid)
+        with self.app.session_scope() as session:
+            # confirm for a library with a unicode name
+            session.add(user_unicode)
+            session.commit()
+
+            stub_library_unicode = LibraryShop()
+            stub_library_unicode.user_view_post_data['name'] = u'\u521b\u65b0\u7fa4\u4f53'
+            library_unicode = self.user_view.create_library(
+                service_uid=user_unicode.id,
+                library_data=stub_library_unicode.user_view_post_data
+            )
+
+            with self.assertRaises(KeyError):
+                library_unicode['bibcode']
+
+            # Check that the library was created with the correct permissions
+            result = session.query(Permissions) \
+                .filter(User.id == Permissions.user_id) \
+                .filter(BaseView.helper_slug_to_uuid(library_unicode['id']) == Permissions.library_id) \
+                .all()
+
+            with self.assertRaises(AttributeError):
+                result.library_unicode.bibcode
+
+            self.assertTrue(len(result) == 1)
+
     def test_user_can_create_a_library_passing_bibcodes(self):
         """
         Checks that a library is created and exists in the database. A set of

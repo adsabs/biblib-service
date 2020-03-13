@@ -10,7 +10,7 @@ from flask_discoverer import advertise
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy import Boolean
 from http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
-    WRONG_TYPE_ERROR, NO_PERMISSION_ERROR, MISSING_LIBRARY_ERROR
+    WRONG_TYPE_ERROR, NO_PERMISSION_ERROR, MISSING_LIBRARY_ERROR, BAD_LIBRARY_ID_ERROR
 from ..biblib_exceptions import PermissionDeniedError
 
 
@@ -244,7 +244,10 @@ class DocumentView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library = self.helper_slug_to_uuid(library)
+        try:
+            library = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
 
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
@@ -330,7 +333,10 @@ class DocumentView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library = self.helper_slug_to_uuid(library)
+        try:
+            library = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
 
         if not self.helper_user_exists(user):
             return err(NO_PERMISSION_ERROR)
@@ -409,7 +415,10 @@ class DocumentView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library = self.helper_slug_to_uuid(library)
+        try:
+            library = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
 
         if not self.helper_user_exists(user):
             return err(NO_PERMISSION_ERROR)

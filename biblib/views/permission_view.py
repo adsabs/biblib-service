@@ -10,7 +10,7 @@ from base_view import BaseView
 from sqlalchemy.orm.exc import NoResultFound
 from ..utils import get_post_data, err
 from http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
-    WRONG_TYPE_ERROR, API_MISSING_USER_EMAIL
+    WRONG_TYPE_ERROR, API_MISSING_USER_EMAIL, BAD_LIBRARY_ID_ERROR
 from ..biblib_exceptions import PermissionDeniedError
 from ..emails import PermissionsChangedEmail
 from jinja2 import Environment, PackageLoader, select_autoescape
@@ -383,7 +383,10 @@ class PermissionView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library = self.helper_slug_to_uuid(library)
+        try:
+            library = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
 
         # Get the service ID from the API resolver
         service_uid = \
@@ -459,7 +462,10 @@ class PermissionView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library_uuid = self.helper_slug_to_uuid(library)
+        try:
+            library_uuid = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
 
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
