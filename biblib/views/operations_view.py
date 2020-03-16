@@ -12,7 +12,7 @@ from flask_discoverer import advertise
 from sqlalchemy.orm.exc import NoResultFound
 from http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
     MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
-    WRONG_TYPE_ERROR, NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR
+    WRONG_TYPE_ERROR, NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR, BAD_LIBRARY_ID_ERROR
 from ..biblib_exceptions import BackendIntegrityError
 
 
@@ -201,7 +201,10 @@ class OperationsView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library_uuid = self.helper_slug_to_uuid(library)
+        try:
+            library_uuid = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
 
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
@@ -241,7 +244,10 @@ class OperationsView(BaseView):
             lib_names.append(primary.name)
             if 'libraries' in data:
                 for lib in data['libraries']:
-                    secondary_uuid = self.helper_slug_to_uuid(lib)
+                    try:
+                        secondary_uuid = self.helper_slug_to_uuid(lib)
+                    except TypeError:
+                        return err(BAD_LIBRARY_ID_ERROR)
                     secondary = session.query(Library).filter_by(id=secondary_uuid).one()
                     lib_names.append(secondary.name)
 

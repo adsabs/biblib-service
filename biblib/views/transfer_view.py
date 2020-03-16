@@ -7,7 +7,7 @@ from base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
 from http_errors import MISSING_USERNAME_ERROR, WRONG_TYPE_ERROR, \
-    API_MISSING_USER_EMAIL, NO_PERMISSION_ERROR
+    API_MISSING_USER_EMAIL, NO_PERMISSION_ERROR, BAD_LIBRARY_ID_ERROR
 from sqlalchemy.orm.exc import NoResultFound
 from ..emails import PermissionsChangedEmail
 from jinja2 import Environment, PackageLoader, select_autoescape
@@ -157,7 +157,10 @@ class TransferView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # URL safe base64 string to UUID
-        library_uuid = self.helper_slug_to_uuid(library)
+        try:
+            library_uuid = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
 
         # Get the internal service user UID
         current_owner_service_uid = self.helper_absolute_uid_to_service_uid(

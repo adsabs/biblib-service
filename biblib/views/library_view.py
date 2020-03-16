@@ -10,7 +10,7 @@ from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy import Boolean
 from http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
-    MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR
+    MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR, BAD_LIBRARY_ID_ERROR
 
 
 class LibraryView(BaseView):
@@ -368,7 +368,10 @@ class LibraryView(BaseView):
                                 'sort: "{}", '
                                 'fl: "{}"'.format(start, rows, sort, fl))
 
-        library = self.helper_slug_to_uuid(library)
+        try:
+            library = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
 
         current_app.logger.info('User: {0} requested library: {1}'
                                 .format(user, library))

@@ -358,7 +358,7 @@ class BaseView(Resource):
                 session.add_all([library, permission, user])
                 session.commit()
 
-                current_app.logger.info('Library: "{0}" made, user_service: {1:d}'
+                current_app.logger.info(u'Library: "{0}" made, user_service: {1:d}'
                                         .format(library.name, user.id))
 
                 library_dict = dict(
