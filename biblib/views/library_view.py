@@ -53,8 +53,13 @@ class LibraryView(BaseView):
             )
             current_app.logger.info('Obtaining email of user: {0} [API UID]'
                                     .format(owner.absolute_uid))
+            
+            headers = {
+                'Authorization': 'Bearer %s' % request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', ''))
+                }
             response = client().get(
-                service
+                service,
+                headers=headers
             )
 
             # For this library get all the people who have permissions
@@ -190,6 +195,7 @@ class LibraryView(BaseView):
 
         headers = {
             'Content-Type': 'big-query/csv',
+            'Authorization': 'Bearer %s' % request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', ''))
         }
         current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
                                 .format(params,
