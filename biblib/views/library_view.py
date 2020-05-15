@@ -195,7 +195,7 @@ class LibraryView(BaseView):
 
         headers = {
             'Content-Type': 'big-query/csv',
-            'Authorization': 'Bearer %s' % request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', ''))
+            'Authorization': request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', ''))
         }
         current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
                                 .format(params,
