@@ -55,7 +55,7 @@ class LibraryView(BaseView):
                                     .format(owner.absolute_uid))
             
             headers = {
-                'Authorization': 'Bearer %s' % request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', ''))
+                'Authorization': request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', ''))
                 }
             response = client().get(
                 service,
