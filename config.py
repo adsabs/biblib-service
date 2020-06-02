@@ -29,7 +29,6 @@ BIBLIB_TWOPOINTOH_SERVICE_URL = 'https://api.adsabs.edu/v1/harbour'
 BIBLIB_CLASSIC_SERVICE_URL = 'https://api.adsabs.edu/v1/harbour'
 BIBLIB_SOLR_BIG_QUERY_URL = 'https://api.adsabs.search/v1/bigquery'
 BIBLIB_USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
-BIBLIB_ADSWS_API_TOKEN = 'this is a secret api token!'
 BIBLIB_ADSWS_API_DB_URI = 'sqlite:////tmp/test.db'
 BIBLIB_MAX_ROWS = 2000
 
