@@ -55,7 +55,7 @@ class LibraryView(BaseView):
                                     .format(owner.absolute_uid))
             
             headers = {
-                'Authorization': request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', ''))
+                'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
                 }
             response = client().get(
                 service,
@@ -195,7 +195,7 @@ class LibraryView(BaseView):
 
         headers = {
             'Content-Type': 'big-query/csv',
-            'Authorization': request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', ''))
+            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
         }
         current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
                                 .format(params,
