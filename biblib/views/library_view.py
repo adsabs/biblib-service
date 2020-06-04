@@ -54,12 +54,8 @@ class LibraryView(BaseView):
             current_app.logger.info('Obtaining email of user: {0} [API UID]'
                                     .format(owner.absolute_uid))
             
-            headers = {
-                'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
-                }
             response = client().get(
-                service,
-                headers=headers
+                service
             )
 
             # For this library get all the people who have permissions
