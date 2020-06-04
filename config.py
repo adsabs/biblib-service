@@ -33,3 +33,7 @@ BIBLIB_ADSWS_API_DB_URI = 'sqlite:////tmp/test.db'
 BIBLIB_MAX_ROWS = 2000
 
 MAIL_DEFAULT_SENDER = 'no-reply@adslabs.org'
+
+# when set, the service will use it instead of the user's token
+# (for requests where it makes sense - not all)
+SERVICE_TOKEN = None
