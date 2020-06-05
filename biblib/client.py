@@ -24,8 +24,6 @@ class Client:
         headers = kwargs.get('headers', {})
         if 'Authorization' not in headers:
             headers['Authorization'] = current_app.config.get('SERVICE_TOKEN', None) or request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', None))
-        if 'timeout' not in kwargs:
-            kwargs['timeout'] = current_app.config.get('GET_TIMEOUT', 5)    
         kwargs['headers'] = headers
         return (args, kwargs)
 
