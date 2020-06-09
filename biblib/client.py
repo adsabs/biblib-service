@@ -18,7 +18,7 @@ class Client:
         :param client_config: configuration dictionary of the client
         """
 
-        self.session = requests.Session()
+        self.session = current_app.client # Use HTTP pool provided by adsmutils ADSFlask
 
     def _sanitize(self, args, kwargs):
         headers = kwargs.get('headers', {})
