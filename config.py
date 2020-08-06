@@ -37,3 +37,6 @@ MAIL_DEFAULT_SENDER = 'no-reply@adslabs.org'
 # when set, the service will use it instead of the user's token
 # (for requests where it makes sense - not all)
 SERVICE_TOKEN = None
+
+# myADS token to allow general notifications that contain docs(library/<id>)
+READONLY_ALL_LIBRARIES_TOKEN = None
