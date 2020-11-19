@@ -313,12 +313,15 @@ class BaseView(Resource):
             service_uid=service_uid,
             library_data=library_data
         )
-        _name = library_data.get('name')
-        _description = library_data.get('description')
+        _name = library_data.get('name', 'Untitled Library')
+        _description = library_data.get('description', 'My ADS library')
         _public = bool(library_data.get('public', False))
         _bibcode = library_data.get('bibcode', False)
 
-        if len(_description) > 200:
+        if _name and len(_name) > 50:
+            _name = _name[:47] + '...'
+
+        if _description and len(_description) > 200:
             _description = _description[:197] + '...'
 
         with current_app.session_scope() as session:
