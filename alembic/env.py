@@ -55,7 +55,7 @@ def get_app_config(key):
     app = application.create_app()
 
     with app.app_context() as c:
-        print 'Getting actual config for', key, app.config.get(key)
+        print('Getting actual config for', key, app.config.get(key))
         return app.config.get(key)
 
 def run_migrations_online():

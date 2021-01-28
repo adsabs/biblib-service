@@ -4,12 +4,12 @@ Document view
 
 from ..utils import err, get_post_data
 from ..models import Library, Permissions
-from base_view import BaseView
+from .base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy import Boolean
-from http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
+from .http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
     WRONG_TYPE_ERROR, NO_PERMISSION_ERROR, MISSING_LIBRARY_ERROR, BAD_LIBRARY_ID_ERROR
 from ..biblib_exceptions import PermissionDeniedError
 

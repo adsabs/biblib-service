@@ -5,12 +5,12 @@ User view
 from ..utils import err
 from ..models import User, Library, Permissions
 from ..client import client
-from base_view import BaseView
+from .base_view import BaseView
 from flask import current_app
 from flask_discoverer import advertise
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from http_errors import MISSING_USERNAME_ERROR
+from .http_errors import MISSING_USERNAME_ERROR
 from sqlalchemy import Boolean
 
 

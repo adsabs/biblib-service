@@ -6,10 +6,10 @@ from flask import request, current_app
 from flask_discoverer import advertise
 from ..models import User, Library, Permissions
 from ..client import client
-from base_view import BaseView
+from .base_view import BaseView
 from sqlalchemy.orm.exc import NoResultFound
 from ..utils import get_post_data, err
-from http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
+from .http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
     WRONG_TYPE_ERROR, API_MISSING_USER_EMAIL, BAD_LIBRARY_ID_ERROR
 from ..biblib_exceptions import PermissionDeniedError
 from ..emails import PermissionsChangedEmail
