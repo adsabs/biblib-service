@@ -460,10 +460,11 @@ class TestUserViews(TestCaseDatabase):
 
         # Get the library created
         with MockEmailService(stub_user_2, end_type='uid'):
-            libraries = self.user_view.get_libraries(
-                service_uid=user_other.id,
-                absolute_uid=user_other.absolute_uid
-            )
+            with MockEmailService(stub_user_1, end_type='uid'):
+                libraries = self.user_view.get_libraries(
+                    service_uid=user_other.id,
+                    absolute_uid=user_other.absolute_uid
+                )
 
         self.assertTrue(len(libraries) == 2)
 
@@ -540,12 +541,13 @@ class TestUserViews(TestCaseDatabase):
                                                 permission=permission)
             # Get the library created
             with MockEmailService(stub_user_other, end_type='uid'):
-                libraries = self.user_view.get_libraries(
-                    service_uid=user_other.id,
-                    absolute_uid=user_other.absolute_uid
-                )
+                with MockEmailService(self.stub_user, end_type='uid'):
+                    libraries = self.user_view.get_libraries(
+                        service_uid=user_other.id,
+                        absolute_uid=user_other.absolute_uid
+                    )
 
-            self.assertEqual(permission.keys()[0], libraries[0]['permission'])
+            self.assertEqual(list(permission.keys())[0], libraries[0]['permission'])
 
     def test_can_only_see_number_of_people_with_admin_or_owner(self):
         """
@@ -577,10 +579,11 @@ class TestUserViews(TestCaseDatabase):
         # Get the library created
         # For user admin
         with MockEmailService(self.stub_user_2, end_type='uid'):
-            libraries = self.user_view.get_libraries(
-                service_uid=user_admin.id,
-                absolute_uid=user_admin.absolute_uid
-            )[0]
+            with MockEmailService(self.stub_user_1, end_type='uid'):
+                libraries = self.user_view.get_libraries(
+                    service_uid=user_admin.id,
+                    absolute_uid=user_admin.absolute_uid
+                )[0]
         self.assertTrue(libraries['num_users'] > 0)
 
         # For user owner
@@ -834,11 +837,12 @@ class TestLibraryViews(TestCaseDatabase):
                 session.expunge(obj)
 
         # Retrieve the bibcodes using the web services
-        response_library, meta_data = \
-            self.library_view.get_documents_from_library(
-                library_id=library.id,
-                service_uid=user.id
-            )
+        with MockEmailService(self.stub_user, end_type='uid'):
+            response_library, meta_data = \
+                self.library_view.get_documents_from_library(
+                    library_id=library.id,
+                    service_uid=user.id
+                )
         self.assertEqual(library.bibcode, response_library.bibcode)
 
     def test_user_retrieves_correct_library_content(self):
@@ -1516,7 +1520,7 @@ class TestDocumentViews(TestCaseDatabase):
             # Check that the document is in the library
             library = session.query(Library).filter(Library.id == library_id).all()
             for _lib in library:
-                self.assertIn(self.stub_library.bibcode.keys()[0], _lib.bibcode)
+                self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
 
             # Add a different document to the library
             number_added = self.document_view.add_document_to_library(
@@ -1528,7 +1532,7 @@ class TestDocumentViews(TestCaseDatabase):
             # Check that the document is in the library
             library = session.query(Library).filter(Library.id == library_id).all()
             for _lib in library:
-                self.assertIn(self.stub_library_2.bibcode.keys()[0], _lib.bibcode)
+                self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
 
     def test_user_cannot_duplicate_same_document_in_library(self):
         """

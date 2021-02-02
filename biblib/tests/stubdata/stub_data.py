@@ -51,7 +51,7 @@ class UserFactory(factory.Factory):
     """
     Factory for creating fake User models
     """
-    class Meta:
+    class Meta(object):
         """
         Defines the model that describes this factory
         """
@@ -67,7 +67,7 @@ class LibraryFactory(factory.Factory):
     Factory for creating fake Library models
     """
 
-    class Meta:
+    class Meta(object):
         """
         Defines the model that describes this factory
         """
@@ -245,7 +245,7 @@ class LibraryShop(object):
         how the models treat libraries.
         :return: list of bibcodes
         """
-        return self.bibcode.keys()
+        return list(self.bibcode.keys())
 
     def create_user_view_post_data(self):
         """

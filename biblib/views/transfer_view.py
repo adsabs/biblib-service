@@ -172,7 +172,7 @@ class TransferView(BaseView):
             transfer_data = get_post_data(
                 request,
                 types=dict(
-                    email=unicode
+                    email=str
                 )
             )
         except TypeError as error:

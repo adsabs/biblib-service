@@ -254,8 +254,8 @@ class UserView(BaseView):
             data = get_post_data(
                 request,
                 types=dict(
-                    name=unicode,
-                    description=unicode,
+                    name=str,
+                    description=str,
                     public=bool,
                     bibcode=list
                 )

@@ -5,7 +5,7 @@ Common utilities used by the test classes
 import re
 import json
 from flask import current_app
-from flask.ext.testing import TestCase
+from flask_testing import TestCase
 from biblib import app
 from biblib.models import Base
 from httpretty import HTTPretty

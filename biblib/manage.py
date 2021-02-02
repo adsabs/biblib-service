@@ -7,8 +7,8 @@ PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(PROJECT_HOME)
 from flask import current_app
-from flask.ext.script import Manager, Command, Option
-from flask.ext.migrate import Migrate, MigrateCommand
+from flask_script import Manager, Command, Option
+from flask_migrate import Migrate, MigrateCommand
 from .models import Base, User, Permissions, Library
 from biblib.app import create_app
 from sqlalchemy import create_engine

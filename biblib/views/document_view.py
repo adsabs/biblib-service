@@ -260,7 +260,7 @@ class DocumentView(BaseView):
         try:
             data = get_post_data(
                 request,
-                types=dict(bibcode=list, action=unicode)
+                types=dict(bibcode=list, action=str)
             )
         except TypeError as error:
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
@@ -355,8 +355,8 @@ class DocumentView(BaseView):
             library_data = get_post_data(
                 request,
                 types=dict(
-                    name=unicode,
-                    description=unicode,
+                    name=str,
+                    description=str,
                     public=bool
                 )
             )
@@ -365,8 +365,8 @@ class DocumentView(BaseView):
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
 
-        # Remove content that is empty
-        for key in library_data.keys():
+        # Remove content that is empty (note that the list() is necessary to create a copy, so pop will work)
+        for key in list(library_data.keys()):
             if library_data[key] == ''.strip(' '):
                 current_app.logger.warning('Removing key: {0} as its empty.'
                                            .format(key))

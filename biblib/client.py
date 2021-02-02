@@ -6,7 +6,7 @@ requests.packages.urllib3.disable_warnings()
 client = lambda: Client(current_app.config)
 
 
-class Client:
+class Client(object):
     """
     The Client class is a thin wrapper around requests; Use it as a centralized
     place to set application specific parameters, such as the oauth2

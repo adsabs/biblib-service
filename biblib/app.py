@@ -10,7 +10,7 @@ from .views import UserView, LibraryView, DocumentView, PermissionView, \
     TransferView, ClassicView, TwoPointOhView, OperationsView
 from flask_restful import Api
 from flask_discoverer import Discoverer
-from flask.ext.mail import Mail
+from flask_mail import Mail
 from adsmutils import ADSFlask
 
 def create_app(**config):

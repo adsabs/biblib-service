@@ -62,7 +62,7 @@ class OperationsView(BaseView):
             out_lib = set(primary_library.get_bibcodes())
 
             for lib in document_data['libraries']:
-                if isinstance(lib, basestring):
+                if isinstance(lib, str):
                     lib = cls.helper_slug_to_uuid(lib)
                 secondary_library = session.query(Library).filter_by(id=lib).one()
                 if operation == 'union':
@@ -96,7 +96,7 @@ class OperationsView(BaseView):
                                 .format(library_id, document_data['libraries']))
 
         secondary_libid = document_data['libraries'][0]
-        if isinstance(secondary_libid, basestring):
+        if isinstance(secondary_libid, str):
             secondary_libid = cls.helper_slug_to_uuid(secondary_libid)
 
         metadata = {}
@@ -217,7 +217,7 @@ class OperationsView(BaseView):
         try:
             data = get_post_data(
                 request,
-                types=dict(libraries=list, action=basestring, name=basestring, description=basestring, public=bool)
+                types=dict(libraries=list, action=str, name=str, description=str, public=bool)
             )
         except TypeError as error:
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'

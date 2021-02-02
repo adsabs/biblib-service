@@ -108,10 +108,11 @@ class TestReturnedDataEpic(TestCaseDatabase):
         # Mary sees that the number of users of the library has increased by 1
         url = url_for('userview')
         with MockEmailService(user_mary, end_type='uid'):
-            response = self.client.get(
-                url,
-                headers=user_mary.headers
-            )
+            with MockEmailService(user_dave, end_type='uid'):
+                response = self.client.get(
+                    url,
+                    headers=user_mary.headers
+                )
 
         library = response.json['libraries'][0]
 
