@@ -5,12 +5,12 @@ from ..views import USER_ID_KEYWORD
 from ..utils import err, get_post_data
 from ..models import User, Library, Permissions
 from ..client import client
-from base_view import BaseView
+from .base_view import BaseView
 from adsmutils import get_date
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy.orm.exc import NoResultFound
-from http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
+from .http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
     MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
     WRONG_TYPE_ERROR, NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR, BAD_LIBRARY_ID_ERROR
 from ..biblib_exceptions import BackendIntegrityError
@@ -62,7 +62,7 @@ class OperationsView(BaseView):
             out_lib = set(primary_library.get_bibcodes())
 
             for lib in document_data['libraries']:
-                if isinstance(lib, basestring):
+                if isinstance(lib, str):
                     lib = cls.helper_slug_to_uuid(lib)
                 secondary_library = session.query(Library).filter_by(id=lib).one()
                 if operation == 'union':
@@ -96,7 +96,7 @@ class OperationsView(BaseView):
                                 .format(library_id, document_data['libraries']))
 
         secondary_libid = document_data['libraries'][0]
-        if isinstance(secondary_libid, basestring):
+        if isinstance(secondary_libid, str):
             secondary_libid = cls.helper_slug_to_uuid(secondary_libid)
 
         metadata = {}
@@ -217,7 +217,7 @@ class OperationsView(BaseView):
         try:
             data = get_post_data(
                 request,
-                types=dict(libraries=list, action=basestring, name=basestring, description=basestring, public=bool)
+                types=dict(libraries=list, action=str, name=str, description=str, public=bool)
             )
         except TypeError as error:
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'

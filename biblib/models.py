@@ -214,7 +214,7 @@ class Library(Base):
         """
         Returns the bibcodes of the library
         """
-        return self.bibcode.keys()
+        return list(self.bibcode.keys())
 
     def add_bibcodes(self, bibcodes):
         """

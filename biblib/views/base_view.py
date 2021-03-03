@@ -8,7 +8,7 @@ from ..views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
     USER_ID_KEYWORD
 from flask import request, current_app
 from flask_restful import Resource
-from flask.ext.mail import Message
+from flask_mail import Message
 from ..models import User, Library, Permissions
 from ..client import client
 from sqlalchemy.exc import IntegrityError
@@ -35,10 +35,11 @@ class BaseView(Resource):
         youtube-style-short-id-and-back
         :param library_uuid: unique identifier for the library
 
-        :return: library_slug: base64 URL safe slug
+        :return: library_slug: base64 URL safe slug, string
         """
         library_slug = base64.urlsafe_b64encode(library_uuid.bytes)
-        library_slug = library_slug.rstrip('=\n').replace('/', '_')
+        library_slug = library_slug.rstrip(b'=\n').replace(b'/', b'_')
+        library_slug = library_slug.decode('utf-8')
         current_app.logger.info('Converted uuid: {0} to slug: {1}'
                                 .format(library_uuid, library_slug))
         return library_slug

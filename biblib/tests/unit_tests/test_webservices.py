@@ -1027,7 +1027,7 @@ class TestWebservices(TestCaseDatabase):
             headers=stub_user.headers
         )
 
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         self.assertIn('Union', response.json['description'])
         self.assertIn('9 other libraries', response.json['description'])
 

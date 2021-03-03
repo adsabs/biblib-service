@@ -5,7 +5,7 @@ Common utilities used by the test classes
 import re
 import json
 from flask import current_app
-from flask.ext.testing import TestCase
+from flask_testing import TestCase
 from biblib import app
 from biblib.models import Base
 from httpretty import HTTPretty
@@ -175,7 +175,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
                 canonical_bibcodes = self.kwargs.get('canonical_bibcode')
                 for i in range(len(canonical_bibcodes)):
                     docs.append({'bibcode': canonical_bibcodes[i]})
-                    print docs
+                    print(docs)
             else:
                 docs = [{'bibcode': 'bibcode'} for i
                         in range(self.kwargs.get('number_of_bibcodes', 1))]

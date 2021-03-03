@@ -124,7 +124,7 @@ class TestBigShareAdminEpic(TestCaseDatabase):
         url = url_for('documentview', library=library_id_dave)
 
         libraries_removed = []
-        for i in range(number_of_documents/2):
+        for i in range(number_of_documents // 2):
             # Remove documents
             response = self.client.post(
                 url,

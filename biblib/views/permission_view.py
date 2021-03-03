@@ -6,10 +6,10 @@ from flask import request, current_app
 from flask_discoverer import advertise
 from ..models import User, Library, Permissions
 from ..client import client
-from base_view import BaseView
+from .base_view import BaseView
 from sqlalchemy.orm.exc import NoResultFound
 from ..utils import get_post_data, err
-from http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
+from .http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
     WRONG_TYPE_ERROR, API_MISSING_USER_EMAIL, BAD_LIBRARY_ID_ERROR
 from ..biblib_exceptions import PermissionDeniedError
 from ..emails import PermissionsChangedEmail
@@ -119,7 +119,7 @@ class PermissionView(BaseView):
         :return: no return
         """
 
-        to_set = [k for k,v in permission.iteritems() if (type(v) == bool)]
+        to_set = [k for k, v in permission.items() if (type(v) == bool)]
         if not set(to_set).issubset(set(['read', 'write', 'admin', 'owner'])):
             raise PermissionDeniedError('Permission Error')
 
@@ -142,12 +142,12 @@ class PermissionView(BaseView):
                     'to [{4}]'
                     .format(service_uid,
                             library_id,
-                            permission.keys(),
+                            list(permission.keys()),
                             getattr(new_permission, 'permissions'),
-                            permission.values())
+                            list(permission.values()))
                 )
 
-                for p, value in permission.iteritems():
+                for p, value in permission.items():
                     getattr(new_permission, 'permissions')[p] = value
 
                 # Check if all permission are False, then remove completely
@@ -188,7 +188,7 @@ class PermissionView(BaseView):
                 if permission.get('owner',False) is not False:
                     raise PermissionDeniedError('Permission Error')
 
-                for p, value in permission.iteritems():
+                for p, value in permission.items():
                     getattr(new_permission, 'permissions')[p] = value
 
                 # Check if all permission are False, then remove completely
@@ -262,10 +262,7 @@ class PermissionView(BaseView):
                 # Convert the user id into
                 user = cls.api_uid_email_lookup(user_info=user.absolute_uid)
 
-                all_permissions = filter(
-                    lambda key: permission.permissions[key],
-                    ['read', 'write', 'admin', 'owner']
-                )
+                all_permissions = [key for key in ['read', 'write', 'admin', 'owner'] if permission.permissions[key]]
 
                 permission_list.append(
                     {user: all_permissions}
@@ -320,7 +317,7 @@ class PermissionView(BaseView):
 
         payload_plain_info = []
         payload_html_info = {}
-        for p, value in permissions.iteritems():
+        for p, value in permissions.items():
             readable_permission = readable_permissions.get(p, None)
             if readable_permission:
                 tmp = u'Library: {0} (ID: {1}) \n    Permission: {2} \n    Have permission? {3} \n'.\
@@ -474,7 +471,7 @@ class PermissionView(BaseView):
             permission_data = get_post_data(
                 request,
                 types=dict(
-                    email=unicode,
+                    email=str,
                     permission=dict
                 )
             )
@@ -483,7 +480,7 @@ class PermissionView(BaseView):
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
 
-        bad_vals = [type(v) for k,v in permission_data['permission'].iteritems() if (type(v)!=bool)]
+        bad_vals = [type(v) for k,v in permission_data['permission'].items() if (type(v)!=bool)]
         if len(bad_vals) > 0:
             current_app.logger.error('Wrong values passed for permissions for POST: {0} [{1}]'
                                      .format(request.data, bad_vals))

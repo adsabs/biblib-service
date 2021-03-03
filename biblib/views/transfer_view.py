@@ -3,10 +3,10 @@ Transfer view
 """
 from ..utils import err, get_post_data
 from ..models import Permissions
-from base_view import BaseView
+from .base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
-from http_errors import MISSING_USERNAME_ERROR, WRONG_TYPE_ERROR, \
+from .http_errors import MISSING_USERNAME_ERROR, WRONG_TYPE_ERROR, \
     API_MISSING_USER_EMAIL, NO_PERMISSION_ERROR, BAD_LIBRARY_ID_ERROR
 from sqlalchemy.orm.exc import NoResultFound
 from ..emails import PermissionsChangedEmail
@@ -172,7 +172,7 @@ class TransferView(BaseView):
             transfer_data = get_post_data(
                 request,
                 types=dict(
-                    email=unicode
+                    email=str
                 )
             )
         except TypeError as error:
