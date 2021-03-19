@@ -5,4 +5,4 @@ alembic==1.5.3
 psycopg2==2.8.6
 Flask-Mail==0.9.1
 Flask-Email==1.4.4
-Jinja2==2.11.2
+Jinja2==2.11.3
