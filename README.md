@@ -1,5 +1,4 @@
 [![Stories in Ready](https://badge.waffle.io/adsabs/biblib-service.png?label=ready&title=Ready)](https://waffle.io/adsabs/biblib-service)
-[![Build Status](https://travis-ci.org/adsabs/biblib-service.svg?branch=master)](https://travis-ci.org/adsabs/biblib-service)
 [![Coverage Status](https://coveralls.io/repos/adsabs/biblib-service/badge.svg?branch=master)](https://coveralls.io/r/adsabs/biblib-service?branch=master)
 [![Code Climate](https://codeclimate.com/github/adsabs/biblib-service/badges/gpa.svg)](https://codeclimate.com/github/adsabs/biblib-service)
 
@@ -53,3 +52,4 @@ If you wish to do anything else, then just look at the default behaviour of *Fla
 ## Feature additions
 
 Please see the issues page for lists of features that have been kept in mind during the building of private libraries.
+

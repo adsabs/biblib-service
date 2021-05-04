@@ -15,6 +15,7 @@ jobs:
 
     - name: Install dependencies
       run: |
+        python -m pip install --upgrade wheel setuptools pip
         pip install -U -r requirements.txt
         pip install -U -r dev-requirements.txt
 
