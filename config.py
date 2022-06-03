@@ -8,7 +8,7 @@ import os
 import pwd
 
 LOG_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '../')
+    os.path.join(os.path.dirname(__file__), './')
 )
 LOG_PATH = '{home}/logs/'.format(home=LOG_PATH)
 LOG_STDOUT = True
