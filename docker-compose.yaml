@@ -1,0 +1,17 @@
+version: '3.1'
+services:
+  pytest_biblib_microservice:
+    build: .
+    image: biblib:latest
+    container_name: pytest_biblib_microservice
+    volumes:
+    - ./:/app
+    networks:
+      - pytest_biblib_microservice
+    stdin_open: true
+    tty: true
+    user: ads
+    entrypoint: scripts/pytest/pytest.sh
+networks:
+  pytest_biblib_microservice:
+    driver: bridge
