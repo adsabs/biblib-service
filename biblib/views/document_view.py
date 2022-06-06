@@ -67,7 +67,7 @@ class DocumentView(BaseView):
         """
         Validates identifiers by collecting all bibcodes returned from a standard query.
         """
-        bibcode_query ="q=bibcode%3A("+"%20OR".join(input_bibcodes)+")"
+        bibcode_query ="identifier:("+"%20OR".join(input_bibcodes)+")"
         if fl == '':
             fl = 'bibcode,alternate_bibcode'
         else:
@@ -97,12 +97,9 @@ class DocumentView(BaseView):
             params=params,
             headers=headers
         ).json()
-        #returns
-        try: 
-            return [doc['bibcode'] for doc in solr['response']['docs']]
-        except:
-            return input_bibcodes
-    
+
+        return solr
+
     @staticmethod
     def solr_big_query(
             bibcodes,
@@ -167,12 +164,8 @@ class DocumentView(BaseView):
             data=bibcodes_string,
             headers=headers
         ).json()
-        #returns
-        # try: 
-        return [doc['bibcode'] for doc in solr['response']['docs']]
-        # except:
-            #current_app.logger.error("SOLR gave response {}".format(solr))
-            # return []
+
+        return solr
 
     @classmethod
     def validate_supplied_bibcodes(cls, input_bibcodes):
@@ -182,22 +175,20 @@ class DocumentView(BaseView):
         on the query length.
         """
         bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
-        internal_fault = {}
         if len(input_bibcodes) < bigquery_min:
             try:
-                valid_bibcodes = cls.standard_ADS_query(input_bibcodes)
+                solr_resp = cls.standard_ADS_query(input_bibcodes)
             except Exception as err:
-                current_app.logger.error("Failed to collect valid bibcodes due to internal error {}.".format(err))
-                valid_bibcodes = []
-                internal_fault = {"error": str(err)}
+                current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}.".format(err))
+                solr_resp = {"error": str(err)}
         else:
             try:
-                valid_bibcodes = cls.solr_big_query(input_bibcodes, rows=min(len(input_bibcodes),current_app.config.get('BIBLIB_MAX_ROWS', len(input_bibcodes))))
+                solr_resp = cls.solr_big_query(input_bibcodes, rows=min(len(input_bibcodes), current_app.config.get('BIBLIB_MAX_ROWS', len(input_bibcodes))))
             except Exception as err:
-                current_app.logger.error("Failed to collect valid bibcodes from input due to SOLR error: {}".format(err))
-                valid_bibcodes = []
-                internal_fault = {"error": str(err)}
-        return valid_bibcodes, internal_fault
+                current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}".format(err))
+                solr_resp = {"error": str(err)}
+        return solr_resp
+    
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):
         """
