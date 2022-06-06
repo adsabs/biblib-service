@@ -57,7 +57,146 @@ class DocumentView(BaseView):
             end_length = len(library.bibcode)
 
             return end_length - start_length
+    @staticmethod
+    def standard_ADS_query(input_bibcodes,
+            start=0,
+            rows=20,
+            sort='date desc',
+            fl='bibcode'):
+        """
+        Validates identifiers by collecting all bibcodes returned from a standard query.
+        """
+        bibcode_query ="q=bibcode%3A("+"%20OR".join(input_bibcodes)+")"
+        if fl == '':
+            fl = 'bibcode,alternate_bibcode'
+        else:
+            fl_split = fl.split(',')
+            for required_fl in ['bibcode', 'alternate_bibcode']:
+                if required_fl not in fl_split:
+                    fl = '{},{}'.format(fl, required_fl)
 
+        params = {
+            'q': bibcode_query,
+            'wt': 'json',
+            'fl': fl,
+            'rows': rows,
+            'start': start,
+            'fq': '{!bitset}',
+            'sort': sort
+        }
+
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
+        }
+        current_app.logger.info('Querying Search microservice: {0}'
+                                .format(params))
+        solr = client().get(
+            url=current_app.config['BIBLIB_SOLR_SEARCH_URL'],
+            params=params,
+            headers=headers
+        ).json()
+        #returns
+        try: 
+            return [doc['bibcode'] for doc in solr['response']['docs']]
+        except:
+            return input_bibcodes
+    
+    @staticmethod
+    def solr_big_query(
+            bibcodes,
+            start=0,
+            rows=20,
+            sort='date desc',
+            fl='bibcode'
+    ):
+        """
+        A thin wrapper for the solr bigquery service.
+
+        :param bibcodes: bibcodes
+        :type bibcodes: list
+
+        :param start: start index
+        :type start: int
+
+        :param rows: number of rows
+        :type rows: int
+
+        :param sort: how the response should be sorted
+        :type sort: str
+
+        :param fl: Solr fields to be returned
+        :type fl: str
+
+        :return: bibcodes from solr bigquery endpoint response
+        """
+
+        bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
+
+        # We need atleast bibcode and alternate bibcode for other methods
+        # to work properly
+        if fl == '':
+            fl = 'bibcode,alternate_bibcode'
+        else:
+            fl_split = fl.split(',')
+            for required_fl in ['bibcode', 'alternate_bibcode']:
+                if required_fl not in fl_split:
+                    fl = '{},{}'.format(fl, required_fl)
+
+        params = {
+            'q': '*:*',
+            'wt': 'json',
+            'fl': fl,
+            'rows': rows,
+            'start': start,
+            'fq': '{!bitset}',
+            'sort': sort
+        }
+
+        headers = {
+            'Content-Type': 'big-query/csv',
+            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
+        }
+        current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
+                                .format(params,
+                                        bibcodes_string.replace('\n', ',')))
+        solr = client().post(
+            url=current_app.config['BIBLIB_SOLR_BIG_QUERY_URL'],
+            params=params,
+            data=bibcodes_string,
+            headers=headers
+        ).json()
+        #returns
+        # try: 
+        return [doc['bibcode'] for doc in solr['response']['docs']]
+        # except:
+            #current_app.logger.error("SOLR gave response {}".format(solr))
+            # return []
+
+    @classmethod
+    def validate_supplied_bibcodes(cls, input_bibcodes):
+        """
+        Takes a list of input bibcodes and validates there existence in ADS
+        through the API. Calls either standard search or bigquery depending 
+        on the query length.
+        """
+        bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
+        internal_fault = {}
+        if len(input_bibcodes) < bigquery_min:
+            try:
+                valid_bibcodes = cls.standard_ADS_query(input_bibcodes)
+            except Exception as err:
+                current_app.logger.error("Failed to collect valid bibcodes due to internal error {}.".format(err))
+                valid_bibcodes = []
+                internal_fault = {"error": str(err)}
+        else:
+            try:
+                valid_bibcodes = cls.solr_big_query(input_bibcodes, rows=min(len(input_bibcodes),current_app.config.get('BIBLIB_MAX_ROWS', len(input_bibcodes))))
+            except Exception as err:
+                current_app.logger.error("Failed to collect valid bibcodes from input due to SOLR error: {}".format(err))
+                valid_bibcodes = []
+                internal_fault = {"error": str(err)}
+        return valid_bibcodes, internal_fault
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):
         """
