@@ -13,8 +13,10 @@ from biblib.views.http_errors import DUPLICATE_LIBRARY_NAME_ERROR, \
     NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR
 from biblib.tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
-    TestCaseDatabase, MockEndPoint, MockClassicService
+    TestCaseDatabase, MockEndPoint, MockClassicService, SolrQueryServiceresp
+from biblib.views import DocumentView
 from biblib.utils import get_item
+from mock import patch
 
 
 class TestWebservices(TestCaseDatabase):
@@ -810,12 +812,13 @@ class TestWebservices(TestCaseDatabase):
         library_id = response.json['id']
 
         # Add to the library
-        url = url_for('documentview', library=library_id)
-        response = self.client.post(
-            url,
-            data=stub_library.document_view_post_data_json('add'),
-            headers=stub_user.headers
-        )
+        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+            url = url_for('documentview', library=library_id)
+            response = self.client.post(
+                url,
+                data=stub_library.document_view_post_data_json('add'),
+                headers=stub_user.headers
+            )
         self.assertEqual(response.json['number_added'],
                          len(stub_library.bibcode))
         self.assertEqual(response.status_code, 200)
@@ -862,23 +865,25 @@ class TestWebservices(TestCaseDatabase):
         library_id = response.json['id']
 
         # Add to the library
-        url = url_for('documentview', library=library_id)
-        response = self.client.post(
-            url,
-            data=stub_library.document_view_post_data_json('add'),
-            headers=stub_user.headers
-        )
+        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+            url = url_for('documentview', library=library_id)
+            response = self.client.post(
+                url,
+                data=stub_library.document_view_post_data_json('add'),
+                headers=stub_user.headers
+            )
         self.assertEqual(response.json['number_added'],
                          len(stub_library.bibcode))
         self.assertEqual(response.status_code, 200)
 
         # Should not be able to add the same document
-        url = url_for('documentview', library=library_id)
-        response = self.client.post(
-            url,
-            data=stub_library.document_view_post_data_json('add'),
-            headers=stub_user.headers
-        )
+        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+            url = url_for('documentview', library=library_id)
+            response = self.client.post(
+                url,
+                data=stub_library.document_view_post_data_json('add'),
+                headers=stub_user.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['number_added'], 0)
 
@@ -910,14 +915,15 @@ class TestWebservices(TestCaseDatabase):
 
         # Add to the library
         url = url_for('documentview', library=library_id)
-        response = self.client.post(
-            url,
-            data=stub_library.document_view_post_data_json('add'),
-            headers=stub_user.headers
-        )
-        self.assertEqual(response.json['number_added'],
-                         len(stub_library.bibcode))
-        self.assertEqual(response.status_code, 200)
+        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+            response = self.client.post(
+                url,
+                data=stub_library.document_view_post_data_json('add'),
+                headers=stub_user.headers
+            )
+            self.assertEqual(response.json['number_added'],
+                            len(stub_library.bibcode))
+            self.assertEqual(response.status_code, 200)
 
         # Delete the document
         url = url_for('documentview', library=library_id)
@@ -973,11 +979,12 @@ class TestWebservices(TestCaseDatabase):
                 data = lib_data[nl]
 
             library_id = response_1.json['id']
-            response_2 = self.client.post(
-                url_for('documentview', library=library_id),
-                data=data,
-                headers=stub_user.headers
-            )
+            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(data).get('bibcode'))) as _standard_ADS_bibcode_query:
+                response_2 = self.client.post(
+                    url_for('documentview', library=library_id),
+                    data=data,
+                    headers=stub_user.headers
+                )
             self.assertEqual(response_2.status_code, 200)
 
             lib_ids.append(library_id)
@@ -1581,20 +1588,22 @@ class TestWebservices(TestCaseDatabase):
         # See if a random user can edit content of the library
         # Add to the library
         url = url_for('documentview', library=library_id)
-        response = self.client.post(
-            url,
-            data=stub_library.document_view_post_data_json('add'),
-            headers=stub_user_2.headers
-        )
+        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+            response = self.client.post(
+                url,
+                data=stub_library.document_view_post_data_json('add'),
+                headers=stub_user_2.headers
+            )
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
 
         # Check the owner can add/remove content
-        response = self.client.post(
-            url,
-            data=stub_library.document_view_post_data_json('add'),
-            headers=stub_user_1.headers
-        )
+        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+            response = self.client.post(
+                url,
+                data=stub_library.document_view_post_data_json('add'),
+                headers=stub_user_1.headers
+            )
         self.assertEqual(response.json['number_added'],
                                        len(stub_library.bibcode))
         self.assertEqual(response.status_code, 200)

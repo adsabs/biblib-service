@@ -49,21 +49,22 @@ class DocumentView(BaseView):
             if "error" in solr_resp.keys():
                 current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
                 output_dict = {"error": solr_resp.get("error"), "number_added": 0}
-                valid_bibcodes = document_data['bibcode']
+                valid_bibcodes = []
             else:
-                valid_bibcodes = [doc.get('bibcodes') for doc in solr_resp.get('docs', {})]
-            
-            #valid_bibcodes = document_data['bibcode']
-            
-            library.add_bibcodes(valid_bibcodes)
+                valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
+                current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
 
-            session.add(library)
-            session.commit()
+            
+            if valid_bibcodes:
+                library.add_bibcodes(valid_bibcodes)
 
-            current_app.logger.info('Added: {0} is now {1}'.format(
-                document_data['bibcode'],
-                library.bibcode)
-            )
+                session.add(library)
+                session.commit()
+
+                current_app.logger.info('Added: {0} is now {1}'.format(
+                    valid_bibcodes,
+                    library.bibcode)
+                )
 
             end_length = len(library.bibcode)
 
@@ -199,7 +200,7 @@ class DocumentView(BaseView):
                 current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}".format(err))
                 solr_resp = {"error": str(err)}
 
-        return solr_resp
+        return solr_resp.get('response')
     
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):

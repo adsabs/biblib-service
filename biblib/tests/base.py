@@ -256,18 +256,20 @@ class MockSolrQueryService(MockADSWSAPI):
             :param headers: header of the HTTP request
             :return:
             """
-            input_query = self.kwargs.get("search_query")
-            if self.kwargs.get('solr_docs'):
-                docs = self.kwargs['solr_docs']
-            elif self.kwargs.get('canonical_bibcode'):
+            # if self.kwargs.get('solr_docs'):
+            #     docs = self.kwargs['solr_docs']
+            if self.kwargs.get('canonical_bibcode'):
                 docs = []
                 canonical_bibcodes = self.kwargs.get('canonical_bibcode')
                 for i in range(len(canonical_bibcodes)):
                     docs.append({'bibcode': canonical_bibcodes[i]})
                     print(docs)
+                input_query ="identifier%3A("+"%20OR%20".join(canonical_bibcodes)+")"
             else:
                 docs = [{'bibcode': 'bibcode'} for i
                         in range(self.kwargs.get('number_of_bibcodes', 1))]
+                input_query = ""
+
             resp = {
                 'responseHeader': {
                     'status': 0,
@@ -319,6 +321,41 @@ class MockSolrQueryService(MockADSWSAPI):
 
         HTTPretty.reset()
         HTTPretty.disable()
+
+def SolrQueryServiceresp(**kwargs):
+    if kwargs.get('canonical_bibcode'):
+        docs = []
+        canonical_bibcodes = kwargs.get('canonical_bibcode')
+        for i in range(len(canonical_bibcodes)):
+            docs.append({'bibcode': canonical_bibcodes[i]})
+            print(docs)
+        input_query ="identifier%3A("+"%20OR%20".join(canonical_bibcodes)+")"
+    else:
+        docs = [{'bibcode': 'bibcode'} for i
+                in range(kwargs.get('number_of_bibcodes', 1))]
+        input_query = ""
+
+    resp = {
+        'responseHeader': {
+            'status': 0,
+            'QTime': 152,
+            'params': {
+                'fl': 'bibcode',
+                'q': input_query,
+                'wt': 'json'
+            }
+        },
+        'response': {
+            'numFound': len(docs),
+            'start': 0,
+            'docs': docs
+        }
+    }
+
+    #resp = resp.get('response')
+
+    return resp
+
 
 class MockEmailService(MockADSWSAPI):
 
