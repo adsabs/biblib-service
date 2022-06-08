@@ -90,7 +90,7 @@ class DocumentView(BaseView):
         """
         Validates identifiers by collecting all bibcodes returned from a standard query.
         """
-        bibcode_query ="identifier:("+"%20OR%20".join(input_bibcodes)+")"
+        bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
         if fl == '':
             fl = 'bibcode,alternate_bibcode'
         else:
