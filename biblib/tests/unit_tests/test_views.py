@@ -1513,11 +1513,11 @@ class TestDocumentViews(TestCaseDatabase):
             # Add a document to the library
             
             with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
-                number_added = self.document_view.add_document_to_library(
+                output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library.document_view_post_data('add')
                 )
-            self.assertEqual(number_added, len(self.stub_library.bibcode))
+            self.assertEqual(output.get("number_added"), len(self.stub_library.bibcode))
 
             # Check that the document is in the library
             library = session.query(Library).filter(Library.id == library_id).all()
@@ -1526,11 +1526,11 @@ class TestDocumentViews(TestCaseDatabase):
 
             # Add a different document to the library
             with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
-                number_added = self.document_view.add_document_to_library(
+                output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library_2.document_view_post_data('add')
                 )
-                self.assertEqual(number_added, len(self.stub_library.bibcode))
+                self.assertEqual(output.get("number_added"), len(self.stub_library.bibcode))
 
             # Check that the document is in the library
             library = session.query(Library).filter(Library.id == library_id).all()
@@ -1570,19 +1570,19 @@ class TestDocumentViews(TestCaseDatabase):
 
             # Add a document to the library
             with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
-                number_added = self.document_view.add_document_to_library(
+                output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library.document_view_post_data('add')
                 )
-            self.assertEqual(number_added, len(self.stub_library.bibcode))
+            self.assertEqual(output.get("number_added"), len(self.stub_library.bibcode))
 
             # Shouldn't add the same document again
             with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
-                number_added = self.document_view.add_document_to_library(
+                output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library.document_view_post_data('add')
                 )
-                self.assertEqual(0, number_added)
+                self.assertEqual(0, output.get("number_added"))
 
     def test_user_can_remove_document_from_library(self):
         """

@@ -65,10 +65,14 @@ class DocumentView(BaseView):
                     valid_bibcodes,
                     library.bibcode)
                 )
-
+            
             end_length = len(library.bibcode)
-
-            return  end_length - start_length #output_dict
+            invalid_bibcodes = list(set(document_data['bibcode']) - set(valid_bibcodes))
+            
+            output_dict = {"number_added": end_length - start_length}
+            
+            if invalid_bibcodes: output_dict['invalid_bibcodes'] = invalid_bibcodes
+            return  output_dict
     
     @staticmethod
     def _standard_ADS_bibcode_query(input_bibcodes,
@@ -413,15 +417,15 @@ class DocumentView(BaseView):
 
         if data['action'] == 'add':
             current_app.logger.info('User requested to add a document')
-            number_added = self.add_document_to_library(
+            output = self.add_document_to_library(
                 library_id=library,
                 document_data=data
             )
             current_app.logger.info(
                 'Successfully added {0} documents to {1} by {2}'
-                .format(number_added, library, user_editing_uid)
+                .format(output.get("number_added"), library, user_editing_uid)
             )
-            return {'number_added': number_added}, 200
+            return {'number_added': output.get("number_added")}, 200
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')
