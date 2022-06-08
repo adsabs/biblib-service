@@ -45,7 +45,17 @@ class DocumentView(BaseView):
 
             start_length = len(library.bibcode)
 
-            library.add_bibcodes(document_data['bibcode'])
+            solr_resp = cls.query_valid_bibcodes(document_data['bibcode'])
+            if "error" in solr_resp.keys():
+                current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
+                output_dict = {"error": solr_resp.get("error"), "number_added": 0}
+                valid_bibcodes = document_data['bibcode']
+            else:
+                valid_bibcodes = [doc.get('bibcodes') for doc in solr_resp.get('docs', {})]
+            
+            #valid_bibcodes = document_data['bibcode']
+            
+            library.add_bibcodes(valid_bibcodes)
 
             session.add(library)
             session.commit()
@@ -57,9 +67,10 @@ class DocumentView(BaseView):
 
             end_length = len(library.bibcode)
 
-            return end_length - start_length
+            return  end_length - start_length #output_dict
+    
     @staticmethod
-    def standard_ADS_query(input_bibcodes,
+    def _standard_ADS_bibcode_query(input_bibcodes,
             start=0,
             rows=20,
             sort='date desc',
@@ -67,7 +78,7 @@ class DocumentView(BaseView):
         """
         Validates identifiers by collecting all bibcodes returned from a standard query.
         """
-        bibcode_query ="identifier:("+"%20OR".join(input_bibcodes)+")"
+        bibcode_query ="identifier%3A("+"%20OR%20".join(input_bibcodes)+")"
         if fl == '':
             fl = 'bibcode,alternate_bibcode'
         else:
@@ -92,16 +103,16 @@ class DocumentView(BaseView):
         }
         current_app.logger.info('Querying Search microservice: {0}'
                                 .format(params))
-        solr = client().get(
+        solr_resp = client().get(
             url=current_app.config['BIBLIB_SOLR_SEARCH_URL'],
             params=params,
             headers=headers
         ).json()
 
-        return solr
+        return solr_resp
 
     @staticmethod
-    def solr_big_query(
+    def _solr_big_query_bibcodes(
             bibcodes,
             start=0,
             rows=20,
@@ -158,35 +169,36 @@ class DocumentView(BaseView):
         current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
                                 .format(params,
                                         bibcodes_string.replace('\n', ',')))
-        solr = client().post(
+        solr_resp = client().post(
             url=current_app.config['BIBLIB_SOLR_BIG_QUERY_URL'],
             params=params,
             data=bibcodes_string,
             headers=headers
         ).json()
 
-        return solr
+        return solr_resp
 
     @classmethod
-    def validate_supplied_bibcodes(cls, input_bibcodes):
-        """
-        Takes a list of input bibcodes and validates there existence in ADS
-        through the API. Calls either standard search or bigquery depending 
-        on the query length.
-        """
+    def query_valid_bibcodes(cls, input_bibcodes):
+        # """
+        # Takes a list of input bibcodes and validates there existence in ADS
+        # through the API. Calls either standard search or bigquery depending 
+        # on the query length.
+        # """
         bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
         if len(input_bibcodes) < bigquery_min:
             try:
-                solr_resp = cls.standard_ADS_query(input_bibcodes)
+                solr_resp = cls._standard_ADS_bibcode_query(input_bibcodes)
             except Exception as err:
                 current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}.".format(err))
                 solr_resp = {"error": str(err)}
         else:
             try:
-                solr_resp = cls.solr_big_query(input_bibcodes, rows=min(len(input_bibcodes), current_app.config.get('BIBLIB_MAX_ROWS', len(input_bibcodes))))
+                solr_resp = cls._solr_big_query_bibcodes(input_bibcodes, rows=min(len(input_bibcodes), current_app.config.get('BIBLIB_MAX_ROWS', len(input_bibcodes))))
             except Exception as err:
                 current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}".format(err))
                 solr_resp = {"error": str(err)}
+
         return solr_resp
     
     @classmethod
