@@ -9,10 +9,12 @@ Storyboard is defined within the comments of the program itself
 import unittest
 from flask import url_for
 from biblib.views.http_errors import NO_PERMISSION_ERROR, API_MISSING_USER_EMAIL
+from biblib.views import DocumentView
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
 from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
-    TestCaseDatabase, MockEndPoint
-
+    TestCaseDatabase, MockEndPoint, SolrQueryServiceresp
+from mock import patch
+import json
 class TestRetiringLibrarianEpic(TestCaseDatabase):
     """
     Base class used to test the Retiring Librarian Epic
@@ -51,11 +53,12 @@ class TestRetiringLibrarianEpic(TestCaseDatabase):
 
             # Add document
             url = url_for('documentview', library=library_id_dave)
-            response = self.client.post(
-                url,
-                data=library.document_view_post_data_json('add'),
-                headers=user_dave.headers
-            )
+            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+                response = self.client.post(
+                    url,
+                    data=library.document_view_post_data_json('add'),
+                    headers=user_dave.headers
+                )
             self.assertEqual(response.json['number_added'],
                              len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)

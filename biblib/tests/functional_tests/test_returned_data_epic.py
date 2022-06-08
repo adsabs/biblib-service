@@ -11,8 +11,11 @@ import unittest
 from datetime import datetime, timedelta
 from flask import url_for
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
+from biblib.views import DocumentView
 from biblib.tests.base import MockEmailService, TestCaseDatabase, \
-    MockSolrBigqueryService, MockEndPoint
+    MockSolrBigqueryService, MockEndPoint, SolrQueryServiceresp
+from mock import patch
+import json
 
 class TestReturnedDataEpic(TestCaseDatabase):
     """
@@ -73,11 +76,12 @@ class TestReturnedDataEpic(TestCaseDatabase):
 
             # Add document
             url = url_for('documentview', library=library_id_dave)
-            response = self.client.post(
-                url,
-                data=library.document_view_post_data_json('add'),
-                headers=user_dave.headers
-            )
+            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+                response = self.client.post(
+                    url,
+                    data=library.document_view_post_data_json('add'),
+                    headers=user_dave.headers
+                )
             self.assertEqual(response.json['number_added'],
                              len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
@@ -129,11 +133,12 @@ class TestReturnedDataEpic(TestCaseDatabase):
 
             # Add document
             url = url_for('documentview', library=library_id_dave)
-            response = self.client.post(
-                url,
-                data=library.document_view_post_data_json('add'),
-                headers=user_mary.headers
-            )
+            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+                response = self.client.post(
+                    url,
+                    data=library.document_view_post_data_json('add'),
+                    headers=user_mary.headers
+                )
             self.assertEqual(response.json['number_added'],
                              len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
@@ -252,11 +257,12 @@ class TestReturnedDataEpic(TestCaseDatabase):
 
             # Add document
             url = url_for('documentview', library=library_id_dave)
-            response = self.client.post(
-                url,
-                data=library.document_view_post_data_json('add'),
-                headers=user_dave.headers
-            )
+            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+                response = self.client.post(
+                    url,
+                    data=library.document_view_post_data_json('add'),
+                    headers=user_dave.headers
+                )
             self.assertEqual(response.json['number_added'],
                              len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
@@ -309,11 +315,12 @@ class TestReturnedDataEpic(TestCaseDatabase):
 
             # Add document
             url = url_for('documentview', library=library_id_dave)
-            response = self.client.post(
-                url,
-                data=library.document_view_post_data_json('add'),
-                headers=user_mary.headers
-            )
+            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+                response = self.client.post(
+                    url,
+                    data=library.document_view_post_data_json('add'),
+                    headers=user_mary.headers
+                )
             self.assertEqual(response.json['number_added'],
                              len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
