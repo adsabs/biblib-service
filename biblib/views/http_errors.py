@@ -62,15 +62,12 @@ BAD_LIBRARY_ID_ERROR = dict(
     body='Bad library ID was passed',
     number=400
 )
-def INVALID_BIBCODE_SPECIFIED_ERROR(bad_bibcodes, full_error):
+def INVALID_BIBCODE_SPECIFIED_ERROR(output_dict):
     #If some bibcodes are added, we do not want to return an error, but we still want to inform the user.
-    if not full_error:
-        err = 200
+    if output_dict.get("number_added") != 0:
+        val = 200
     #If no bibcodes are added, then we want to return an error.
     else:
-        err = 400
+        val = 400
     
-    return dict(
-        body='The following idenitifers were not found in ADS: {}.'.format(bad_bibcodes),
-        action=err
-    )
+    return {'The following idenitifers were not found in ADS: {}.'.format(output_dict.get("invalid_bibcodes"))}, val

@@ -352,9 +352,7 @@ def SolrQueryServiceresp(**kwargs):
         }
     }
 
-    #resp = resp.get('response')
-
-    return resp
+    return resp, 200
 
 
 class MockEmailService(MockADSWSAPI):

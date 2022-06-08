@@ -45,17 +45,21 @@ class DocumentView(BaseView):
 
             start_length = len(library.bibcode)
 
-            solr_resp = cls.query_valid_bibcodes(document_data['bibcode'])
+            #Validate supplied bibcodes to confirm they exist in SOLR
+            solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'])
+
             if "error" in solr_resp.keys():
+                #If SOLR request fails, pass the error back to the user
                 current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
-                output_dict = {"error": solr_resp.get("error"), "number_added": 0}
+                output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
                 valid_bibcodes = []
             else:
+                #If SOLR query succeeds generate list of valid bibcodes from response
                 valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
                 current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
-
             
             if valid_bibcodes:
+                #Add all valid bibcodes to library
                 library.add_bibcodes(valid_bibcodes)
 
                 session.add(library)
@@ -67,11 +71,14 @@ class DocumentView(BaseView):
                 )
             
             end_length = len(library.bibcode)
+
+            #Generate a list of invalid bibcodes
             invalid_bibcodes = list(set(document_data['bibcode']) - set(valid_bibcodes))
             
+            #Generate output that contains the number added and the number of invalid bibcodes.
             output_dict = {"number_added": end_length - start_length}
-            
             if invalid_bibcodes: output_dict['invalid_bibcodes'] = invalid_bibcodes
+            
             return  output_dict
     
     @staticmethod
@@ -83,7 +90,7 @@ class DocumentView(BaseView):
         """
         Validates identifiers by collecting all bibcodes returned from a standard query.
         """
-        bibcode_query ="identifier%3A("+"%20OR%20".join(input_bibcodes)+")"
+        bibcode_query ="identifier:("+"%20OR%20".join(input_bibcodes)+")"
         if fl == '':
             fl = 'bibcode,alternate_bibcode'
         else:
@@ -112,9 +119,8 @@ class DocumentView(BaseView):
             url=current_app.config['BIBLIB_SOLR_SEARCH_URL'],
             params=params,
             headers=headers
-        ).json()
-
-        return solr_resp
+        )
+        return solr_resp.json(), solr_resp.status_code 
 
     @staticmethod
     def _solr_big_query_bibcodes(
@@ -179,9 +185,8 @@ class DocumentView(BaseView):
             params=params,
             data=bibcodes_string,
             headers=headers
-        ).json()
-
-        return solr_resp
+        )
+        return solr_resp.json(), solr_resp.status_code
 
     @classmethod
     def query_valid_bibcodes(cls, input_bibcodes):
@@ -193,18 +198,21 @@ class DocumentView(BaseView):
         bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
         if len(input_bibcodes) < bigquery_min:
             try:
-                solr_resp = cls._standard_ADS_bibcode_query(input_bibcodes)
+                solr_resp, status = cls._standard_ADS_bibcode_query(input_bibcodes)
+            #Do we really want to r
             except Exception as err:
                 current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}.".format(err))
-                solr_resp = {"error": str(err)}
+                solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
+                status = 500
         else:
             try:
-                solr_resp = cls._solr_big_query_bibcodes(input_bibcodes, rows=min(len(input_bibcodes), current_app.config.get('BIBLIB_MAX_ROWS', len(input_bibcodes))))
+                solr_resp, status = cls._solr_big_query_bibcodes(input_bibcodes, rows=min(len(input_bibcodes), current_app.config.get('BIBLIB_MAX_ROWS', len(input_bibcodes))))
             except Exception as err:
                 current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}".format(err))
-                solr_resp = {"error": str(err)}
+                solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
+                status = 500
 
-        return solr_resp.get('response')
+        return solr_resp.get("response"), status
     
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):
@@ -421,11 +429,19 @@ class DocumentView(BaseView):
                 library_id=library,
                 document_data=data
             )
-            current_app.logger.info(
-                'Successfully added {0} documents to {1} by {2}'
-                .format(output.get("number_added"), library, user_editing_uid)
-            )
-            return {'number_added': output.get("number_added")}, 200
+            if "error" in output.keys():
+                return err(dict(body=output.get("error",""), number=output.get("status_code", 400)))
+
+            elif "invalid_bibcodes" in output.keys():
+                #Returns the list of invalid bibcodes, but only returns 400 if no bibcodes were added.
+                return INVALID_BIBCODE_SPECIFIED_ERROR(output)
+
+            else:
+                current_app.logger.info(
+                    'Successfully added {0} documents to {1} by {2}'
+                    .format(output.get("number_added"), library, user_editing_uid)
+                )
+                return {'number_added': output.get("number_added")}, 200
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')

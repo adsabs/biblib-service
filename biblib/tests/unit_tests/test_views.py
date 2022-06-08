@@ -1530,7 +1530,7 @@ class TestDocumentViews(TestCaseDatabase):
                     library_id=library_id,
                     document_data=self.stub_library_2.document_view_post_data('add')
                 )
-                self.assertEqual(output.get("number_added"), len(self.stub_library.bibcode))
+            self.assertEqual(output.get("number_added"), len(self.stub_library.bibcode))
 
             # Check that the document is in the library
             library = session.query(Library).filter(Library.id == library_id).all()
