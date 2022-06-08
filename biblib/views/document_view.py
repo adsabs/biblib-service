@@ -101,7 +101,6 @@ class DocumentView(BaseView):
             
             return  output_dict
 
-
     @classmethod
     def query_valid_bibcodes(cls, input_bibcodes, start, rows):
         """
