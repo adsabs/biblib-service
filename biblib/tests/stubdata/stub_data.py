@@ -66,13 +66,13 @@ class LibraryFactory(factory.Factory):
     """
     Factory for creating fake Library models
     """
-
     class Meta(object):
         """
         Defines the model that describes this factory
         """
         model = Library
-
+        exclude = ('nb_codes', )
+    nb_codes = 1
     name = factory.LazyAttribute(lambda x: faker.sentence(nb_words=3)[:49])
     description = \
         factory.LazyAttribute(lambda x: faker.sentence(nb_words=5)[:49])
@@ -80,7 +80,7 @@ class LibraryFactory(factory.Factory):
     read = False
     write = False
     bibcode = factory.LazyAttribute(
-        lambda x: {k: {} for k in fake_biblist(nb_codes=1)}
+        lambda x: {k: {} for k in fake_biblist(x.nb_codes)}
     )
 
 
@@ -212,12 +212,13 @@ class LibraryShop(object):
 
         :return: no return
         """
-        self.stub = LibraryFactory.stub()
+        self.kwargs = kwargs
+
+        self.stub = LibraryFactory.stub(nb_codes=kwargs.get("nb_codes", 1))
 
         self.user_view_post_data = None
         self.user_view_post_data_json = None
 
-        self.kwargs = kwargs
 
         self.want_bibcode = False
 

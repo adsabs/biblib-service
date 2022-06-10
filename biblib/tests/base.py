@@ -359,8 +359,9 @@ def SolrQueryServicerespInvalid(**kwargs):
         docs = []
         canonical_bibcodes = kwargs.get('canonical_bibcode')
         for i in range(len(canonical_bibcodes)):
-            docs.append({'bibcode': canonical_bibcodes[i]})
-            print(docs)
+            if i%2-1 == 0:
+                docs.append({'bibcode': canonical_bibcodes[i]})
+                print(docs)
         input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
     else:
         docs = [{'bibcode': 'bibcode'} for i
@@ -378,9 +379,9 @@ def SolrQueryServicerespInvalid(**kwargs):
             }
         },
         'response': {
-            'numFound': 0,
+            'numFound': len(docs),
             'start': 0,
-            'docs': []
+            'docs': docs
         }
     }
 

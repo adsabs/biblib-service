@@ -13,7 +13,7 @@ from biblib.views.http_errors import DUPLICATE_LIBRARY_NAME_ERROR, \
     NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR
 from biblib.tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
-    TestCaseDatabase, MockEndPoint, MockClassicService, SolrQueryServiceresp
+    TestCaseDatabase, MockEndPoint, MockClassicService, SolrQueryServiceresp, SolrQueryServicerespInvalid
 from biblib.views import DocumentView
 from biblib.utils import get_item
 from mock import patch
@@ -836,6 +836,115 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, 200, response)
         self.assertEqual(stub_library.get_bibcodes(),
                          response.json['documents'])
+
+    def test_add_invalid_document_to_library(self):
+        """
+        Test the /documents/<> end point with POST to reject an invalid document
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Add to the library
+        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServicerespInvalid(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+            url = url_for('documentview', library=library_id)
+            response = self.client.post(
+                url,
+                data=stub_library.document_view_post_data_json('add'),
+                headers=stub_user.headers
+            )
+
+        self.assertEqual(response.status_code, 400)
+
+        # Check the library was created and documents exist
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService(
+                canonical_bibcode=stub_library.bibcode) as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+
+        self.assertEqual(response.status_code, 200, response)
+        self.assertNotEqual(stub_library.get_bibcodes(),
+                         response.json['documents'])
+
+    def test_add_some_invalid_documents_to_library(self):
+        """
+        Test the /documents/<> end point with POST to reject invalid documents while adding others
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop(nb_codes=2)
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Add to the library
+        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServicerespInvalid(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+            url = url_for('documentview', library=library_id)
+            response = self.client.post(
+                url,
+                data=stub_library.document_view_post_data_json('add'),
+                headers=stub_user.headers
+            )
+        
+        #Check that the response is as expected.
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json.get('body'),
+                        'The following idenitifers were not found in ADS: {}.'.format(json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')[:1]))
+        self.assertEqual(response.json.get("number_added"), 1)
+        
+        # Check the library was created and documents exist
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService(
+                canonical_bibcode=stub_library.bibcode) as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+        #Check that the expected bibcode and only the expected bibcode is in the libary.
+        self.assertIn(json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')[1], response.json['documents'])
+        self.assertNotIn(json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')[0], response.json['documents'])
+
+        #Check that the library makes sense.
+        self.assertEqual(response.status_code, 200, response)
+        self.assertEqual(1, len(response.json.get('documents')))
 
     def test_cannot_add_duplicate_documents_to_library(self):
         """
@@ -2392,7 +2501,7 @@ class TestWebservices(TestCaseDatabase):
                 headers=stub_user.headers
             )
         self.assertEqual(
-            stub_library.get_bibcodes(),
+            sorted(stub_library.get_bibcodes()),
             response.json['documents'],
             msg='Bibcodes received do not match: {} != {}'
                 .format(stub_library.bibcode, response.json['documents'])

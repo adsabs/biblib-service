@@ -434,7 +434,10 @@ class DocumentView(BaseView):
 
             elif "invalid_bibcodes" in output.keys():
                 #Returns the list of invalid bibcodes, but only returns 400 if no bibcodes were added.
-                return INVALID_BIBCODE_SPECIFIED_ERROR(output)
+                if output.get('number_added') != 0:
+                    return {"body":'The following idenitifers were not found in ADS: {}.'.format(output.get("invalid_bibcodes")), "number_added": output.get('number_added')}, 200
+                else:
+                    return err(INVALID_BIBCODE_SPECIFIED_ERROR(output))
 
             else:
                 current_app.logger.info(
