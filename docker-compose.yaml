@@ -11,7 +11,7 @@ services:
     stdin_open: true
     tty: true
     user: ads
-    entrypoint: scripts/pytest/pytest_persistent.sh
+    entrypoint: scripts/pytest/pytest.sh
   pytest_biblib_db:
     container_name: pytest_biblib_db
     image: postgres:12.6
