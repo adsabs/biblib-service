@@ -7,6 +7,7 @@
 Astrophysic Data System's library service 
 
 ## development
+**NOTE: This method is now deprecated and only works on x64 machines. For aarch64 users, refer to the `docker-compose` method.**
 
 A Vagrantfile and puppet manifest are available for development within a virtual machine. To use the vagrant VM defined here you will need to install *Vagrant* and *VirtualBox*. 
 
@@ -14,6 +15,19 @@ A Vagrantfile and puppet manifest are available for development within a virtual
   * [VirtualBox](https://www.virtualbox.org)
 
 To load and enter the VM: `vagrant up && vagrant ssh`
+
+### Docker Compose
+Users not wanting to deal with Vagrant can instead use `docker-compose` to run `pytest` by executing the following command in a terminal:
+
+```
+docker-compose -f docker-compose-persistent.yaml up --force-recreate --abort-on-container-exit
+```
+This command starts a persistent docker container and automatically runs the full suite of tests. To do further work in the container simply run
+
+```
+docker exec -it pytest_biblib_microservice bash 
+```
+In a separate terminal to launch a bash terminal in the docker container.
 
 ### tests
 
