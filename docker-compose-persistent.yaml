@@ -12,6 +12,20 @@ services:
     tty: true
     user: ads
     entrypoint: scripts/pytest/pytest_persistent.sh
+  pytest_biblib_db:
+    container_name: pytest_biblib_db
+    image: postgres:12.6
+    ports:
+      - "1234:5432"
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - ./scripts/pytest/support/init-db.sh:/docker-entrypoint-initdb.d/initdb.sh
+    networks:
+      - pytest_biblib_microservice
 networks:
   pytest_biblib_microservice:
     driver: bridge
