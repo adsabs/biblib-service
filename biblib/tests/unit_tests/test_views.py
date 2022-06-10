@@ -13,7 +13,7 @@ from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
 from biblib.utils import get_item
 from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
-from biblib.tests.base import MockSolrQueryService, SolrQueryServiceresp, TestCaseDatabase, MockEmailService, \
+from biblib.tests.base import SolrQueryServicerespInvalid, SolrQueryServiceresp, TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService
 from biblib.emails import PermissionsChangedEmail
 from mock import patch
@@ -1583,6 +1583,65 @@ class TestDocumentViews(TestCaseDatabase):
                     document_data=self.stub_library.document_view_post_data('add')
                 )
                 self.assertEqual(0, output.get("number_added"))
+
+    def test_user_cannot_add_invalid_document_to_library(self):
+        """
+        Tests user cannot add invalid bibcode to a library and that 
+        it returns invalid bibcodes.
+        :return:
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+
+            library_id = library.id
+
+            # Get stub data for the document
+
+            # Add a document to the library
+            
+            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
+                output = self.document_view.add_document_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library.document_view_post_data('add')
+                )
+            self.assertEqual(output.get("number_added"), len(self.stub_library.bibcode))
+
+            # Check that the document is in the library
+            library = session.query(Library).filter(Library.id == library_id).all()
+            for _lib in library:
+                self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
+
+            # Add an invalid document to the library
+            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServicerespInvalid(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
+                output = self.document_view.add_document_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library_2.document_view_post_data('add')
+                )
+            self.assertEqual(output.get("number_added"), 0)
+            self.assertEqual(output.get("invalid_bibcodes"), self.stub_library_2.document_view_post_data('add').get('bibcode'))
+
+            # Check that the document is not in the library
+            library = session.query(Library).filter(Library.id == library_id).all()
+            for _lib in library:
+                self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
 
     def test_user_can_remove_document_from_library(self):
         """
