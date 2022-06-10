@@ -1641,7 +1641,7 @@ class TestDocumentViews(TestCaseDatabase):
             # Check that the document is not in the library
             library = session.query(Library).filter(Library.id == library_id).all()
             for _lib in library:
-                self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
+                self.assertNotIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
 
     def test_user_can_remove_document_from_library(self):
         """
