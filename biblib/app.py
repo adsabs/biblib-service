@@ -6,7 +6,7 @@ Application
 import logging.config
 
 from werkzeug.serving import run_simple
-from .views import UserView, LibraryView, DocumentView, PermissionView, \
+from .views import UserView, LibraryView, DocumentView, QueryView, PermissionView, \
     TransferView, ClassicView, TwoPointOhView, OperationsView
 from flask_restful import Api
 from flask_discoverer import Discoverer
@@ -42,6 +42,10 @@ def create_app(**config):
 
     api.add_resource(DocumentView,
                      '/documents/<string:library>',
+                     methods=['POST', 'DELETE', 'PUT'])
+    
+    api.add_resource(QueryView,
+                     '/query/<string:library>',
                      methods=['POST', 'DELETE', 'PUT'])
 
     api.add_resource(PermissionView,

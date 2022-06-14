@@ -11,6 +11,7 @@ from .base_view import BaseView
 from .user_view import UserView
 from .library_view import LibraryView
 from .document_view import DocumentView
+from .document_view import QueryView
 from .permission_view import PermissionView
 from .transfer_view import TransferView
 from .classic_view import ClassicView, TwoPointOhView
