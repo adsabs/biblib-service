@@ -92,10 +92,10 @@ class DocumentView(BaseView):
         """
         bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
         if fl == '':
-            fl = 'bibcode,alternate_bibcode'
+            fl = 'bibcode'
         else:
             fl_split = fl.split(',')
-            for required_fl in ['bibcode', 'alternate_bibcode']:
+            for required_fl in ['bibcode']:
                 if required_fl not in fl_split:
                     fl = '{},{}'.format(fl, required_fl)
 
@@ -105,7 +105,6 @@ class DocumentView(BaseView):
             'fl': fl,
             'rows': rows,
             'start': start,
-            'fq': '{!bitset}',
             'sort': sort
         }
 
@@ -199,7 +198,6 @@ class DocumentView(BaseView):
         if len(input_bibcodes) < bigquery_min:
             try:
                 solr_resp, status = cls._standard_ADS_bibcode_query(input_bibcodes)
-            #Do we really want to r
             except Exception as err:
                 current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}.".format(err))
                 solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
@@ -435,9 +433,9 @@ class DocumentView(BaseView):
             elif "invalid_bibcodes" in output.keys():
                 #Returns the list of invalid bibcodes, but only returns 400 if no bibcodes were added.
                 if output.get('number_added') != 0:
-                    return {"body":'The following idenitifers were not found in ADS: {}.'.format(output.get("invalid_bibcodes")), "number_added": output.get('number_added')}, 200
+                    return {"invalid_identifiers": output.get("invalid_bibcodes"), "number_added": output.get('number_added')}, 200
                 else:
-                    return err(INVALID_BIBCODE_SPECIFIED_ERROR(output))
+                    return INVALID_BIBCODE_SPECIFIED_ERROR(output)
 
             else:
                 current_app.logger.info(
