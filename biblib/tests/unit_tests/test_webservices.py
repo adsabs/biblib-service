@@ -925,8 +925,8 @@ class TestWebservices(TestCaseDatabase):
         
         #Check that the response is as expected.
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json.get('body'),
-                        'The following idenitifers were not found in ADS: {}.'.format(json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')[:1]))
+        self.assertEqual(response.json.get('invalid_identifiers'),
+                        json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')[:1])
         self.assertEqual(response.json.get("number_added"), 1)
         
         # Check the library was created and documents exist
