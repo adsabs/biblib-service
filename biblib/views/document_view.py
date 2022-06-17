@@ -545,10 +545,9 @@ class DocumentView(BaseView):
 class QueryView(BaseView):
     """
     End point to interact with a specific library, by adding documents and
-    removing documents. You also use this endpoint to delete the entire
-    library as this method should be scoped. Instead of dealing with a list
-    of bibcodes, this endpoint takes a search query string as input and returns
-    the result.
+    removing documents. Instead of dealing with a list
+    of bibcodes, this endpoint takes an ADS search query either in the form of parameters 
+    or /search GET syntax as input and returns the result.
     """
     # TODO: adding tags using PUT for RESTful endpoint?
 
@@ -573,8 +572,18 @@ class QueryView(BaseView):
             library = session.query(Library).filter_by(id=library_id).one()
 
             start_length = len(library.bibcode)
+            #Validate supplied bibcodes to confirm they exist in SOLR
+            solr_resp, status_code = cls._query_ADS_bibcodes(document_data.get('params'))
 
-            library.add_bibcodes(document_data['bibcode'])
+            if "error" in solr_resp.keys():
+                #If SOLR request fails, pass the error back to the user
+                current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
+                valid_bibcodes = []
+            else:
+                #If SOLR query succeeds generate list of valid bibcodes from response
+                valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
+                current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
+            library.add_bibcodes(valid_bibcodes)
 
             session.add(library)
             session.commit()
@@ -588,21 +597,57 @@ class QueryView(BaseView):
 
             return end_length - start_length
 
-    @staticmethod
-    def _standard_ADS_bibcode_query(params):
+    @classmethod
+    def remove_documents_from_library(cls, library_id, document_data):
         """
-        Validates identifiers by collecting all bibcodes returned from a standard query.
+        Remove a given document from a specific library
+
+        :param library_id: the unique ID of the library
+        :param document_data: the meta data of the document
+
+        :return: number_removed: number of documents successfully removed
+        """
+        current_app.logger.info('Removing a document: {0} from library_uuid: '
+                                '{1}'.format(document_data, library_id))
+        with current_app.session_scope() as session:
+            library = session.query(Library).filter_by(id=library_id).one()
+            start_length = len(library.bibcode)
+
+            solr_resp, status_code = cls._query_ADS_bibcodes(document_data.get('params'))
+
+            if "error" in solr_resp.keys():
+                #If SOLR request fails, pass the error back to the user
+                current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
+                output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
+                valid_bibcodes = []
+            else:
+                #If SOLR query succeeds generate list of valid bibcodes from response
+                valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
+                current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
+
+            library.remove_bibcodes(valid_bibcodes)
+
+            session.add(library)
+            session.commit()
+            current_app.logger.info('Removed document successfully: {0}'
+                                    .format(library.bibcode))
+            end_length = len(library.bibcode)
+
+            return start_length - end_length
+
+    @staticmethod
+    def _query_ADS_bibcodes(params):
+        """
+        Generates bibcodes by performing a standard query based on the supplied parameters.
         """
 
         if params.get('fl', '') == '':
-            fl = 'bibcode'
+            params['fl'] = 'bibcode'
         else:
-            fl_split = fl.split(',')
+            fl_split = params.get('fl').split(',')
             for required_fl in ['bibcode']:
                 if required_fl not in fl_split:
-                    params['fl'] = '{},{}'.format(fl, required_fl)
-
-
+                    params['fl'] = '{},{}'.format(params.get('fl'), required_fl)
 
         headers = {
             'Content-Type': 'application/json',
@@ -616,7 +661,7 @@ class QueryView(BaseView):
             headers=headers
         )
         return solr_resp.json(), solr_resp.status_code 
-
+ 
     def post(self, library):
         """
         HTTP POST request that adds a document to a library for a given user
