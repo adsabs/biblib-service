@@ -4,6 +4,7 @@ Document view
 
 from ..utils import err, get_post_data
 from ..models import Library, Permissions
+from ..client import client
 from .base_view import BaseView
 from ..client import client
 from flask import request, current_app
@@ -587,6 +588,34 @@ class QueryView(BaseView):
 
             return end_length - start_length
 
+    @staticmethod
+    def _standard_ADS_bibcode_query(params):
+        """
+        Validates identifiers by collecting all bibcodes returned from a standard query.
+        """
+
+        if params.get('fl', '') == '':
+            fl = 'bibcode'
+        else:
+            fl_split = fl.split(',')
+            for required_fl in ['bibcode']:
+                if required_fl not in fl_split:
+                    params['fl'] = '{},{}'.format(fl, required_fl)
+
+
+
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
+        }
+        current_app.logger.info('Querying Search microservice: {0}'
+                                .format(params))
+        solr_resp = client().get(
+            url=current_app.config['BIBLIB_SOLR_SEARCH_URL'],
+            params=params,
+            headers=headers
+        )
+        return solr_resp.json(), solr_resp.status_code 
 
     def post(self, library):
         """
