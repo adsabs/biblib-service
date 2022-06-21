@@ -46,7 +46,7 @@ def create_app(**config):
     
     api.add_resource(QueryView,
                      '/query/<string:library>',
-                     methods=['POST', 'DELETE', 'PUT'])
+                     methods=['POST', 'GET'])
 
     api.add_resource(PermissionView,
                      '/permissions/<string:library>',
