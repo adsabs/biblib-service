@@ -800,12 +800,11 @@ class QueryView(BaseView):
             return err(NO_PERMISSION_ERROR)
 
         try:
-            data = get_GET_params(
-                request,
-                types=dict(bibcode=list, action=str)
-            )
+            data = {"params": get_GET_params(
+                request
+            )}
         except TypeError as error:
-            current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
+            current_app.logger.error('Wrong type passed for GET: {0} [{1}]'
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
 
