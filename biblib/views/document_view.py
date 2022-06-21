@@ -2,7 +2,7 @@
 Document view
 """
 
-from ..utils import err, get_post_data
+from ..utils import err, get_post_data, get_GET_params
 from ..models import Library, Permissions
 from ..client import client
 from .base_view import BaseView
@@ -751,3 +751,71 @@ class QueryView(BaseView):
         else:
             current_app.logger.info('User requested a non-standard action')
             return {}, 400
+
+    def get(self, library):
+        """
+        HTTP GET request that adds documents to a library for a given user
+        :param library: library ID based on a /search query.
+
+        :return: the response for if the library was successfully created
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        GET params:
+        Any params that would be passed to the /search endpoint.
+        'fl' will automatically be reset to only bibcode.
+
+        Return data:
+        -----------
+        number_added: number of documents added
+
+        Permissions:
+        -----------
+        The following type of user can add documents:
+          - owner
+          - admin
+          - write
+        """
+        # Get the user requesting this from the header
+        try:
+            user_editing = self.helper_get_user_id()
+        except KeyError:
+            return err(MISSING_USERNAME_ERROR)
+
+        # URL safe base64 string to UUID
+        try:
+            library = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
+
+        user_editing_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
+
+        # Check the permissions of the user
+        if not self.write_access(service_uid=user_editing_uid,
+                                 library_id=library):
+            return err(NO_PERMISSION_ERROR)
+
+        try:
+            data = get_GET_params(
+                request,
+                types=dict(bibcode=list, action=str)
+            )
+        except TypeError as error:
+            current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
+                                     .format(request.data, error))
+            return err(WRONG_TYPE_ERROR)
+
+        current_app.logger.info('User requested to add a document')
+        number_added = self.add_document_to_library(
+            library_id=library,
+            document_data=data
+        )
+        current_app.logger.info(
+            'Successfully added {0} documents to {1} by {2}'
+            .format(number_added, library, user_editing_uid)
+        )
+        return {'number_added': number_added}, 200
