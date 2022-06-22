@@ -53,6 +53,7 @@ class DocumentView(BaseView):
                 current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
                 output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
                 valid_bibcodes = []
+                return output_dict
             else:
                 #If SOLR query succeeds generate list of valid bibcodes from response
                 valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
