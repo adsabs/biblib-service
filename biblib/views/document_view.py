@@ -579,23 +579,27 @@ class QueryView(BaseView):
                 #If SOLR request fails, pass the error back to the user
                 current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
                 valid_bibcodes = []
+                output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
+                return output_dict
             else:
                 #If SOLR query succeeds generate list of valid bibcodes from response
                 valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
                 current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
+                output_dict = {"number_added": end_length - start_length, "bibcodes": valid_bibcodes}
+
             library.add_bibcodes(valid_bibcodes)
 
             session.add(library)
             session.commit()
 
             current_app.logger.info('Added: {0} is now {1}'.format(
-                document_data['bibcode'],
+                valid_bibcodes,
                 library.bibcode)
             )
 
             end_length = len(library.bibcode)
 
-            return end_length - start_length
+            return output_dict
 
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):
@@ -800,9 +804,7 @@ class QueryView(BaseView):
             return err(NO_PERMISSION_ERROR)
 
         try:
-            data = {"params": get_GET_params(
-                request
-            )}
+            data = {"params": get_GET_params(request)}
         except TypeError as error:
             current_app.logger.error('Wrong type passed for GET: {0} [{1}]'
                                      .format(request.data, error))
