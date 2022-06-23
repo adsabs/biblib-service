@@ -97,3 +97,8 @@ def get_item(list_of_dictionaries, key):
     return next(
         item[key]for item in list_of_dictionaries if key in item.keys()
     )
+
+solr_query_fields=["abstract", "ack", "aff", "alternate_bicode", "alternate_title", "arxiv_class", "author", \
+    "bibcode", "bibgroup", "bibstem", "body", "citation_count", "copyright", "data", "date", "database", "doi", "doctype"\
+    "first_author", "grant", "id", "identifier", "indexstamp", "issue", "keyword", "lang", "orcid_pub", "orcid_user", "orcid_other",\
+    "page", "property", "pub", "pubdate", "read_count", "title", "vizier", "volume", "year"]
