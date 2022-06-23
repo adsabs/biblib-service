@@ -14,6 +14,8 @@ services:
     tty: true
     user: ads
     entrypoint: scripts/pytest/pytest.sh
+    command: 
+      - ${arg1}
   pytest_biblib_db:
     container_name: pytest_biblib_db
     image: postgres:12.6
