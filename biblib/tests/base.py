@@ -349,6 +349,96 @@ class MockSolrQueryService(MockADSWSAPI):
         HTTPretty.reset()
         HTTPretty.disable()
 
+class MockSolrQueryService(MockADSWSAPI):
+    """
+    Thin wrapper around the MockADSWSAPI class specficically for the Solr
+    Bigquery end point.
+    """
+
+    def __init__(self, **kwargs):
+
+        """
+        Constructor
+        :param api_endpoint: name of the API end point
+        :param user_uid: unique API user ID to be returned
+        :return: no return
+        """
+
+        self.kwargs = kwargs
+        self.api_endpoint = current_app.config['BIBLIB_SOLR_QUERY_URL']
+
+        def request_callback(request, uri, headers):
+            """
+            :param request: HTTP request
+            :param uri: URI/URL to send the request
+            :param headers: header of the HTTP request
+            :return:
+            """
+
+            if self.kwargs.get('solr_docs'):
+                docs = self.kwargs['solr_docs']
+            elif self.kwargs.get('canonical_bibcode'):
+                docs = []
+                canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                for i in range(len(canonical_bibcodes)):
+                    docs.append({'bibcode': canonical_bibcodes[i]})
+                    print(docs)
+            elif self.kwargs.get('params'):
+                self.kwargs.get('params')
+            else:
+                docs = [{'bibcode': 'bibcode'} for i
+                        in range(self.kwargs.get('number_of_bibcodes', 1))]
+            resp = {
+                'responseHeader': {
+                    'status': 0,
+                    'QTime': 152,
+                    'params': {
+                        'fl': 'bibcode',
+                        'q': '*:*',
+                        'wt': 'json'
+                    }
+                },
+                'response': {
+                    'numFound': 1,
+                    'start': 0,
+                    'docs': docs
+                }
+            }
+
+            if self.kwargs.get('fail', False):
+                resp.pop('response')
+
+            resp = json.dumps(resp)
+
+            status = self.kwargs.get('status', 200)
+            return status, headers, resp
+
+        HTTPretty.register_uri(
+            HTTPretty.POST,
+            self.api_endpoint,
+            body=request_callback,
+            content_type='application/json'
+        )
+
+    def __enter__(self):
+        """
+        Defines the behaviour for __enter__
+        :return: no return
+        """
+
+        HTTPretty.enable()
+
+    def __exit__(self, etype, value, traceback):
+        """
+        Defines the behaviour for __exit__
+        :param etype: exit type
+        :param value: exit value
+        :param traceback: the traceback for the exit
+        :return: no return
+        """
+
+        HTTPretty.reset()
+        HTTPretty.disable()
 
 class MockEmailService(MockADSWSAPI):
 

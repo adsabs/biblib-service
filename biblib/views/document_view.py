@@ -554,7 +554,55 @@ class QueryView(BaseView):
     scopes = ['user']
     rate_limit = [1000, 60*60*24]
 
-    
+    @classmethod
+    def add_document_to_library(cls, library_id, document_data):
+        """
+        Adds a document to a user's library
+        :param library_id: the library id to update
+        :param document_data: the meta data of the document
+
+        :return: number_added: number of documents successfully added
+        """
+        current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
+                                .format(document_data, library_id))
+
+        with current_app.session_scope() as session:
+            # Find the specified library
+            library = session.query(Library).filter_by(id=library_id).one()
+
+            start_length = len(library.bibcode)
+            #Validate supplied bibcodes to confirm they exist in SOLR
+            current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
+            solr_resp, status_code = cls._query_ADS_bibcodes(document_data.get('params'))
+            current_app.logger.info("SOLR response: {}".format(solr_resp))
+            
+            if "error" in solr_resp.keys():
+                #If SOLR request fails, pass the error back to the user
+                current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
+                valid_bibcodes = []
+                output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
+                return output_dict
+            else:
+                current_app.logger.info("docs: {}".format(solr_resp.get('response').get("docs")))
+                #If SOLR query succeeds generate list of valid bibcodes from response
+                valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('response').get('docs')]
+                current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
+
+            library.add_bibcodes(valid_bibcodes)
+
+            session.add(library)
+            session.commit()
+
+            current_app.logger.info('Added: {0} is now {1}'.format(
+                valid_bibcodes,
+                library.bibcode)
+            )
+
+            end_length = len(library.bibcode)
+            output_dict = {"number_added": end_length - start_length, "bibcodes": valid_bibcodes}
+
+            return output_dict
+
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):
         """
@@ -681,69 +729,26 @@ class QueryView(BaseView):
         else:
             return False
 
-
-    @classmethod
-    def add_document_to_library(cls, library_id, document_data):
-        """
-        Adds a document to a user's library
-        :param library_id: the library id to update
-        :param document_data: the meta data of the document
-
-        :return: number_added: number of documents successfully added
-        """
-        current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
-                                .format(document_data, library_id))
-
-        with current_app.session_scope() as session:
-            # Find the specified library
-            library = session.query(Library).filter_by(id=library_id).one()
-
-            start_length = len(library.bibcode)
-            #Validate supplied bibcodes to confirm they exist in SOLR
-            current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
-            solr_resp, status_code = cls._query_ADS_bibcodes(document_data.get('params'))
-            current_app.logger.info("SOLR response: {}".format(solr_resp))
-            
-            if "error" in solr_resp.keys():
-                #If SOLR request fails, pass the error back to the user
-                current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
-                valid_bibcodes = []
-                output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
-                return output_dict
-            else:
-                current_app.logger.info("docs: {}".format(solr_resp.get('response').get("docs")))
-                #If SOLR query succeeds generate list of valid bibcodes from response
-                valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('response').get('docs')]
-                current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
-
-            library.add_bibcodes(valid_bibcodes)
-
-            session.add(library)
-            session.commit()
-
-            current_app.logger.info('Added: {0} is now {1}'.format(
-                valid_bibcodes,
-                library.bibcode)
-            )
-
-            end_length = len(library.bibcode)
-            output_dict = {"number_added": end_length - start_length, "bibcodes": valid_bibcodes}
-
-            return output_dict
-
     @staticmethod
     def _query_ADS_bibcodes(params):
         """
         Generates bibcodes by performing a standard query based on the supplied parameters.
         """
-        current_app.logger.debug("Using params {params}")
+        solr_query_fields=["q", "rows", "start", "fl", "fq", "sort"]
+
         if params.get('fl', '') == '':
             params['fl'] = 'bibcode'
+        
+        valid_params = {}
+        for key in params.keys():
+            if key in solr_query_fields:
+                valid_params[key] = params.get(key)
+
         else:
-            fl_split = params.get('fl').split(',')
+            fl_split = valid_params.get('fl').split(',')
             for required_fl in ['bibcode']:
                 if required_fl not in fl_split:
-                    params['fl'] = '{},{}'.format(params.get('fl'), required_fl)
+                    valid_params['fl'] = '{},{}'.format(valid_params.get('fl'), required_fl)
         params['wt'] = 'json'
 
         headers = {
@@ -753,7 +758,7 @@ class QueryView(BaseView):
 
         solr_resp = client().get(
             url=current_app.config['BIBLIB_SOLR_SEARCH_URL'],
-            params=params,
+            params=valid_params,
             headers=headers
         )
 
