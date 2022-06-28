@@ -16,7 +16,6 @@ from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint, MockClassicService, MockSolrQueryService
 from biblib.views import DocumentView
 from biblib.utils import get_item
-from mock import patch
 
 
 class TestWebservices(TestCaseDatabase):
