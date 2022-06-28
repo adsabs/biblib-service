@@ -283,18 +283,29 @@ class LibraryShop(object):
         )
         return post_data
 
-    def query_view_post_data(self):
+    def query_view_post_data(self, action='add'):
         """
-        Expected data to be sent in a POST request to the DocumentView
-        end point, /documents/<>
+        Expected data to be sent in a POST request to the QueryView
+        end point, /query/<>
         :param action: action to perform with the bibcode (add, remove)
 
         :return: POST data in dictionary format
         """
         post_data = dict(
-            params ={'q':'(author = A. Scientist AND aff = Institution)', 'fl': 'bibcode', 'wt': 'json'}
+            params = {'q':'(author = A. Scientist AND aff = Institution)', 'fl': 'bibcode', 'wt': 'json'},
+            action = action
         )
         return post_data
+
+    def query_view_post_data_json(self, action='add'):
+        """
+        Expected data to be sent in a POST request to the QueryView
+        end point converted into JSON.
+
+        :return: POST data in dictionary format
+        """
+        post_data = self.query_view_post_data(action)
+        return json.dumps(post_data)
 
     def document_view_post_data_json(self, action='add'):
         """

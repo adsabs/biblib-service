@@ -1056,6 +1056,170 @@ class TestWebservices(TestCaseDatabase):
         self.assertTrue(len(response.json['documents']) == 0,
                         response.json['documents'])
 
+    def test_add_query_to_library(self):
+        """
+        Test the /query/<> end point with POST to add a document
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Add to the library
+        url = url_for('queryview', library=library_id)
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
+            response = self.client.post(
+                url,
+                data=stub_library.query_view_post_data_json('add'),
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.json['number_added'],
+                         len(stub_library.bibcode))
+        self.assertEqual(response.status_code, 200)
+
+        # Check the library was created and documents exist
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService(
+                canonical_bibcode=stub_library.bibcode) as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+
+        self.assertEqual(response.status_code, 200, response)
+        self.assertEqual(stub_library.get_bibcodes(),
+                         response.json['documents'])
+
+    def test_cannot_add_duplicate_documents_to_library_from_query(self):
+        """
+        Test the /query/<> end point with POST to add a document. Should
+        not be able to add the same document more than once.
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Add to the library
+        url = url_for('queryview', library=library_id)
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
+            response = self.client.post(
+                url,
+                data=stub_library.query_view_post_data_json(),
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.json['number_added'],
+                         len(stub_library.bibcode))
+        self.assertEqual(response.status_code, 200)
+
+        # Should not be able to add the same document
+        url = url_for('queryview', library=library_id)
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
+            response = self.client.post(
+                url,
+                data=stub_library.query_view_post_data_json(),
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['number_added'], 0)
+
+    def test_remove_document_from_library(self):
+        """
+        Test the /libraries/<> end point with POST to remove a document
+
+        :return:
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Add to the library
+        url = url_for('queryview', library=library_id)
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
+            response = self.client.post(
+                url,
+                data=stub_library.query_view_post_data_json('add'),
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.json['number_added'],
+                         len(stub_library.bibcode))
+        self.assertEqual(response.status_code, 200)
+
+        # Delete the document
+        url = url_for('queryview', library=library_id)
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('remove')).get('bibcode')) as SQ:
+            response = self.client.post(
+                url,
+                data=stub_library.query_view_post_data_json('remove'),
+                headers=stub_user.headers
+            )
+        self.assertEqual(response.json['number_removed'],
+                         len(stub_library.bibcode))
+        self.assertEqual(response.status_code, 200)
+
+        # Check the library is empty
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService(number_of_bibcodes=0) as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
+            response = self.client.get(
+                url,
+                headers=stub_user.headers
+            )
+        self.assertTrue(len(response.json['documents']) == 0,
+                        response.json['documents'])
+
+
     def _create_libraries(self, n=2, lib_data=None):
         """
         Create testing libraries
