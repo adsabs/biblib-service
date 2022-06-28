@@ -742,6 +742,8 @@ class QueryView(BaseView):
         for key in params.keys():
             if key in solr_query_fields:
                 valid_params[key] = params.get(key)
+            else:
+                return {"error":"Invalid /search parameters specified."}, 400
 
         else:
             fl_split = valid_params.get('fl').split(',')
