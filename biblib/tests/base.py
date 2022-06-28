@@ -234,7 +234,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
 class MockSolrQueryService(MockADSWSAPI):
     """
     Thin wrapper around the MockADSWSAPI class specficically for the Solr
-    Bigquery end point.
+    Query end point.
     """
 
     def __init__(self, **kwargs):
@@ -256,19 +256,32 @@ class MockSolrQueryService(MockADSWSAPI):
             :param headers: header of the HTTP request
             :return:
             """
-            # if self.kwargs.get('solr_docs'):
-            #     docs = self.kwargs['solr_docs']
-            if self.kwargs.get('canonical_bibcode'):
-                docs = []
-                canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                for i in range(len(canonical_bibcodes)):
-                    docs.append({'bibcode': canonical_bibcodes[i]})
-                    print(docs)
-                input_query ="identifier%3A("+"%20OR%20".join(canonical_bibcodes)+")"
+            if not self.kwargs.get('invalid'):
+                if self.kwargs.get('canonical_bibcode'):
+                    docs = []
+                    canonical_bibcodes = kwargs.get('canonical_bibcode')
+                    for i in range(len(canonical_bibcodes)):
+                        docs.append({'bibcode': canonical_bibcodes[i]})
+                        print(docs)
+                    input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
+                else:
+                    docs = [{'bibcode': 'bibcode'} for i
+                            in range(kwargs.get('number_of_bibcodes', 1))]
+                    input_query = ""
+            
             else:
-                docs = [{'bibcode': 'bibcode'} for i
-                        in range(self.kwargs.get('number_of_bibcodes', 1))]
-                input_query = ""
+                if self.kwargs.get('canonical_bibcode'):
+                    docs = []
+                    canonical_bibcodes = kwargs.get('canonical_bibcode')
+                    for i in range(len(canonical_bibcodes)):
+                        if i%2-1 == 0:
+                            docs.append({'bibcode': canonical_bibcodes[i]})
+                            print(docs)
+                    input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
+                else:
+                    docs = [{'bibcode': 'bibcode'} for i
+                            in range(kwargs.get('number_of_bibcodes', 1))]
+                    input_query = ""
 
             resp = {
                 'responseHeader': {
@@ -296,7 +309,7 @@ class MockSolrQueryService(MockADSWSAPI):
             return status, headers, resp
 
         HTTPretty.register_uri(
-            HTTPretty.POST,
+            HTTPretty.GET,
             self.api_endpoint,
             body=request_callback,
             content_type='application/json'
@@ -321,71 +334,6 @@ class MockSolrQueryService(MockADSWSAPI):
 
         HTTPretty.reset()
         HTTPretty.disable()
-
-def SolrQueryServiceresp(**kwargs):
-    if kwargs.get('canonical_bibcode'):
-        docs = []
-        canonical_bibcodes = kwargs.get('canonical_bibcode')
-        for i in range(len(canonical_bibcodes)):
-            docs.append({'bibcode': canonical_bibcodes[i]})
-            print(docs)
-        input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
-    else:
-        docs = [{'bibcode': 'bibcode'} for i
-                in range(kwargs.get('number_of_bibcodes', 1))]
-        input_query = ""
-
-    resp = {
-        'responseHeader': {
-            'status': 0,
-            'QTime': 152,
-            'params': {
-                'fl': 'bibcode',
-                'q': input_query,
-                'wt': 'json'
-            }
-        },
-        'response': {
-            'numFound': len(docs),
-            'start': 0,
-            'docs': docs
-        }
-    }
-
-    return resp, 200
-
-def SolrQueryServicerespInvalid(**kwargs):
-    if kwargs.get('canonical_bibcode'):
-        docs = []
-        canonical_bibcodes = kwargs.get('canonical_bibcode')
-        for i in range(len(canonical_bibcodes)):
-            if i%2-1 == 0:
-                docs.append({'bibcode': canonical_bibcodes[i]})
-                print(docs)
-        input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
-    else:
-        docs = [{'bibcode': 'bibcode'} for i
-                in range(kwargs.get('number_of_bibcodes', 1))]
-        input_query = ""
-
-    resp = {
-        'responseHeader': {
-            'status': 0,
-            'QTime': 152,
-            'params': {
-                'fl': 'bibcode',
-                'q': input_query,
-                'wt': 'json'
-            }
-        },
-        'response': {
-            'numFound': len(docs),
-            'start': 0,
-            'docs': docs
-        }
-    }
-
-    return resp, 200
 
 
 class MockEmailService(MockADSWSAPI):

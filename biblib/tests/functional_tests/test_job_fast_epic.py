@@ -10,8 +10,7 @@ import unittest
 from flask import url_for
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
 from biblib.views import DocumentView
-from biblib.tests.base import TestCaseDatabase, MockSolrBigqueryService, MockEndPoint, SolrQueryServiceresp
-from mock import patch
+from biblib.tests.base import MockSolrQueryService, TestCaseDatabase, MockSolrBigqueryService, MockEndPoint
 import json
 
 class TestJobFastEpic(TestCaseDatabase):
@@ -69,7 +68,7 @@ class TestJobFastEpic(TestCaseDatabase):
         # Accidentally tries to add the same bibcodes, but it does not work as
         # expected
         url = url_for('documentview', library=library_id)
-        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
             response = self.client.post(
                 url,
                 data=stub_library.document_view_post_data_json('add'),

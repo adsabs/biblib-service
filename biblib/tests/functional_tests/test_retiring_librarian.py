@@ -11,9 +11,8 @@ from flask import url_for
 from biblib.views.http_errors import NO_PERMISSION_ERROR, API_MISSING_USER_EMAIL
 from biblib.views import DocumentView
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
-from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
-    TestCaseDatabase, MockEndPoint, SolrQueryServiceresp
-from mock import patch
+from biblib.tests.base import MockEmailService, MockSolrBigqueryService, MockSolrQueryService,\
+    TestCaseDatabase, MockEndPoint
 import json
 class TestRetiringLibrarianEpic(TestCaseDatabase):
     """
@@ -53,7 +52,7 @@ class TestRetiringLibrarianEpic(TestCaseDatabase):
 
             # Add document
             url = url_for('documentview', library=library_id_dave)
-            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+            with MockSolrQueryService(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode')) as SQ:
                 response = self.client.post(
                     url,
                     data=library.document_view_post_data_json('add'),

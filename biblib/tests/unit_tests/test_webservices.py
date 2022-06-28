@@ -13,10 +13,9 @@ from biblib.views.http_errors import DUPLICATE_LIBRARY_NAME_ERROR, \
     NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR
 from biblib.tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
-    TestCaseDatabase, MockEndPoint, MockClassicService, SolrQueryServiceresp, SolrQueryServicerespInvalid
+    TestCaseDatabase, MockEndPoint, MockClassicService, MockSolrQueryService
 from biblib.views import DocumentView
 from biblib.utils import get_item
-from mock import patch
 
 
 class TestWebservices(TestCaseDatabase):
@@ -812,8 +811,8 @@ class TestWebservices(TestCaseDatabase):
         library_id = response.json['id']
 
         # Add to the library
-        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
-            url = url_for('documentview', library=library_id)
+        url = url_for('documentview', library=library_id)
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
             response = self.client.post(
                 url,
                 data=stub_library.document_view_post_data_json('add'),
@@ -864,7 +863,7 @@ class TestWebservices(TestCaseDatabase):
         library_id = response.json['id']
 
         # Add to the library
-        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServicerespInvalid(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'), invalid=True) as SQ:
             url = url_for('documentview', library=library_id)
             response = self.client.post(
                 url,
@@ -915,14 +914,14 @@ class TestWebservices(TestCaseDatabase):
         library_id = response.json['id']
 
         # Add to the library
-        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServicerespInvalid(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
-            url = url_for('documentview', library=library_id)
+        url = url_for('documentview', library=library_id)
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'), invalid = True) as SQ:
             response = self.client.post(
                 url,
                 data=stub_library.document_view_post_data_json('add'),
                 headers=stub_user.headers
             )
-        
+            print(response.json)
         #Check that the response is as expected.
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json.get('invalid_identifiers'),
@@ -974,19 +973,20 @@ class TestWebservices(TestCaseDatabase):
         library_id = response.json['id']
 
         # Add to the library
-        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
             url = url_for('documentview', library=library_id)
             response = self.client.post(
                 url,
                 data=stub_library.document_view_post_data_json('add'),
                 headers=stub_user.headers
             )
+        print(response.json)
         self.assertEqual(response.json['number_added'],
                          len(stub_library.bibcode))
         self.assertEqual(response.status_code, 200)
 
         # Should not be able to add the same document
-        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
             url = url_for('documentview', library=library_id)
             response = self.client.post(
                 url,
@@ -1024,7 +1024,7 @@ class TestWebservices(TestCaseDatabase):
 
         # Add to the library
         url = url_for('documentview', library=library_id)
-        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+        with MockSolrQueryService(canonical_bibcode=json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
             response = self.client.post(
                 url,
                 data=stub_library.document_view_post_data_json('add'),
@@ -1088,7 +1088,7 @@ class TestWebservices(TestCaseDatabase):
                 data = lib_data[nl]
 
             library_id = response_1.json['id']
-            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(data).get('bibcode'))) as _standard_ADS_bibcode_query:
+            with MockSolrQueryService(canonical_bibcode=json.loads(data).get('bibcode')) as SQ:
                 response_2 = self.client.post(
                     url_for('documentview', library=library_id),
                     data=data,
@@ -1697,7 +1697,7 @@ class TestWebservices(TestCaseDatabase):
         # See if a random user can edit content of the library
         # Add to the library
         url = url_for('documentview', library=library_id)
-        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add'))) as SQ:
             response = self.client.post(
                 url,
                 data=stub_library.document_view_post_data_json('add'),
@@ -1707,12 +1707,13 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
 
         # Check the owner can add/remove content
-        with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'))) as _standard_ADS_bibcode_query:
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
             response = self.client.post(
                 url,
                 data=stub_library.document_view_post_data_json('add'),
                 headers=stub_user_1.headers
             )
+        print(response.json)
         self.assertEqual(response.json['number_added'],
                                        len(stub_library.bibcode))
         self.assertEqual(response.status_code, 200)

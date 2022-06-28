@@ -13,10 +13,9 @@ from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
 from biblib.utils import get_item
 from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
-from biblib.tests.base import SolrQueryServicerespInvalid, SolrQueryServiceresp, TestCaseDatabase, MockEmailService, \
-    MockSolrBigqueryService
+from biblib.tests.base import TestCaseDatabase, MockEmailService, \
+    MockSolrBigqueryService, MockSolrQueryService
 from biblib.emails import PermissionsChangedEmail
-from mock import patch
 
 class TestBaseViews(TestCaseDatabase):
     """
@@ -1512,7 +1511,7 @@ class TestDocumentViews(TestCaseDatabase):
 
             # Add a document to the library
             
-            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')):
                 output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library.document_view_post_data('add')
@@ -1525,7 +1524,7 @@ class TestDocumentViews(TestCaseDatabase):
                 self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
 
             # Add a different document to the library
-            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
+            with MockSolrQueryService(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode')):
                 output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library_2.document_view_post_data('add')
@@ -1569,7 +1568,7 @@ class TestDocumentViews(TestCaseDatabase):
             # Get stub data for the document
 
             # Add a document to the library
-            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')):
                 output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library.document_view_post_data('add')
@@ -1577,7 +1576,7 @@ class TestDocumentViews(TestCaseDatabase):
             self.assertEqual(output.get("number_added"), len(self.stub_library.bibcode))
 
             # Shouldn't add the same document again
-            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')):
                 output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library.document_view_post_data('add')
@@ -1617,7 +1616,7 @@ class TestDocumentViews(TestCaseDatabase):
 
             # Add a document to the library
             
-            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServiceresp(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')):
                 output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library.document_view_post_data('add')
@@ -1630,7 +1629,7 @@ class TestDocumentViews(TestCaseDatabase):
                 self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
 
             # Add an invalid document to the library
-            with patch.object(DocumentView, '_standard_ADS_bibcode_query', return_value =  SolrQueryServicerespInvalid(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode'))) as _standard_ADS_bibcode_query:
+            with MockSolrQueryService(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode'), invalid = True):
                 output = self.document_view.add_document_to_library(
                     library_id=library_id,
                     document_data=self.stub_library_2.document_view_post_data('add')
