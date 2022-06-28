@@ -2119,8 +2119,8 @@ class TestQueryViews(TestCaseDatabase):
         """
 
         super(TestQueryViews, self).__init__(*args, **kwargs)
-        self.document_view = QueryView
-
+        self.query_view = QueryView
+        self.document_view = DocumentView
         # Stub data
         self.stub_user = self.stub_user_1 = UserShop()
         self.stub_user_2 = UserShop()
@@ -2160,28 +2160,30 @@ class TestQueryViews(TestCaseDatabase):
             # Get stub data for the document
 
             # Add a document to the library
-            number_added = self.document_view.add_document_to_library(
-                library_id=library_id,
-                document_data= {"params":{"q":"author:Jacovich AND property:REFEREED"}, "action": "add"}#self.stub_library.document_view_post_data('add')
-            )
-            self.assertEqual(number_added.get("number_added"), 4)#len(self.stub_library.bibcode))
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')) as SQ:
+                number_added = self.query_view.add_document_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library.query_view_post_data()
+                )
+            self.assertEqual(number_added.get("number_added"), len(self.stub_library.bibcode))
 
             # Check that the document is in the library
             library = session.query(Library).filter(Library.id == library_id).all()
-            # for _lib in library:
-            #     self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
+            for _lib in library:
+                self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
 
             # Add a different document to the library
-            number_added = self.document_view.add_document_to_library(
-                library_id=library_id,
-                document_data= {"params":{"q":"author: Jacovich"}, "action": "add"}#self.stub_library.document_view_post_data('add')
-            )
-            self.assertEqual(number_added.get("number_added"), 5)#len(self.stub_library.bibcode))
+            with MockSolrQueryService(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode')) as SQ:
+                number_added = self.query_view.add_document_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library_2.query_view_post_data()
+                )
+            self.assertEqual(number_added.get("number_added"), len(self.stub_library.bibcode))
 
             # Check that the document is in the library
             library = session.query(Library).filter(Library.id == library_id).all()
-            # for _lib in library:
-            #     self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
+            for _lib in library:
+                self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
 
     def test_user_cannot_duplicate_same_document_in_library(self):
         """
@@ -2215,18 +2217,20 @@ class TestQueryViews(TestCaseDatabase):
             # Get stub data for the document
 
             # Add a document to the library
-            number_added = self.document_view.add_document_to_library(
-                library_id=library_id,
-                document_data=self.stub_library.document_view_post_data('add')
-            )
-            self.assertEqual(number_added, len(self.stub_library.bibcode))
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')) as SQ:
+                number_added = self.query_view.add_document_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library.query_view_post_data()
+                )
+            self.assertEqual(number_added.get('number_added'), len(self.stub_library.bibcode))
 
             # Shouldn't add the same document again
-            number_added = self.document_view.add_document_to_library(
-                library_id=library_id,
-                document_data=self.stub_library.document_view_post_data('add')
-            )
-            self.assertEqual(0, number_added)
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')) as SQ:
+                number_added = self.query_view.add_document_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library.query_view_post_data()
+                )
+            self.assertEqual(0, number_added.get('number_added'))
 
     def test_user_can_remove_document_from_library(self):
         """
@@ -2258,11 +2262,12 @@ class TestQueryViews(TestCaseDatabase):
             session.expunge(library)
 
         # Remove the bibcode from the library
-        number_removed = self.document_view.remove_documents_from_library(
-            library_id=library.id,
-            document_data=self.stub_library.document_view_post_data('remove')
-        )
-        self.assertEqual(number_removed, len(self.stub_library.bibcode))
+        with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('remove').get('bibcode')) as SQ:
+            number_removed = self.query_view.remove_documents_from_library(
+                library_id=library.id,
+                document_data=self.stub_library.query_view_post_data()
+            )
+        self.assertEqual(number_removed.get("number_removed"), len(self.stub_library.bibcode))
 
         # Check it worked
         library = session.query(Library).filter(Library.id == library.id).one()
@@ -2304,7 +2309,7 @@ class TestQueryViews(TestCaseDatabase):
             session.commit()
 
             # add 1 to the UID to represent a random user
-            access = self.document_view.write_access(
+            access = self.query_view.write_access(
                 service_uid=self.stub_user_2.absolute_uid,
                 library_id=library.id
             )

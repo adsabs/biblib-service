@@ -352,7 +352,7 @@ class MockSolrQueryService(MockADSWSAPI):
 class MockSolrQueryService(MockADSWSAPI):
     """
     Thin wrapper around the MockADSWSAPI class specficically for the Solr
-    Bigquery end point.
+    Query end point.
     """
 
     def __init__(self, **kwargs):
@@ -365,7 +365,7 @@ class MockSolrQueryService(MockADSWSAPI):
         """
 
         self.kwargs = kwargs
-        self.api_endpoint = current_app.config['BIBLIB_SOLR_QUERY_URL']
+        self.api_endpoint = current_app.config['BIBLIB_SOLR_SEARCH_URL']
 
         def request_callback(request, uri, headers):
             """
@@ -374,32 +374,63 @@ class MockSolrQueryService(MockADSWSAPI):
             :param headers: header of the HTTP request
             :return:
             """
-
-            if self.kwargs.get('solr_docs'):
-                docs = self.kwargs['solr_docs']
-            elif self.kwargs.get('canonical_bibcode'):
-                docs = []
-                canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                for i in range(len(canonical_bibcodes)):
-                    docs.append({'bibcode': canonical_bibcodes[i]})
-                    print(docs)
-            elif self.kwargs.get('params'):
-                self.kwargs.get('params')
+            if not self.kwargs.get('invalid'):
+                if self.kwargs.get('canonical_bibcode'):
+                    docs = []
+                    canonical_bibcodes = kwargs.get('canonical_bibcode')
+                    for i in range(len(canonical_bibcodes)):
+                        docs.append({'bibcode': canonical_bibcodes[i]})
+                        print(docs)
+                    input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
+                    params = {
+                        'fl': 'bibcode',
+                        'q': input_query,
+                        'wt': 'json'
+                    }
+                else:
+                    docs = [{'bibcode': 'bibcode'} for i
+                            in range(kwargs.get('number_of_bibcodes', 1))]
+                    input_query = ""
+                    params = {
+                        'fl': 'bibcode',
+                        'q': input_query,
+                        'wt': 'json'
+                    }
+            
             else:
-                docs = [{'bibcode': 'bibcode'} for i
-                        in range(self.kwargs.get('number_of_bibcodes', 1))]
+                if self.kwargs.get('canonical_bibcode'):
+                    docs = []
+                    canonical_bibcodes = kwargs.get('canonical_bibcode')
+                    for i in range(len(canonical_bibcodes)):
+                        if i%2-1 == 0:
+                            docs.append({'bibcode': canonical_bibcodes[i]})
+                            print(docs)
+                    input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
+                    params = {
+                        'fl': 'bibcode',
+                        'q': input_query,
+                        'wt': 'json'
+                    }
+                else:
+                    docs = [{'bibcode': 'bibcode'} for i
+                            in range(kwargs.get('number_of_bibcodes', 1))]
+                    input_query = ""
+                    params = {
+                        'fl': 'bibcode',
+                        'q': input_query,
+                        'wt': 'json'
+                    }
+
+            if self.kwargs.get('params'): params = self.kwarg.get('params')
+
             resp = {
                 'responseHeader': {
                     'status': 0,
                     'QTime': 152,
-                    'params': {
-                        'fl': 'bibcode',
-                        'q': '*:*',
-                        'wt': 'json'
-                    }
+                    'params': params
                 },
                 'response': {
-                    'numFound': 1,
+                    'numFound': len(docs),
                     'start': 0,
                     'docs': docs
                 }
@@ -414,7 +445,7 @@ class MockSolrQueryService(MockADSWSAPI):
             return status, headers, resp
 
         HTTPretty.register_uri(
-            HTTPretty.POST,
+            HTTPretty.GET,
             self.api_endpoint,
             body=request_callback,
             content_type='application/json'
