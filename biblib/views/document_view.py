@@ -751,7 +751,7 @@ class QueryView(BaseView):
                 if required_fl not in fl_split:
                     valid_params['fl'] = '{},{}'.format(valid_params.get('fl'), required_fl)
         valid_params['wt'] = 'json'
-        valid_params['rows'] = min(params.get('rows'), current_app.config.get('BIBLIB_MAX_ROWS'))
+        valid_params['rows'] = min(params.get('rows', current_app.config.get('BIBLIB_MAX_ROWS')), current_app.config.get('BIBLIB_MAX_ROWS'))
 
         headers = {
             'Content-Type': 'application/json',
