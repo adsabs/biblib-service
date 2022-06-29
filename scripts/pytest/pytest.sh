@@ -1,7 +1,7 @@
 #!/bin/bash
 cd /app
 
-py.test biblib/tests/unit_tests/test_views.py
+py.test
 RESULT=$?
 
 if [[ "$1" = "-p" ]]; then
@@ -11,4 +11,4 @@ if [[ "$1" = "-p" ]]; then
     tail -f /dev/null
 fi
 
-return $RESULT
+exit $RESULT
