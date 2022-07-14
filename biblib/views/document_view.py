@@ -86,131 +86,31 @@ class DocumentView(BaseView):
             if invalid_bibcodes: output_dict['invalid_bibcodes'] = invalid_bibcodes
             
             return  output_dict
-    
-    @staticmethod
-    def _standard_ADS_bibcode_query(input_bibcodes,
-            start=0,
-            rows=20,
-            sort='date desc',
-            fl='bibcode'):
-        """
-        Validates identifiers by collecting all bibcodes returned from a standard query.
-        """
-        bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
-        if fl == '':
-            fl = 'bibcode'
-        else:
-            fl_split = fl.split(',')
-            for required_fl in ['bibcode']:
-                if required_fl not in fl_split:
-                    fl = '{},{}'.format(fl, required_fl)
 
-        params = {
-            'q': bibcode_query,
-            'wt': 'json',
-            'fl': fl,
-            'rows': rows,
-            'start': start,
-            'sort': sort
-        }
-
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
-        }
-        current_app.logger.info('Querying Search microservice: {0}'
-                                .format(params))
-        solr_resp = client().get(
-            url=current_app.config['BIBLIB_SOLR_SEARCH_URL'],
-            params=params,
-            headers=headers
-        )
-        return solr_resp.json(), solr_resp.status_code 
-
-    @staticmethod
-    def _solr_big_query_bibcodes(
-            bibcodes,
-            start=0,
-            rows=20,
-            sort='date desc',
-            fl='bibcode'
-    ):
-        """
-        A thin wrapper for the solr bigquery service.
-
-        :param bibcodes: bibcodes
-        :type bibcodes: list
-
-        :param start: start index
-        :type start: int
-
-        :param rows: number of rows
-        :type rows: int
-
-        :param sort: how the response should be sorted
-        :type sort: str
-
-        :param fl: Solr fields to be returned
-        :type fl: str
-
-        :return: bibcodes from solr bigquery endpoint response
-        """
-
-        bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
-
-        # We need atleast bibcode and alternate bibcode for other methods
-        # to work properly
-        if fl == '':
-            fl = 'bibcode,alternate_bibcode'
-        else:
-            fl_split = fl.split(',')
-            for required_fl in ['bibcode', 'alternate_bibcode']:
-                if required_fl not in fl_split:
-                    fl = '{},{}'.format(fl, required_fl)
-
-        params = {
-            'q': '*:*',
-            'wt': 'json',
-            'fl': fl,
-            'rows': rows,
-            'start': start,
-            'fq': '{!bitset}',
-            'sort': sort
-        }
-
-        headers = {
-            'Content-Type': 'big-query/csv',
-            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
-        }
-        current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
-                                .format(params,
-                                        bibcodes_string.replace('\n', ',')))
-        solr_resp = client().post(
-            url=current_app.config['BIBLIB_SOLR_BIG_QUERY_URL'],
-            params=params,
-            data=bibcodes_string,
-            headers=headers
-        )
-        return solr_resp.json(), solr_resp.status_code
 
     @classmethod
     def query_valid_bibcodes(cls, input_bibcodes):
-        # """
-        # Takes a list of input bibcodes and validates there existence in ADS
-        # through the API. Calls either standard search or bigquery depending 
-        # on the query length.
-        # """
+        """
+        Takes a list of input bibcodes and validates there existence in ADS
+        through the API. Calls either standard search or bigquery depending 
+        on the query length.
+        """
         bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
         if len(input_bibcodes) < bigquery_min:
             try:
-                solr_resp, status = cls._standard_ADS_bibcode_query(input_bibcodes)
+                response = cls.standard_ADS_bibcode_query(input_bibcodes)
+                solr_resp = response.json()
+                status = response.status_code
             except Exception as err:
                 current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}.".format(err))
                 solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
                 status = 500
         else:
             try:
-                solr_resp, status = cls._solr_big_query_bibcodes(input_bibcodes, rows=min(len(input_bibcodes), current_app.config.get('BIBLIB_MAX_ROWS', len(input_bibcodes))))
+                #For calls to bigquery, we limit the number of rows allowed in config.
+                response = cls.solr_big_query(input_bibcodes, rows=min(len(input_bibcodes), current_app.config.get('BIGQUERY_MAX_ROWS', len(input_bibcodes))))
+                solr_resp = response.json()
+                status = response.status_code
             except Exception as err:
                 current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}".format(err))
                 solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}

@@ -9,7 +9,6 @@ Storyboard is defined within the comments of the program itself
 import unittest
 from flask import url_for
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
-from biblib.views import DocumentView
 from biblib.tests.base import MockSolrQueryService, TestCaseDatabase, MockSolrBigqueryService, MockEndPoint
 import json
 

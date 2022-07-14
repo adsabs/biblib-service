@@ -11,7 +11,6 @@ import unittest
 from datetime import datetime, timedelta
 from flask import url_for
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
-from biblib.views import DocumentView
 from biblib.tests.base import MockEmailService, MockSolrQueryService, TestCaseDatabase, \
     MockSolrBigqueryService, MockEndPoint
 import json

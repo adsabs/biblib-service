@@ -32,6 +32,7 @@ BIBLIB_SOLR_SEARCH_URL = 'https://api.adsabs.harvard.edu/v1/search/query'
 BIBLIB_USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
 BIBLIB_ADSWS_API_DB_URI = 'sqlite:////tmp/test.db'
 BIBLIB_MAX_ROWS = 2000
+BIGQUERY_MAX_ROWS = 2000
 BIBLIB_SOLR_BIG_QUERY_MIN = 10
 
 MAIL_DEFAULT_SENDER = 'no-reply@adslabs.org'

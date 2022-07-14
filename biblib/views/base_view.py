@@ -414,3 +414,109 @@ class BaseView(Resource):
 
         current_app.logger.info('Email sent to {0} with payload: {1}'.format(msg.recipients, msg.body))
         return msg
+
+    @staticmethod
+    def solr_big_query(
+            bibcodes,
+            start=0,
+            rows=20,
+            sort='date desc',
+            fl='bibcode'
+    ):
+        """
+        A thin wrapper for the solr bigquery service.
+
+        :param bibcodes: bibcodes
+        :type bibcodes: list
+
+        :param start: start index
+        :type start: int
+
+        :param rows: number of rows
+        :type rows: int
+
+        :param sort: how the response should be sorted
+        :type sort: str
+
+        :param fl: Solr fields to be returned
+        :type fl: str
+
+        :return: bibcodes from solr bigquery endpoint response
+        """
+
+        bibcodes_string = 'bibcode\n' + '\n'.join(bibcodes)
+
+        # We need at least bibcode and alternate bibcode for other methods
+        # to work properly
+        if fl == '':
+            fl = 'bibcode,alternate_bibcode'
+        else:
+            fl_split = fl.split(',')
+            for required_fl in ['bibcode', 'alternate_bibcode']:
+                if required_fl not in fl_split:
+                    fl = '{},{}'.format(fl, required_fl)
+
+        params = {
+            'q': '*:*',
+            'wt': 'json',
+            'fl': fl,
+            'rows': rows,
+            'start': start,
+            'fq': '{!bitset}',
+            'sort': sort
+        }
+
+        headers = {
+            'Content-Type': 'big-query/csv',
+            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
+        }
+        current_app.logger.info('Querying Solr bigquery microservice: {0}, {1}'
+                                .format(params,
+                                        bibcodes_string.replace('\n', ',')))
+        solr_resp = client().post(
+            url=current_app.config['BIBLIB_SOLR_BIG_QUERY_URL'],
+            params=params,
+            data=bibcodes_string,
+            headers=headers
+        )
+        return solr_resp
+
+    @staticmethod
+    def standard_ADS_bibcode_query(input_bibcodes,
+            start=0,
+            rows=20,
+            sort='date desc',
+            fl='bibcode'):
+        """
+        Validates identifiers by collecting all bibcodes returned from a standard query.
+        """
+        bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
+        if fl == '':
+            fl = 'bibcode'
+        else:
+            fl_split = fl.split(',')
+            for required_fl in ['bibcode']:
+                if required_fl not in fl_split:
+                    fl = '{},{}'.format(fl, required_fl)
+
+        params = {
+            'q': bibcode_query,
+            'wt': 'json',
+            'fl': fl,
+            'rows': rows,
+            'start': start,
+            'sort': sort
+        }
+
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
+        }
+        current_app.logger.info('Querying Search microservice: {0}'
+                                .format(params))
+        solr_resp = client().get(
+            url=current_app.config['BIBLIB_SOLR_SEARCH_URL'],
+            params=params,
+            headers=headers
+        )
+        return solr_resp
