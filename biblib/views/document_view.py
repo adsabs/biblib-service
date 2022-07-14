@@ -70,7 +70,7 @@ class DocumentView(BaseView):
                     valid_bibcodes,
                     library_id)
                 )
-
+                
                 current_app.logger.debug('Added: {0} is now {1}'.format(
                     valid_bibcodes,
                     library.bibcode)
