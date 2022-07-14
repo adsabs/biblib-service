@@ -1301,6 +1301,7 @@ class TestDocumentViews(TestCaseDatabase):
 
         self.stub_library = self.stub_library_1 = LibraryShop()
         self.stub_library_2 = LibraryShop()
+        self.stub_library_3 = LibraryShop(nb_codes=4)
 
     def test_user_can_delete_a_library(self):
         """
@@ -1641,6 +1642,66 @@ class TestDocumentViews(TestCaseDatabase):
             library = session.query(Library).filter(Library.id == library_id).all()
             for _lib in library:
                 self.assertNotIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
+
+    def test_user_can_add_mixed_validity_documents_to_library(self):
+        """
+        Tests user cannot add invalid bibcode to a library and that 
+        it returns invalid bibcodes, but can still add valid ones.
+        :return:
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+
+            library_id = library.id
+
+            # Get stub data for the document
+
+            # Add a document to the library
+            
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')):
+                output = self.document_view.add_document_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library.document_view_post_data('add')
+                )
+            self.assertEqual(output.get("number_added"), len(self.stub_library.bibcode))
+
+            # Check that the document is in the library
+            library = session.query(Library).filter(Library.id == library_id).all()
+            for _lib in library:
+                self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
+
+            # Add some more documents to the library with some being invalid
+            with MockSolrQueryService(canonical_bibcode = self.stub_library_3.document_view_post_data('add').get('bibcode'), invalid = True):
+                output = self.document_view.add_document_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library_3.document_view_post_data('add')
+                )
+            self.assertEqual(output.get("number_added"), 2)
+            self.assertUnsortedEqual(output.get("invalid_bibcodes"), self.stub_library_3.document_view_post_data('add').get('bibcode')[0::2])
+
+            # Check that the  first document is not in the library but the second one is.
+            library = session.query(Library).filter(Library.id == library_id).all()
+            for _lib in library:
+                self.assertNotIn(list(self.stub_library_3.bibcode.keys())[0], _lib.bibcode)
+                self.assertIn(list(self.stub_library_3.bibcode.keys())[1], _lib.bibcode)
 
     def test_user_can_remove_document_from_library(self):
         """

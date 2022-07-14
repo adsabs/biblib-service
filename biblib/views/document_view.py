@@ -57,7 +57,7 @@ class DocumentView(BaseView):
             else:
                 #If SOLR query succeeds generate list of valid bibcodes from response
                 valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
-                current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
+                current_app.logger.debug("Found the following valid bibcodes: {}".format(valid_bibcodes))
             
             if valid_bibcodes:
                 #Add all valid bibcodes to library
@@ -66,7 +66,12 @@ class DocumentView(BaseView):
                 session.add(library)
                 session.commit()
 
-                current_app.logger.info('Added: {0} is now {1}'.format(
+                current_app.logger.info('Added: {0} to {1}'.format(
+                    valid_bibcodes,
+                    library_id)
+                )
+
+                current_app.logger.debug('Added: {0} is now {1}'.format(
                     valid_bibcodes,
                     library.bibcode)
                 )
@@ -429,7 +434,7 @@ class DocumentView(BaseView):
                 document_data=data
             )
             if "error" in output.keys():
-                return err(dict(body=output.get("error",""), number=output.get("status_code", 400)))
+                return err(dict(body=output.get("error"), number=output.get("status_code", 400)))
 
             elif "invalid_bibcodes" in output.keys():
                 #Returns the list of invalid bibcodes, but only returns 400 if no bibcodes were added.

@@ -257,9 +257,10 @@ class MockSolrQueryService(MockADSWSAPI):
             :return:
             """
             if not self.kwargs.get('invalid'):
+                #Sets all generated bibcodes as valid
                 if self.kwargs.get('canonical_bibcode'):
                     docs = []
-                    canonical_bibcodes = kwargs.get('canonical_bibcode')
+                    canonical_bibcodes = self.kwargs.get('canonical_bibcode')
                     for i in range(len(canonical_bibcodes)):
                         docs.append({'bibcode': canonical_bibcodes[i]})
                         print(docs)
@@ -272,7 +273,8 @@ class MockSolrQueryService(MockADSWSAPI):
             else:
                 if self.kwargs.get('canonical_bibcode'):
                     docs = []
-                    canonical_bibcodes = kwargs.get('canonical_bibcode')
+                    canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    #Sets all odd indexed bibcodes as valid, all other bibcodes are invalid.        
                     for i in range(len(canonical_bibcodes)):
                         if i%2-1 == 0:
                             docs.append({'bibcode': canonical_bibcodes[i]})
@@ -280,7 +282,7 @@ class MockSolrQueryService(MockADSWSAPI):
                     input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
                 else:
                     docs = [{'bibcode': 'bibcode'} for i
-                            in range(kwargs.get('number_of_bibcodes', 1))]
+                            in range(self.kwargs.get('number_of_bibcodes', 1))]
                     input_query = ""
 
             resp = {
