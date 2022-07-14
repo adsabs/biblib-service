@@ -341,7 +341,7 @@ class DocumentView(BaseView):
                 if output.get('number_added') != 0:
                     return {"invalid_identifiers": output.get("invalid_bibcodes"), "number_added": output.get('number_added')}, 200
                 else:
-                    return INVALID_BIBCODE_SPECIFIED_ERROR(output)
+                    return err(INVALID_BIBCODE_SPECIFIED_ERROR(output))
 
             else:
                 current_app.logger.info(

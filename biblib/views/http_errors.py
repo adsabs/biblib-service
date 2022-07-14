@@ -63,8 +63,9 @@ BAD_LIBRARY_ID_ERROR = dict(
     number=400
 )
 def INVALID_BIBCODE_SPECIFIED_ERROR(output_dict):
-    #If some bibcodes are added, we do not want to return an error, but we still want to inform the user.
     return dict(
-        error='No specified identifiers were able to be added.',
-        invalid_identifiers=output_dict.get("invalid_bibcodes")), 400
+        body='No specified identifiers were able to be added. invalid_bibcodes: {}'.format(
+        output_dict.get("invalid_bibcodes")),
+        number=400
+        )
     
