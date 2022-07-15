@@ -562,7 +562,7 @@ class QueryView(BaseView):
 
         :return: {number_added: number of documents successfully added, valid_bibcodes: corresponding bibcodes}
         """
-        current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
+        current_app.logger.info('Adding queried documents: {0} to library_uuid: {1}'
                                 .format(document_data, library_id))
 
         with current_app.session_scope() as session:
@@ -612,7 +612,7 @@ class QueryView(BaseView):
 
         :return: {number_removed: number of documents successfully removed, valid_bibcodes: Corresponding bibcodes}
         """
-        current_app.logger.info('Removing a document: {0} from library_uuid: '
+        current_app.logger.info('Removing queried documents: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
         current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
         solr_resp, status_code = cls._standard_ADS_bibcode_query(document_data.get('params'))
@@ -638,7 +638,7 @@ class QueryView(BaseView):
 
             session.add(library)
             session.commit()
-            current_app.logger.info('Removed document successfully: {0}'
+            current_app.logger.info('Removed queried documents successfully: {0}'
                                     .format(library.bibcode))
             end_length = len(library.bibcode)
 
