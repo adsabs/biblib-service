@@ -560,7 +560,7 @@ class QueryView(BaseView):
         :param library_id: the library id to update
         :param document_data: the /search query parameters
 
-        :return: number_added: number of documents successfully added and the corresponding bibcodes
+        :return: {number_added: number of documents successfully added, valid_bibcodes: corresponding bibcodes}
         """
         current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
                                 .format(document_data, library_id))
@@ -610,7 +610,7 @@ class QueryView(BaseView):
         :param library_id: the unique ID of the library
         :param document_data: the /search query parameters
 
-        :return: number_removed: number of documents successfully removed and corresponding bibcodes
+        :return: {number_removed: number of documents successfully removed, valid_bibcodes: Corresponding bibcodes}
         """
         current_app.logger.info('Removing a document: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
@@ -790,6 +790,7 @@ class QueryView(BaseView):
         -----------
         number_added: number of documents added (if 'add' is used)
         number_removed: number of documents removed (if 'remove' is used)
+        valid_bibcodes: The list of valid bibcodes
 
         Permissions:
         -----------
@@ -867,7 +868,7 @@ class QueryView(BaseView):
         HTTP GET request that adds documents to a library for a given user
         :param library: library ID based on a /search query.
 
-        :return: the response for if the library was successfully created
+        :return: the response for if the document was successfully added
 
         Header:
         -------
@@ -881,6 +882,7 @@ class QueryView(BaseView):
         Return data:
         -----------
         number_added: number of documents added
+        valid_bibcode: the list of valid bibcodes
 
         Permissions:
         -----------
