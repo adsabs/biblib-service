@@ -830,7 +830,7 @@ class QueryView(BaseView):
             return err(WRONG_TYPE_ERROR)
 
         if data['action'] == 'add':
-            current_app.logger.info('User requested to add a document')
+            current_app.logger.info('User requested to add documents from query')
             output_dict = self.add_query_to_library(
                 library_id=library,
                 document_data=data
@@ -845,7 +845,7 @@ class QueryView(BaseView):
             return {'number_added': output_dict.get('number_added'), "bibcodes": output_dict.get('bibcodes')}, 200
 
         elif data['action'] == 'remove':
-            current_app.logger.info('User requested to remove a document')
+            current_app.logger.info('User requested to remove documents by query')
             output_dict = self.remove_query_from_library(
                 library_id=library,
                 document_data=data
@@ -918,7 +918,7 @@ class QueryView(BaseView):
                                      .format(request.data, error))
             return err(BAD_QUERY_ERROR)
 
-        current_app.logger.info('User requested to add a document')
+        current_app.logger.info('User requested to add documents from query')
         output_dict = self.add_query_to_library(
             library_id=library,
             document_data=data
