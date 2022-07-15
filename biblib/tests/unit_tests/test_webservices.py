@@ -1249,7 +1249,7 @@ class TestWebservices(TestCaseDatabase):
         url = url_for('queryview', library=library_id)
         with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'), params = stub_library.query_view_post_data('add').get('params')) as SQ:
             response = self.client.get(
-                url,
+                url+'/?q=author%3A"Author, N."',
                 headers=stub_user.headers
             )
         self.assertEqual(response.json['number_added'],
@@ -1269,6 +1269,43 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, 200, response)
         self.assertEqual(stub_library.get_bibcodes(),
                          response.json['documents'])
+    
+    def test_query_cannot_add_library_without_q_get(self):
+        """
+        Test the /query/<> end point with POST to add a document
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop()
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for key in ['name', 'id']:
+            self.assertIn(key, response.json)
+
+        # Get the library ID
+        library_id = response.json['id']
+
+        # Add to the library
+        url = url_for('queryview', library=library_id)
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'), params = stub_library.query_view_post_data('add').get('params')) as SQ:
+            response = self.client.get(
+                url+'/?g=usesless_junk_not_real_query"',
+                headers=stub_user.headers
+            )
+
+        self.assertEqual(response.status_code, 400, response)
+
 
     def test_cannot_add_duplicate_documents_to_library_from_query_get(self):
         """
@@ -1301,7 +1338,7 @@ class TestWebservices(TestCaseDatabase):
         url = url_for('queryview', library=library_id)
         with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode'), params = stub_library.query_view_post_data('add').get('params')) as SQ:
             response = self.client.get(
-                url,
+                url+'/?q=author%3A"Author, N."',
                 headers=stub_user.headers
             )
         self.assertEqual(response.json['number_added'],

@@ -15,11 +15,15 @@ def get_GET_params(request, types={}):
     """
     try:
         get_params = request.args.to_dict()
-    except:
-        get_params = request.args
+    except ValueError:
+        msg = "Failed to parse input parameters: {}. Please confirm request is properly formatted.".format(request)
+        raise ValueError(msg)
+    if "q" in get_params.keys():
+        return get_params
+    else:
+        msg = "Query: {} is missing parameter 'q'. Please confirm request conforms to ADS /search syntax.".format(get_params)
+        raise ValueError(msg)
 
-    return get_params
-    
 def get_post_data(request, types={}):
     """
     Attempt to coerce POST json data from the request, falling

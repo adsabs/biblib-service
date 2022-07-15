@@ -33,6 +33,11 @@ WRONG_TYPE_ERROR = dict(
          .format(API_HELP),
     number=400
 )
+BAD_QUERY_ERROR = dict(
+    body='You passed a query that was not parseable. Please See the API documentation: {0}'
+         .format(API_HELP),
+    number=400
+)
 API_MISSING_USER_EMAIL = dict(
     body='User does not have an ADS account',
     number=404

@@ -292,7 +292,7 @@ class LibraryShop(object):
         :return: POST data in dictionary format
         """
         post_data = dict(
-            params = {'q': '(author = A. Scientist AND aff = Institution)', 'fl': 'bibcode'},
+            params = {'q': 'author:"A. Scientist" AND aff:Institution', 'fl': 'bibcode'},
             action = action
         )
         return post_data

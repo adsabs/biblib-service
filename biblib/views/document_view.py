@@ -554,13 +554,13 @@ class QueryView(BaseView):
     rate_limit = [1000, 60*60*24]
 
     @classmethod
-    def add_document_to_library(cls, library_id, document_data):
+    def add_query_to_library(cls, library_id, document_data):
         """
-        Adds a document to a user's library
+        Adds a the results of a query to a user's library
         :param library_id: the library id to update
-        :param document_data: the meta data of the document
+        :param document_data: the /search query parameters
 
-        :return: number_added: number of documents successfully added
+        :return: number_added: number of documents successfully added and the corresponding bibcodes
         """
         current_app.logger.info('Adding a document: {0} to library_uuid: {1}'
                                 .format(document_data, library_id))
@@ -603,14 +603,14 @@ class QueryView(BaseView):
             return output_dict
 
     @classmethod
-    def remove_documents_from_library(cls, library_id, document_data):
+    def remove_query_from_library(cls, library_id, document_data):
         """
-        Remove a given document from a specific library
+        Remove the results of a given query from a specific library
 
         :param library_id: the unique ID of the library
-        :param document_data: the meta data of the document
+        :param document_data: the /search query parameters
 
-        :return: number_removed: number of documents successfully removed
+        :return: number_removed: number of documents successfully removed and corresponding bibcodes
         """
         current_app.logger.info('Removing a document: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
@@ -830,7 +830,7 @@ class QueryView(BaseView):
 
         if data['action'] == 'add':
             current_app.logger.info('User requested to add a document')
-            output_dict = self.add_document_to_library(
+            output_dict = self.add_query_to_library(
                 library_id=library,
                 document_data=data
             )
@@ -845,7 +845,7 @@ class QueryView(BaseView):
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')
-            output_dict = self.remove_documents_from_library(
+            output_dict = self.remove_query_from_library(
                 library_id=library,
                 document_data=data
             )
@@ -911,13 +911,13 @@ class QueryView(BaseView):
 
         try:
             data = {"params": get_GET_params(request)}
-        except TypeError as error:
-            current_app.logger.error('Wrong type passed for GET: {0} [{1}]'
+        except ValueError as error:
+            current_app.logger.error('Improperly formatted query passed to GET: {0} [{1}]'
                                      .format(request.data, error))
-            return err(WRONG_TYPE_ERROR)
+            return err(BAD_QUERY_ERROR)
 
         current_app.logger.info('User requested to add a document')
-        output_dict = self.add_document_to_library(
+        output_dict = self.add_query_to_library(
             library_id=library,
             document_data=data
         )
