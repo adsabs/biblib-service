@@ -18,7 +18,7 @@ if not os.path.isdir(LOG_PATH):
 
 # For running tests on TravisCI
 SQLALCHEMY_BINDS = {
-    'libraries': 'postgresql+psycopg2://postgres:postgres@localhost:5432/test_biblib'
+    'libraries': 'postgresql+psycopg2://postgres:postgres@localhost:5432/pytest_biblib_db'
 }
 
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'unset-env').lower()
