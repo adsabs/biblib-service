@@ -12,11 +12,11 @@ from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.types import TypeDecorator, CHAR, String as StringType
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
-from sqlalchemy.orm import relationship
-
+from sqlalchemy.orm import relationship, configure_mappers
+from sqlalchemy_continuum import make_versioned
+make_versioned(user_cls=None)
 
 Base = declarative_base()
-
 
 class GUID(TypeDecorator):
     """
@@ -180,6 +180,7 @@ class Library(Base):
     much like a bibtex file.
     """
     __tablename__ = 'library'
+    __versioned__ = {}
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
     name = Column(String(50))
     description = Column(String(200))
@@ -267,4 +268,4 @@ class Permissions(Base):
         return '<Permissions, user_id: {0}, library_id: {1}, permissions: {2}>'\
             .format(self.user_id, self.library_id, self.permissions)
 
-
+configure_mappers()
