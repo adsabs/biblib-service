@@ -2,17 +2,17 @@
 User view
 """
 
-from ..utils import err, get_post_data
-from ..models import User, Library, Permissions
-from ..client import client
-from .base_view import BaseView
+from biblib.utils import err, get_post_data
+from biblib.models import User, Library, Permissions
+from biblib.client import client
+from biblib.views.base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy import Boolean
 from sqlalchemy.exc import IntegrityError
-from .http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
+from biblib.views.http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
     WRONG_TYPE_ERROR
-from ..biblib_exceptions import BackendIntegrityError
+from biblib.biblib_exceptions import BackendIntegrityError
 
 class UserView(BaseView):
     """
