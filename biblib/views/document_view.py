@@ -46,18 +46,23 @@ class DocumentView(BaseView):
             start_length = len(library.bibcode)
 
             #Validate supplied bibcodes to confirm they exist in SOLR
-            solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'])
+            valid_bibcodes = []
+            page_size = min(current_app.config.get('BIGQUERY_MAX_ROWS', len(document_data['bibcode'])), len(document_data['bibcode']))
+            #Check if there are more than the allowed number of bibcodes. Iterate over all pages if needed.
+            pages = len(document_data['bibcode']) // page_size + (len(document_data['bibcode']) % page_size > 0)
+            for page in range(0,  pages + 1):
+                solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'], start=page*page_size, rows=min(page_size, len(document_data['bibcode'])))
 
-            if "error" in solr_resp.keys():
-                #If SOLR request fails, pass the error back to the user
-                current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
-                output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
-                valid_bibcodes = []
-                return output_dict
-            else:
-                #If SOLR query succeeds generate list of valid bibcodes from response
-                valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
-                current_app.logger.debug("Found the following valid bibcodes: {}".format(valid_bibcodes))
+                if "error" in solr_resp.keys():
+                    #If SOLR request fails, pass the error back to the user
+                    current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
+                    output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
+                    valid_bibcodes += []
+                    return output_dict
+                else:
+                    #If SOLR query succeeds generate list of valid bibcodes from response
+                    valid_bibcodes += [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
+                    current_app.logger.debug("Found the following valid bibcodes: {}".format(valid_bibcodes))
             
             if valid_bibcodes:
                 #Add all valid bibcodes to library
@@ -89,7 +94,7 @@ class DocumentView(BaseView):
 
 
     @classmethod
-    def query_valid_bibcodes(cls, input_bibcodes):
+    def query_valid_bibcodes(cls, input_bibcodes, start, rows):
         """
         Takes a list of input bibcodes and validates there existence in ADS
         through the API. Calls either standard search or bigquery depending 
@@ -108,7 +113,7 @@ class DocumentView(BaseView):
         else:
             try:
                 #For calls to bigquery, we limit the number of rows allowed in config.
-                response = cls.solr_big_query(input_bibcodes, rows=min(len(input_bibcodes), current_app.config.get('BIGQUERY_MAX_ROWS', len(input_bibcodes))))
+                response = cls.solr_big_query(input_bibcodes, start=start, rows=rows)
                 solr_resp = response.json()
                 status = response.status_code
             except Exception as err:
