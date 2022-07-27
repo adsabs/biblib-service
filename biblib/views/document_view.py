@@ -50,6 +50,7 @@ class DocumentView(BaseView):
             page_size = min(current_app.config.get('BIGQUERY_MAX_ROWS', len(document_data['bibcode'])), len(document_data['bibcode']))
             #Check if there are more than the allowed number of bibcodes. Iterate over all pages if needed.
             pages = len(document_data['bibcode']) // page_size + (len(document_data['bibcode']) % page_size > 0)
+            
             for page in range(0,  pages + 1):
                 solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'], start=page*page_size, rows=min(page_size, len(document_data['bibcode'])))
 
@@ -61,8 +62,13 @@ class DocumentView(BaseView):
                     return output_dict
                 else:
                     #If SOLR query succeeds generate list of valid bibcodes from response
-                    valid_bibcodes += [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
-                    current_app.logger.debug("Found the following valid bibcodes: {}".format(valid_bibcodes))
+                    add_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
+                    if add_bibcodes:
+                        valid_bibcodes += add_bibcodes
+                        current_app.logger.debug("Found the following valid bibcodes: {}".format(add_bibcodes))
+                    else:
+                        current_app.logger.debug("query returned no new bibcodes. Halting paging.")
+                        break
             
             if valid_bibcodes:
                 #Add all valid bibcodes to library
