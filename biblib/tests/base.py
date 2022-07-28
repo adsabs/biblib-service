@@ -346,7 +346,8 @@ class MockSolrQueryService(MockADSWSAPI):
         :param traceback: the traceback for the exit
         :return: no return
         """
-
+        #adding this allows for checking pagination calls.
+        return self.page
         HTTPretty.reset()
         HTTPretty.disable()
 
