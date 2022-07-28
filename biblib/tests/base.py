@@ -320,6 +320,7 @@ class MockSolrQueryService(MockADSWSAPI):
             resp = json.dumps(resp)
 
             status = self.kwargs.get('status', 200)
+            self.page += 1
             return status, headers, resp
 
         HTTPretty.register_uri(
