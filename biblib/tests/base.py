@@ -172,11 +172,22 @@ class MockSolrBigqueryService(MockADSWSAPI):
 
             if self.kwargs.get('solr_docs'):
                 docs = self.kwargs['solr_docs']
+                
             elif self.kwargs.get('canonical_bibcode'):
-                docs = []
-                canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                for i in range(self.page*self.page_size, min(len(canonical_bibcodes), (self.page + 1)*self.page_size)):
-                    docs.append({'bibcode': canonical_bibcodes[i]})
+                if not self.kwargs.get('invalid'):
+                    docs = []
+                    canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    for i in range(self.page*self.page_size, min(len(canonical_bibcodes), (self.page + 1)*self.page_size)):
+                        docs.append({'bibcode': canonical_bibcodes[i]})
+                else:
+                    #This treats every other odd bibcode as valid.
+                    docs = []
+                    canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    i = self.page*self.page_size
+                    while len(docs) <  min(len(canonical_bibcodes), (self.page + 1)*self.page_size) and i < len(canonical_bibcodes):
+                        if i%4-1 == 0:                        
+                            docs.append({'bibcode': canonical_bibcodes[i]})
+                        i+=1
             else:
                 docs = [{'bibcode': 'bibcode'} for i
                         in range(self.kwargs.get('number_of_bibcodes', 1))]
@@ -229,7 +240,8 @@ class MockSolrBigqueryService(MockADSWSAPI):
         :param traceback: the traceback for the exit
         :return: no return
         """
-
+        #adding this allows for checking pagination calls.
+        return self.page
         HTTPretty.reset()
         HTTPretty.disable()
 
