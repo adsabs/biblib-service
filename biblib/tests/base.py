@@ -159,6 +159,8 @@ class MockSolrBigqueryService(MockADSWSAPI):
 
         self.kwargs = kwargs
         self.api_endpoint = current_app.config['BIBLIB_SOLR_BIG_QUERY_URL']
+        self.page = 0
+        self.page_size = current_app.config['BIGQUERY_MAX_ROWS']
 
         def request_callback(request, uri, headers):
             """
@@ -173,7 +175,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
             elif self.kwargs.get('canonical_bibcode'):
                 docs = []
                 canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                for i in range(len(canonical_bibcodes)):
+                for i in range(self.page*self.page_size, min(len(canonical_bibcodes), (self.page + 1)*self.page_size)):
                     docs.append({'bibcode': canonical_bibcodes[i]})
             else:
                 docs = [{'bibcode': 'bibcode'} for i
@@ -189,7 +191,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
                     }
                 },
                 'response': {
-                    'numFound': 1,
+                    'numFound': len(docs),
                     'start': 0,
                     'docs': docs
                 }
@@ -201,6 +203,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
             resp = json.dumps(resp)
 
             status = self.kwargs.get('status', 200)
+            self.page += 1
             return status, headers, resp
 
         HTTPretty.register_uri(

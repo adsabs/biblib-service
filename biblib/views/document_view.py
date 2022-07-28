@@ -51,7 +51,7 @@ class DocumentView(BaseView):
             #Check if there are more than the allowed number of bibcodes. Iterate over all pages if needed.
             pages = len(document_data['bibcode']) // page_size + (len(document_data['bibcode']) % page_size > 0)
             
-            for page in range(0,  pages + 1):
+            for page in range(0,  pages):
                 solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'], start=page*page_size, rows=min(page_size, len(document_data['bibcode'])))
 
                 if "error" in solr_resp.keys():

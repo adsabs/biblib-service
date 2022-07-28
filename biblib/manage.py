@@ -9,7 +9,7 @@ sys.path.append(PROJECT_HOME)
 from flask import current_app
 from flask_script import Manager, Command, Option
 from flask_migrate import Migrate, MigrateCommand
-from .models import Base, User, Permissions, Library
+from biblib.models import Base, User, Permissions, Library
 from biblib.app import create_app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
