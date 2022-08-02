@@ -203,7 +203,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
                 },
                 'response': {
                     'numFound': len(docs),
-                    'start': 0,
+                    'start': self.page*self.page_size,
                     'docs': docs
                 }
             }
