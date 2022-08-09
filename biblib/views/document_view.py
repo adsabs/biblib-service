@@ -571,7 +571,9 @@ class QueryView(BaseView):
             start_length = len(library.bibcode)
             #Validate supplied bibcodes to confirm they exist in SOLR
             current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
-            solr_resp, status_code = cls._standard_ADS_bibcode_query(document_data.get('params'))
+            response = cls.standard_ADS_bibcode_query(params=document_data.get('params'))
+            solr_resp = response.json()
+            status_code = response.status_code
             current_app.logger.info("SOLR response: {}".format(solr_resp))
             
             if "error" in solr_resp.keys():
@@ -614,7 +616,9 @@ class QueryView(BaseView):
         current_app.logger.info('Removing queried documents: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
         current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
-        solr_resp, status_code = cls._standard_ADS_bibcode_query(document_data.get('params'))
+        response = cls.standard_ADS_bibcode_query(params=document_data.get('params'))
+        solr_resp = response.json()
+        status_code = response.status_code
         current_app.logger.info("SOLR response: {}".format(solr_resp))
 
         if "error" in solr_resp.keys():
@@ -726,44 +730,6 @@ class QueryView(BaseView):
             return True
         else:
             return False
-
-    @staticmethod
-    def _standard_ADS_bibcode_query(params):
-        """
-        Generates bibcodes by performing a standard query based on the supplied parameters.
-        """
-        solr_query_fields=["q", "rows", "start", "fl", "fq", "sort"]
-
-        if params.get('fl', '') == '':
-            params['fl'] = 'bibcode'
-        
-        valid_params = {}
-        for key in params.keys():
-            if key in solr_query_fields:
-                valid_params[key] = params.get(key)
-            else:
-                return {"error":"Invalid /search parameters specified."}, 400
-
-        else:
-            fl_split = valid_params.get('fl').split(',')
-            for required_fl in ['bibcode']:
-                if required_fl not in fl_split:
-                    valid_params['fl'] = '{},{}'.format(valid_params.get('fl'), required_fl)
-        valid_params['wt'] = 'json'
-        valid_params['rows'] = min(params.get('rows', current_app.config.get('BIBLIB_MAX_ROWS')), current_app.config.get('BIBLIB_MAX_ROWS'))
-
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
-        }
-
-        solr_resp = client().get(
-            url=current_app.config['BIBLIB_SOLR_SEARCH_URL'],
-            params=valid_params,
-            headers=headers
-        )
-
-        return solr_resp.json(), solr_resp.status_code 
  
     def post(self, library):
         """
