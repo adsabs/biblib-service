@@ -7,7 +7,7 @@ import base64
 
 from ..views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
     USER_ID_KEYWORD
-from flask import request, current_app
+from flask import request, current_app, make_response, jsonify
 from flask_restful import Resource
 from flask_mail import Message
 from ..models import User, Library, Permissions
@@ -491,6 +491,10 @@ class BaseView(Resource):
         """
         Validates identifiers by collecting all bibcodes returned from a standard query.
         """
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
+        }
         if kwargs.get('params'):
             params = kwargs.get('params')
             solr_query_fields=["q", "rows", "start", "fl", "fq", "sort"]
@@ -500,7 +504,10 @@ class BaseView(Resource):
                 if key in solr_query_fields:
                     valid_params[key] = params.get(key)
                 else:
-                    return {"error":"Invalid /search parameters specified."}, 400
+                    error_resp = make_response(jsonify({"error":"Invalid /search parameters specified."}),400)
+                    for key in headers.keys():
+                        error_resp.headers[key] = headers[key]
+                    return error_resp
 
             if params.get('fl', '') == '':
                 params['fl'] = 'bibcode'
@@ -533,10 +540,7 @@ class BaseView(Resource):
                 'sort': sort
             }
 
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
-        }
+        
         current_app.logger.info('Querying Search microservice: {0}'
                                 .format(params))
         solr_resp = client().get(
