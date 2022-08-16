@@ -487,7 +487,8 @@ class BaseView(Resource):
             start=0,
             rows=20,
             sort='date desc',
-            fl='bibcode', **kwargs):
+            fl='bibcode', 
+            **kwargs):
         """
         Validates identifiers by collecting all bibcodes returned from a standard query.
         """
