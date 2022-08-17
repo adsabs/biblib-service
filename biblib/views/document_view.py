@@ -599,7 +599,12 @@ class QueryView(BaseView):
             )
 
             end_length = len(library.bibcode)
-            output_dict = {"number_added": end_length - start_length, "bibcodes": valid_bibcodes}
+            added_bibcodes = end_length - start_length
+            if added_bibcodes != 0:
+                output_dict = {"number_added": added_bibcodes, "bibcodes": list(set(valid_bibcodes) & set(library.bibcode))}
+            else:
+                output_dict = {"number_added": added_bibcodes, "bibcodes": ""}
+
 
             return output_dict
 
