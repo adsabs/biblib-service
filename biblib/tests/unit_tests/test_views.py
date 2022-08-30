@@ -1757,13 +1757,13 @@ class TestDocumentViews(TestCaseDatabase):
                 )
                 #Checks to make sure paging stops when we have all valid bibcodes.
                 self.assertEqual(pages, 1)
-            self.assertEqual(output.get("number_added"), int(len(self.stub_library_max.document_view_post_data('add').get('bibcode'))/4))
+            self.assertEqual(output.get("number_added"), round(len(self.stub_library_max.document_view_post_data('add').get('bibcode'))/4))
 
             # Check that the first document is not in the library but the 597th one is.
             library = session.query(Library).filter(Library.id == library_id).all()
             for _lib in library:
                 self.assertNotIn(list(self.stub_library_max.bibcode.keys())[0], _lib.bibcode)
-                self.assertIn(list(self.stub_library_max.bibcode.keys())[-3], _lib.bibcode)
+                self.assertIn(list(self.stub_library_max.bibcode.keys())[597], _lib.bibcode)
 
     def test_user_can_add_more_than_BIGQUERY_MAX_ROWS(self):
         """
