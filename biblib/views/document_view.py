@@ -52,7 +52,7 @@ class DocumentView(BaseView):
             pages = len(document_data['bibcode']) // page_size + (len(document_data['bibcode']) % page_size > 0)
             
             for page in range(0, pages):
-                solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'], start=page*page_size, rows=min(page_size, len(document_data['bibcode'])))
+                solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'], start=page*page_size, rows=page_size)
 
                 if "error" in solr_resp.keys():
                     #If SOLR request fails, pass the error back to the user

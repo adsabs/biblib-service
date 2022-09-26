@@ -277,10 +277,10 @@ class MockSolrQueryService(MockADSWSAPI):
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
                     for i in range(len(canonical_bibcodes)):
                         docs.append({'bibcode': canonical_bibcodes[i]})
-                    input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
+                    input_query ="identifier:(" + " OR ".join(canonical_bibcodes)+")"
                 else:
                     docs = [{'bibcode': 'bibcode'} for i
-                            in range(kwargs.get('number_of_bibcodes', 1))]
+                            in range(self.kwargs.get('number_of_bibcodes', 1))]
                     input_query = ""
             
             else:
@@ -291,7 +291,7 @@ class MockSolrQueryService(MockADSWSAPI):
                     for i in range(len(canonical_bibcodes)):
                         if i%2-1 == 0:
                             docs.append({'bibcode': canonical_bibcodes[i]})
-                    input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
+                    input_query ="identifier:(" + " OR ".join(canonical_bibcodes)+")"
                 else:
                     docs = [{'bibcode': 'bibcode'} for i
                             in range(self.kwargs.get('number_of_bibcodes', 1))]
