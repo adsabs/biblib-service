@@ -8,7 +8,7 @@ import os
 import pwd
 
 LOG_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '../')
+    os.path.join(os.path.dirname(__file__), './')
 )
 LOG_PATH = '{home}/logs/'.format(home=LOG_PATH)
 LOG_STDOUT = True
@@ -28,9 +28,12 @@ ENVIRONMENT = os.getenv('ENVIRONMENT', 'unset-env').lower()
 BIBLIB_TWOPOINTOH_SERVICE_URL = 'https://api.adsabs.edu/v1/harbour'
 BIBLIB_CLASSIC_SERVICE_URL = 'https://api.adsabs.edu/v1/harbour'
 BIBLIB_SOLR_BIG_QUERY_URL = 'https://api.adsabs.search/v1/bigquery'
+BIBLIB_SOLR_SEARCH_URL = 'https://api.adsabs.harvard.edu/v1/search/query'
 BIBLIB_USER_EMAIL_ADSWS_API_URL = 'https://api.adsabs.harvard.edu/v1/user'
 BIBLIB_ADSWS_API_DB_URI = 'sqlite:////tmp/test.db'
 BIBLIB_MAX_ROWS = 2000
+BIGQUERY_MAX_ROWS = 200
+BIBLIB_SOLR_BIG_QUERY_MIN = 10
 
 MAIL_DEFAULT_SENDER = 'no-reply@adslabs.org'
 

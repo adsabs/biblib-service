@@ -58,8 +58,14 @@ TOO_MANY_LIBRARIES_SPECIFIED_ERROR = dict(
     body='Too many secondary libraries specified; only one secondary library allowed.',
     number=400
 )
-
 BAD_LIBRARY_ID_ERROR = dict(
     body='Bad library ID was passed',
     number=400
 )
+def INVALID_BIBCODE_SPECIFIED_ERROR(output_dict):
+    return dict(
+        body='No specified identifiers were able to be added. invalid_bibcodes: {}'.format(
+        output_dict.get("invalid_bibcodes")),
+        number=400
+        )
+    

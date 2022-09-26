@@ -9,7 +9,8 @@ Storyboard is defined within the comments of the program itself
 import unittest
 from flask import url_for
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
-from biblib.tests.base import TestCaseDatabase, MockSolrBigqueryService, MockEndPoint
+from biblib.tests.base import MockSolrQueryService, TestCaseDatabase, MockSolrBigqueryService, MockEndPoint
+import json
 
 class TestJobFastEpic(TestCaseDatabase):
     """
@@ -66,11 +67,12 @@ class TestJobFastEpic(TestCaseDatabase):
         # Accidentally tries to add the same bibcodes, but it does not work as
         # expected
         url = url_for('documentview', library=library_id)
-        response = self.client.post(
-            url,
-            data=stub_library.document_view_post_data_json('add'),
-            headers=user_mary.headers
-        )
+        with MockSolrQueryService(canonical_bibcode = json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')) as SQ:
+            response = self.client.post(
+                url,
+                data=stub_library.document_view_post_data_json('add'),
+                headers=user_mary.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['number_added'], 0)
 

@@ -159,6 +159,8 @@ class MockSolrBigqueryService(MockADSWSAPI):
 
         self.kwargs = kwargs
         self.api_endpoint = current_app.config['BIBLIB_SOLR_BIG_QUERY_URL']
+        self.page = 0
+        self.page_size = current_app.config['BIGQUERY_MAX_ROWS']
 
         def request_callback(request, uri, headers):
             """
@@ -170,12 +172,22 @@ class MockSolrBigqueryService(MockADSWSAPI):
 
             if self.kwargs.get('solr_docs'):
                 docs = self.kwargs['solr_docs']
+                
             elif self.kwargs.get('canonical_bibcode'):
-                docs = []
-                canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                for i in range(len(canonical_bibcodes)):
-                    docs.append({'bibcode': canonical_bibcodes[i]})
-                    print(docs)
+                if not self.kwargs.get('invalid'):
+                    docs = []
+                    canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    for i in range(self.page*self.page_size, min(len(canonical_bibcodes), (self.page + 1)*self.page_size)):
+                        docs.append({'bibcode': canonical_bibcodes[i]})
+                else:
+                    #This treats every other odd bibcode as valid.
+                    docs = []
+                    canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    i = self.page*self.page_size
+                    while len(docs) <  min(len(canonical_bibcodes), (self.page + 1)*self.page_size) and i < len(canonical_bibcodes):
+                        if i%4-1 == 0:                        
+                            docs.append({'bibcode': canonical_bibcodes[i]})
+                        i+=1
             else:
                 docs = [{'bibcode': 'bibcode'} for i
                         in range(self.kwargs.get('number_of_bibcodes', 1))]
@@ -190,7 +202,113 @@ class MockSolrBigqueryService(MockADSWSAPI):
                     }
                 },
                 'response': {
-                    'numFound': 1,
+                    'numFound': len(docs),
+                    'start': self.page*self.page_size,
+                    'docs': docs
+                }
+            }
+
+            if self.kwargs.get('fail', False):
+                resp.pop('response')
+
+            resp = json.dumps(resp)
+
+            status = self.kwargs.get('status', 200)
+            self.page += 1
+            return status, headers, resp
+
+        HTTPretty.register_uri(
+            HTTPretty.POST,
+            self.api_endpoint,
+            body=request_callback,
+            content_type='application/json'
+        )
+
+    def __enter__(self):
+        """
+        Defines the behaviour for __enter__
+        :return: no return
+        """
+
+        HTTPretty.enable()
+
+    def __exit__(self, etype, value, traceback):
+        """
+        Defines the behaviour for __exit__
+        :param etype: exit type
+        :param value: exit value
+        :param traceback: the traceback for the exit
+        :return: no return
+        """
+        #adding this allows for checking pagination calls.
+        return self.page
+        HTTPretty.reset()
+        HTTPretty.disable()
+
+class MockSolrQueryService(MockADSWSAPI):
+    """
+    Thin wrapper around the MockADSWSAPI class specficically for the Solr
+    Query end point.
+    """
+
+    def __init__(self, **kwargs):
+
+        """
+        Constructor
+        :param api_endpoint: name of the API end point
+        :param user_uid: unique API user ID to be returned
+        :return: no return
+        """
+
+        self.kwargs = kwargs
+        self.api_endpoint = current_app.config['BIBLIB_SOLR_SEARCH_URL']
+
+        def request_callback(request, uri, headers):
+            """
+            :param request: HTTP request
+            :param uri: URI/URL to send the request
+            :param headers: header of the HTTP request
+            :return:
+            """
+            if not self.kwargs.get('invalid'):
+                #Sets all generated bibcodes as valid
+                if self.kwargs.get('canonical_bibcode'):
+                    docs = []
+                    canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    for i in range(len(canonical_bibcodes)):
+                        docs.append({'bibcode': canonical_bibcodes[i]})
+                    input_query ="identifier:(" + " OR ".join(canonical_bibcodes)+")"
+                else:
+                    docs = [{'bibcode': 'bibcode'} for i
+                            in range(self.kwargs.get('number_of_bibcodes', 1))]
+                    input_query = ""
+            
+            else:
+                if self.kwargs.get('canonical_bibcode'):
+                    docs = []
+                    canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    #Sets all odd indexed bibcodes as valid, all other bibcodes are invalid.        
+                    for i in range(len(canonical_bibcodes)):
+                        if i%2-1 == 0:
+                            docs.append({'bibcode': canonical_bibcodes[i]})
+                    input_query ="identifier:(" + " OR ".join(canonical_bibcodes)+")"
+                else:
+                    docs = [{'bibcode': 'bibcode'} for i
+                            in range(self.kwargs.get('number_of_bibcodes', 1))]
+                    input_query = ""
+
+            resp = {
+                'responseHeader': {
+                    'status': 0,
+                    'QTime': 152,
+                    'params': {
+                        'fl': 'bibcode',
+                        'q': input_query,
+                        'wt': 'json'
+                    }
+                },
+                'response': {
+                    'numFound': len(docs),
                     'start': 0,
                     'docs': docs
                 }
@@ -205,7 +323,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
             return status, headers, resp
 
         HTTPretty.register_uri(
-            HTTPretty.POST,
+            HTTPretty.GET,
             self.api_endpoint,
             body=request_callback,
             content_type='application/json'

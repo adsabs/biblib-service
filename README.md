@@ -7,6 +7,7 @@
 Astrophysic Data System's library service 
 
 ## development
+**NOTE: This method is now deprecated and only works on x64 machines.**
 
 A Vagrantfile and puppet manifest are available for development within a virtual machine. To use the vagrant VM defined here you will need to install *Vagrant* and *VirtualBox*. 
 
@@ -15,11 +16,12 @@ A Vagrantfile and puppet manifest are available for development within a virtual
 
 To load and enter the VM: `vagrant up && vagrant ssh`
 
+
 ### tests
 
 Run the tests using `py.test`:
 ```bash
-docker run --name some-postgres -e POSTGRES_PASSWORD= -d -p 1234:5432 postgres
+docker run --name some-postgres -e POSTGRES_USER="postgres" POSTGRES_PASSWORD="postgres" -p 5432:5432 --name postgres
 virtualenv python
 source python/bin/activate
 pip install -r requirements.txt
@@ -37,6 +39,21 @@ Tests are split into three (excessive) stages:
 
 All tests have been written top down, or in a Test-Driven Development approach, so keep this in mind when reading the tests. All the logic has been built based on these tests, so if you were to add something, I'd advise you first create a test for your expected behaviour, and build the logic until it works.
 
+### Running Biblib Locally
+
+To run a version of Biblib locally, a postgres database needs to be created and properly formatted for use with Biblib. This can be done with a local postgres instance or in a docker container using the following commands.
+`config.py` must also be copied to `local_config.py` and the environment variables must be adjusted to reflect the local environment.
+```bash
+docker run -d -e POSTGRES_USER="postgres" -e POSTGRES_PASSWORD="postgres" -p 5432:5432 --name postgres  postgres:12.6
+docker exec -it postgres bash -c "psql -c \"CREATE ROLE biblib_service WITH LOGIN PASSWORD 'biblib_service';\""
+docker exec -it postgres bash -c "psql -c \"CREATE DATABASE biblib_service;\""
+docker exec -it postgres bash -c "psql -c \"GRANT CREATE ON DATABASE biblib_service TO biblib_service;\""
+python3 manage.py createdb
+```
+A test version of the microservice can then be deployed using
+```bash
+python3 wsgi.py
+```
 
 ## deployment
 

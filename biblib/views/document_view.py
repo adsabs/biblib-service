@@ -5,12 +5,13 @@ Document view
 from ..utils import err, get_post_data
 from ..models import Library, Permissions
 from .base_view import BaseView
+from ..client import client
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy import Boolean
 from .http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
-    WRONG_TYPE_ERROR, NO_PERMISSION_ERROR, MISSING_LIBRARY_ERROR, BAD_LIBRARY_ID_ERROR
+    WRONG_TYPE_ERROR, NO_PERMISSION_ERROR, MISSING_LIBRARY_ERROR, BAD_LIBRARY_ID_ERROR, INVALID_BIBCODE_SPECIFIED_ERROR
 from ..biblib_exceptions import PermissionDeniedError
 
 
@@ -44,20 +45,92 @@ class DocumentView(BaseView):
 
             start_length = len(library.bibcode)
 
-            library.add_bibcodes(document_data['bibcode'])
+            #Validate supplied bibcodes to confirm they exist in SOLR
+            valid_bibcodes = []
+            page_size = min(current_app.config.get('BIGQUERY_MAX_ROWS', len(document_data['bibcode'])), len(document_data['bibcode']))
+            #Check if there are more than the allowed number of bibcodes. Iterate over pages if needed.
+            pages = len(document_data['bibcode']) // page_size + (len(document_data['bibcode']) % page_size > 0)
+            
+            for page in range(0, pages):
+                solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'], start=page*page_size, rows=page_size)
 
-            session.add(library)
-            session.commit()
+                if "error" in solr_resp.keys():
+                    #If SOLR request fails, pass the error back to the user
+                    current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
+                    output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
+                    valid_bibcodes += []
+                    return output_dict
+                else:
+                    #If SOLR query succeeds generate list of valid bibcodes from response
+                    add_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('docs', {})]
+                    if add_bibcodes:
+                        valid_bibcodes += add_bibcodes
+                        current_app.logger.debug("Found the following valid bibcodes: {}".format(add_bibcodes))
+                    #Added additional check to prevent unnecessary calls to bigquery.
+                    if len(add_bibcodes) < current_app.config.get('BIGQUERY_MAX_ROWS'):
+                        current_app.logger.debug("Bigquery returned less than max row number of bibcodes. Assuming all valid bibcodes are accounted for.")
+                        break
+                         
+            
+            if valid_bibcodes:
+                #Add all valid bibcodes to library
+                library.add_bibcodes(valid_bibcodes)
 
-            current_app.logger.info('Added: {0} is now {1}'.format(
-                document_data['bibcode'],
-                library.bibcode)
-            )
+                session.add(library)
+                session.commit()
 
+                current_app.logger.info('Added: {0} to {1}'.format(
+                    valid_bibcodes,
+                    library_id)
+                )
+                
+                current_app.logger.debug('Added: {0} is now {1}'.format(
+                    valid_bibcodes,
+                    library.bibcode)
+                )
+            
             end_length = len(library.bibcode)
 
-            return end_length - start_length
+            #Generate a list of invalid bibcodes
+            invalid_bibcodes = list(set(document_data['bibcode']) - set(valid_bibcodes))
+            
+            #Generate output that contains the number added and the number of invalid bibcodes.
+            output_dict = {"number_added": end_length - start_length}
+            if invalid_bibcodes: output_dict['invalid_bibcodes'] = invalid_bibcodes
+            
+            return  output_dict
 
+
+    @classmethod
+    def query_valid_bibcodes(cls, input_bibcodes, start, rows):
+        """
+        Takes a list of input bibcodes and validates there existence in ADS
+        through the API. Calls either standard search or bigquery depending 
+        on the query length.
+        """
+        bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
+        if len(input_bibcodes) < bigquery_min:
+            try:
+                response = cls.standard_ADS_bibcode_query(input_bibcodes)
+                solr_resp = response.json()
+                status = response.status_code
+            except Exception as err:
+                current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}.".format(err))
+                solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
+                status = 500
+        else:
+            try:
+                #For calls to bigquery, we limit the number of rows allowed in config.
+                response = cls.solr_big_query(input_bibcodes, start=start, rows=rows)
+                solr_resp = response.json()
+                status = response.status_code
+            except Exception as err:
+                current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}".format(err))
+                solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
+                status = 500
+
+        return solr_resp.get("response"), status
+    
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):
         """
@@ -269,15 +342,26 @@ class DocumentView(BaseView):
 
         if data['action'] == 'add':
             current_app.logger.info('User requested to add a document')
-            number_added = self.add_document_to_library(
+            output = self.add_document_to_library(
                 library_id=library,
                 document_data=data
             )
-            current_app.logger.info(
-                'Successfully added {0} documents to {1} by {2}'
-                .format(number_added, library, user_editing_uid)
-            )
-            return {'number_added': number_added}, 200
+            if "error" in output.keys():
+                return err(dict(body=output.get("error"), number=output.get("status_code", 400)))
+
+            elif "invalid_bibcodes" in output.keys():
+                #Returns the list of invalid bibcodes, but only returns 400 if no bibcodes were added.
+                if output.get('number_added') != 0:
+                    return {"invalid_identifiers": output.get("invalid_bibcodes"), "number_added": output.get('number_added')}, 200
+                else:
+                    return err(INVALID_BIBCODE_SPECIFIED_ERROR(output))
+
+            else:
+                current_app.logger.info(
+                    'Successfully added {0} documents to {1} by {2}'
+                    .format(output.get("number_added"), library, user_editing_uid)
+                )
+                return {'number_added': output.get("number_added")}, 200
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')

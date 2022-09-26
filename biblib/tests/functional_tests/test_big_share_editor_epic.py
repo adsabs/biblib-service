@@ -9,9 +9,11 @@ Storyboard is defined within the comments of the program itself
 import unittest
 from flask import url_for
 from biblib.views.http_errors import NO_PERMISSION_ERROR
+from biblib.views import DocumentView
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
-from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
+from biblib.tests.base import MockEmailService, MockSolrBigqueryService, MockSolrQueryService,\
     TestCaseDatabase, MockEndPoint
+import json
 
 class TestBigShareEditorEpic(TestCaseDatabase):
     """
@@ -49,13 +51,13 @@ class TestBigShareEditorEpic(TestCaseDatabase):
             # Add document
 
             library = LibraryShop()
-
-            url = url_for('documentview', library=library_id_dave)
-            response = self.client.post(
-                url,
-                data=library.document_view_post_data_json('add'),
-                headers=user_dave.headers
-            )
+            with MockSolrQueryService(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode')) as SQ:
+                url = url_for('documentview', library=library_id_dave)
+                response = self.client.post(
+                    url,
+                    data=library.document_view_post_data_json('add'),
+                    headers=user_dave.headers
+                )
             self.assertEqual(response.json['number_added'],
                              len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
@@ -78,11 +80,12 @@ class TestBigShareEditorEpic(TestCaseDatabase):
         # librarian friend Mary to do it. Dave does not realise she cannot
         # add without permissions and Mary gets some error messages
         url = url_for('documentview', library=library_id_dave)
-        response = self.client.post(
-            url,
-            data=library.document_view_post_data_json('add'),
-            headers=user_mary.headers
-        )
+        with MockSolrQueryService(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode')) as SQ:
+            response = self.client.post(
+                url,
+                data=library.document_view_post_data_json('add'),
+                headers=user_mary.headers
+            )
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
@@ -149,11 +152,12 @@ class TestBigShareEditorEpic(TestCaseDatabase):
         url = url_for('documentview', library=library_id_dave)
         for library in libraries_removed:
             # Add documents
-            response = self.client.post(
-                url,
-                data=library.document_view_post_data_json('add'),
-                headers=user_mary.headers
-            )
+            with MockSolrQueryService(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode')) as SQ:
+                response = self.client.post(
+                    url,
+                    data=library.document_view_post_data_json('add'),
+                    headers=user_mary.headers
+                )
             self.assertEqual(response.json['number_added'],
                              len(library.bibcode))
             self.assertEqual(response.status_code, 200, response)
@@ -186,12 +190,13 @@ class TestBigShareEditorEpic(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
 
         # Mary tries to add content
-        url = url_for('documentview', library=library_id_dave)
-        response = self.client.post(
-            url,
-            data=library.document_view_post_data_json('add'),
-            headers=user_mary.headers
-        )
+        url = url_for('documentview', library=library_id_dave)            
+        with MockSolrQueryService(canonical_bibcode = json.loads(library.document_view_post_data_json('add')).get('bibcode')) as SQ:
+            response = self.client.post(
+                url,
+                data=library.document_view_post_data_json('add'),
+                headers=user_mary.headers
+            )
         self.assertEqual(response.status_code, NO_PERMISSION_ERROR['number'])
         self.assertEqual(response.json['error'], NO_PERMISSION_ERROR['body'])
 
