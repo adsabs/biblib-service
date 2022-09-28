@@ -18,5 +18,5 @@ python
 .cache
 **/.DS_Store
 docker-compose*
-DockerFile
+Dockerfile
 scripts/pytest/*
