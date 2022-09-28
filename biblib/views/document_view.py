@@ -6,7 +6,6 @@ from ..utils import err, get_post_data, get_GET_params
 from ..models import Library, Permissions
 from ..client import client
 from .base_view import BaseView
-from ..client import client
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy.orm.exc import NoResultFound
@@ -48,12 +47,14 @@ class DocumentView(BaseView):
 
             #Validate supplied bibcodes to confirm they exist in SOLR
             valid_bibcodes = []
-            page_size = min(current_app.config.get('BIGQUERY_MAX_ROWS', len(document_data['bibcode'])), len(document_data['bibcode']))
+            doc_bibcodes = document_data['bibcode']
+            len_bibcodes = len(doc_bibcodes)
+            page_size = min(current_app.config.get('BIGQUERY_MAX_ROWS', len_bibcodes), len_bibcodes)
             #Check if there are more than the allowed number of bibcodes. Iterate over pages if needed.
-            pages = len(document_data['bibcode']) // page_size + (len(document_data['bibcode']) % page_size > 0)
+            pages = len_bibcodes // page_size + (len_bibcodes % page_size > 0)
             
             for page in range(0, pages):
-                solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'], start=page*page_size, rows=page_size)
+                solr_resp, status_code = cls.query_valid_bibcodes(doc_bibcodes, start=page*page_size, rows=page_size)
 
                 if "error" in solr_resp.keys():
                     #If SOLR request fails, pass the error back to the user
@@ -93,7 +94,7 @@ class DocumentView(BaseView):
             end_length = len(library.bibcode)
 
             #Generate a list of invalid bibcodes
-            invalid_bibcodes = list(set(document_data['bibcode']) - set(valid_bibcodes))
+            invalid_bibcodes = list(set(doc_bibcodes) - set(valid_bibcodes))
             
             #Generate output that contains the number added and the number of invalid bibcodes.
             output_dict = {"number_added": end_length - start_length}
@@ -752,7 +753,7 @@ class QueryView(BaseView):
         ----------
         KEYWORD, VALUE
 
-        bibcode:  <list>          List of bibcodes to be added
+        query:  dict         parameters of a solr query
         action:   add, remove     add - adds a bibcode, remove - removes a
                                   bibcode
 

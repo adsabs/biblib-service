@@ -1,7 +1,6 @@
 """
 Base view
 """
-from unittest.mock import NonCallableMagicMock
 import uuid
 import base64
 
