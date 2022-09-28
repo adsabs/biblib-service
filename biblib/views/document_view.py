@@ -793,7 +793,7 @@ class QueryView(BaseView):
         try:
             data = get_post_data(
                 request,
-                types=dict(bibcode=list, action=str)
+                types=dict(params=dict, action=str)
             )
         except TypeError as error:
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
