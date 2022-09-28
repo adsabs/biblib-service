@@ -72,5 +72,9 @@ def INVALID_BIBCODE_SPECIFIED_ERROR(output_dict):
         body='No specified identifiers were able to be added. invalid_bibcodes: {}'.format(
         output_dict.get("invalid_bibcodes")),
         number=400
-        )
-    
+    )
+
+INVALID_QUERY_PARAMETERS_SPECIFIED = dict(
+    body = "Invalid /search parameters specified.",
+    number = 400
+) 

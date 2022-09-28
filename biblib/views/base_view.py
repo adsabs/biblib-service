@@ -4,6 +4,8 @@ Base view
 import uuid
 import base64
 
+from biblib.views.http_errors import INVALID_QUERY_PARAMETERS_SPECIFIED
+
 from ..views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
     USER_ID_KEYWORD
 from flask import request, current_app, make_response, jsonify
@@ -15,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy import Boolean
 from ..biblib_exceptions import BackendIntegrityError, PermissionDeniedError
-from ..utils import uniquify
+from ..utils import uniquify, err
 from ..emails import Email
 
 class BaseView(Resource):
@@ -504,7 +506,7 @@ class BaseView(Resource):
                 if key in solr_query_fields:
                     valid_params[key] = params.get(key)
                 else:
-                    error_resp = make_response(jsonify({"error":"Invalid /search parameters specified."}),400)
+                    error_resp = err(INVALID_QUERY_PARAMETERS_SPECIFIED)
                     for key in headers.keys():
                         error_resp.headers[key] = headers[key]
                     return error_resp
