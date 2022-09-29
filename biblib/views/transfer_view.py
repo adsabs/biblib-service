@@ -30,25 +30,6 @@ class TransferView(BaseView):
     # Some permissions for this View
     write_allowed = ['owner']
 
-    @classmethod
-    def write_access(cls, service_uid, library_id):
-        """
-        Defines which type of user has write permissions to a library.
-
-        :param service_uid: the user ID within this microservice
-        :param library_id: the unique ID of the library
-
-        :return: boolean, access (True), no access (False)
-        """
-
-        for access_type in cls.write_allowed:
-            if cls.helper_access_allowed(service_uid=service_uid,
-                                         library_id=library_id,
-                                         access_type=access_type):
-                return True
-
-        return False
-
     @staticmethod
     def transfer_ownership(current_owner_uid, new_owner_uid, library_id):
         """

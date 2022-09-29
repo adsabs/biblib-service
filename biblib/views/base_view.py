@@ -188,6 +188,60 @@ class BaseView(Resource):
         else:
             raise Exception('Unknown internal error')
 
+    @classmethod
+    def update_access(cls, service_uid, library_id):
+        """
+        Defines which type of user has delete permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+        update_allowed = ['admin', 'owner']
+        for access_type in update_allowed:
+            if cls.helper_access_allowed(service_uid=service_uid,
+                                         library_id=library_id,
+                                         access_type=access_type):
+                return True
+
+        return False
+    
+    @classmethod
+    def delete_access(cls, service_uid, library_id):
+        """
+        Defines which type of user has delete permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+        delete_allowed = cls.helper_access_allowed(service_uid=service_uid,
+                                                   library_id=library_id,
+                                                   access_type='owner')
+        return delete_allowed 
+    
+    @classmethod
+    def write_access(cls, service_uid, library_id):
+        """
+        Defines which type of user has write permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+
+        read_allowed = ['write', 'admin', 'owner']
+        for access_type in read_allowed:
+            if cls.helper_access_allowed(service_uid=service_uid,
+                                         library_id=library_id,
+                                         access_type=access_type):
+                return True
+
+        return False
+              
     @staticmethod
     def helper_access_allowed(service_uid, library_id, access_type):
         """
