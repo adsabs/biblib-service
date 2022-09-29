@@ -25,6 +25,8 @@ class BaseView(Resource):
     A base view class to keep a single version of common functions used between
     all of the views.
     """
+    #default permissions for write_access()
+    write_allowed = ['write', 'admin', 'owner']
 
     @staticmethod
     def helper_uuid_to_slug(library_uuid):
@@ -233,15 +235,14 @@ class BaseView(Resource):
         :return: boolean, access (True), no access (False)
         """
 
-        read_allowed = ['write', 'admin', 'owner']
-        for access_type in read_allowed:
+        for access_type in cls.write_allowed:
             if cls.helper_access_allowed(service_uid=service_uid,
                                          library_id=library_id,
                                          access_type=access_type):
                 return True
 
         return False
-              
+
     @staticmethod
     def helper_access_allowed(service_uid, library_id, access_type):
         """
