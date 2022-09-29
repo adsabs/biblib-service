@@ -444,6 +444,33 @@ class BaseView(Resource):
             except Exception:
                 session.rollback()
                 raise
+            
+    @staticmethod
+    def library_name_exists(service_uid, library_name):
+        """
+        Checks to see if a library name already exists in the user's created
+        libraries
+
+        :param service_uid: the user ID within this microservice
+        :param library_name: name to check if it exists
+
+        :return: True (exists), False (does not exist)
+        """
+
+        with current_app.session_scope() as session:
+            library_names = \
+                [i.library.name for i in
+                 session.query(Permissions)\
+                     .filter_by(user_id = service_uid)\
+                     .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True)).all()]
+
+        if library_name in library_names:
+            current_app.logger.error('Name supplied for the library already '
+                                     'exists: "{0}"'.format(library_name))
+
+            return True
+        else:
+            return False
 
     @staticmethod
     def send_email(email_addr, payload_plain, payload_html, email_template=Email):
