@@ -110,9 +110,19 @@ class DocumentView(BaseView):
         on the query length.
         """
         bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
+        
         if len(input_bibcodes) < bigquery_min:
+            bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
+            params = {
+                'q': bibcode_query,
+                'wt': 'json',
+                'fl': 'bibcode',
+                'rows': rows,
+                'start': start,
+                'sort': 'date desc'
+                }
             try:
-                response = cls.standard_ADS_bibcode_query(input_bibcodes)
+                response = cls.standard_ADS_bibcode_query(params=params)
                 solr_resp = response.json()
                 status = response.status_code
             except Exception as err:

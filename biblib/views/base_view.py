@@ -566,12 +566,7 @@ class BaseView(Resource):
         return solr_resp
 
     @staticmethod
-    def standard_ADS_bibcode_query(input_bibcodes=[],
-            start=0,
-            rows=20,
-            sort='date desc',
-            fl='bibcode', 
-            **kwargs):
+    def standard_ADS_bibcode_query(params):
         """
         Validates identifiers by collecting all bibcodes returned from a standard query.
         """
@@ -579,52 +574,30 @@ class BaseView(Resource):
             'Content-Type': 'application/json',
             'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
         }
-        if kwargs.get('params'):
-            params = kwargs.get('params')
-            solr_query_fields=["q", "rows", "start", "fl", "fq", "sort"]
-            valid_params = {}
-            
-            for key in params.keys():
-                if key in solr_query_fields:
-                    valid_params[key] = params.get(key)
-                else:
-                    error_resp = err(INVALID_QUERY_PARAMETERS_SPECIFIED)
-                    for key in headers.keys():
-                        error_resp.headers[key] = headers[key]
-                    return error_resp
-
-            if params.get('fl', '') == '':
-                params['fl'] = 'bibcode'
-            
-            else:
-                fl_split = valid_params.get('fl').split(',')
-                for required_fl in ['bibcode']:
-                    if required_fl not in fl_split:
-                        valid_params['fl'] = '{},{}'.format(valid_params.get('fl'), required_fl)
-
-            valid_params['wt'] = 'json'
-            valid_params['rows'] = min(params.get('rows', current_app.config.get('BIBLIB_MAX_ROWS')), current_app.config.get('BIBLIB_MAX_ROWS'))
-
-        else:
-            bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
-            if fl == '':
-                fl = 'bibcode'
-            else:
-                fl_split = fl.split(',')
-                for required_fl in ['bibcode']:
-                    if required_fl not in fl_split:
-                        fl = '{},{}'.format(fl, required_fl)
-
-            params = {
-                'q': bibcode_query,
-                'wt': 'json',
-                'fl': fl,
-                'rows': rows,
-                'start': start,
-                'sort': sort
-            }
-
+        solr_query_fields=["q", "wt", "rows", "start", "fl", "fq", "sort"]
+        valid_params = {}
         
+        for key in params.keys():
+            if key in solr_query_fields:
+                valid_params[key] = params.get(key)
+            else:
+                error_resp = err(INVALID_QUERY_PARAMETERS_SPECIFIED)
+                for key in headers.keys():
+                    error_resp.headers[key] = headers[key]
+                return error_resp
+
+        if params.get('fl', '') == '':
+            params['fl'] = 'bibcode'
+        
+        else:
+            fl_split = valid_params.get('fl').split(',')
+            for required_fl in ['bibcode']:
+                if required_fl not in fl_split:
+                    valid_params['fl'] = '{},{}'.format(valid_params.get('fl'), required_fl)
+
+        valid_params['wt'] = 'json'
+        valid_params['rows'] = min(params.get('rows', current_app.config.get('BIBLIB_MAX_ROWS')), current_app.config.get('BIBLIB_MAX_ROWS'))
+
         current_app.logger.info('Querying Search microservice: {0}'
                                 .format(params))
         solr_resp = client().get(

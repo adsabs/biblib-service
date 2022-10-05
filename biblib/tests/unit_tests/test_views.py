@@ -1510,9 +1510,7 @@ class TestDocumentViews(TestCaseDatabase):
             library_id = library.id
 
             # Get stub data for the document
-
             # Add a document to the library
-            
             with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')):
                 output = self.document_view.add_document_to_library(
                     library_id=library_id,
