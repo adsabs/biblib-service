@@ -1853,10 +1853,11 @@ class TestDocumentViews(TestCaseDatabase):
             session.expunge(library)
 
         # Remove the bibcode from the library
-        number_removed = self.document_view.remove_documents_from_library(
+        output_dict = self.document_view.remove_documents_from_library(
             library_id=library.id,
             document_data=self.stub_library.document_view_post_data('remove')
         )
+        number_removed = output_dict.get('number_removed')
         self.assertEqual(number_removed, len(self.stub_library.bibcode))
 
         # Check it worked

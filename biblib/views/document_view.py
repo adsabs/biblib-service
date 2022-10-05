@@ -110,7 +110,7 @@ class DocumentView(BaseView):
         on the query length.
         """
         bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
-        
+
         if len(input_bibcodes) < bigquery_min:
             bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
             params = {
@@ -157,6 +157,7 @@ class DocumentView(BaseView):
         with current_app.session_scope() as session:
             library = session.query(Library).filter_by(id=library_id).one()
             start_length = len(library.bibcode)
+            bibcodes_removed = list(set(document_data['bibcode']) & set(library.bibcode))
 
             library.remove_bibcodes(document_data['bibcode'])
 
@@ -165,8 +166,14 @@ class DocumentView(BaseView):
             current_app.logger.info('Removed document successfully: {0}'
                                     .format(library.bibcode))
             end_length = len(library.bibcode)
+            
+            number_removed = start_length - end_length
+            if number_removed != 0:
+                output_dict = {"number_removed": number_removed, "bibcodes": bibcodes_removed}
+            else:
+                output_dict = {"number_removed": number_removed, "bibcodes": ""}
 
-            return start_length - end_length
+            return output_dict
 
     @staticmethod
     def update_library(library_id, library_data):
@@ -295,15 +302,15 @@ class DocumentView(BaseView):
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')
-            number_removed = self.remove_documents_from_library(
+            output_dict = self.remove_documents_from_library(
                 library_id=library,
                 document_data=data
             )
             current_app.logger.info(
                 'Successfully removed {0} documents to {1} by {2}'
-                .format(number_removed, library, user_editing_uid)
+                .format(output_dict.get('number_removed'), library, user_editing_uid)
                 )
-            return {'number_removed': number_removed}, 200
+            return output_dict, 200
 
         else:
             current_app.logger.info('User requested a non-standard action')
@@ -571,6 +578,7 @@ class QueryView(BaseView):
         with current_app.session_scope() as session:
             library = session.query(Library).filter_by(id=library_id).one()
             start_length = len(library.bibcode)
+            bibcodes_removed = list(set(valid_bibcodes) & set(library.bibcode))
 
             library.remove_bibcodes(valid_bibcodes)
 
@@ -579,8 +587,11 @@ class QueryView(BaseView):
             current_app.logger.info('Removed queried documents successfully: {0}'
                                     .format(library.bibcode))
             end_length = len(library.bibcode)
-
-            output_dict = {"number_removed": start_length - end_length, "bibcodes": valid_bibcodes}
+            number_removed = start_length - end_length
+            if number_removed != 0:
+                output_dict = {"number_removed": number_removed, "bibcodes": bibcodes_removed}
+            else:
+                output_dict = {"number_removed": number_removed, "bibcodes": ""}
 
             return output_dict
 
