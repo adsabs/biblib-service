@@ -511,7 +511,7 @@ class QueryView(BaseView):
             response = cls.standard_ADS_bibcode_query(params=document_data.get('params'))
             solr_resp = response.json()
             status_code = response.status_code
-            current_app.logger.info("SOLR response: {}".format(solr_resp))
+            current_app.logger.info("SOLR returned status: {}".format(status_code))
             
             if "error" in solr_resp.keys():
                 #If SOLR request fails, pass the error back to the user
@@ -523,7 +523,7 @@ class QueryView(BaseView):
                 current_app.logger.info("docs: {}".format(solr_resp.get('response').get("docs")))
                 #If SOLR query succeeds generate list of valid bibcodes from response
                 valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('response').get('docs')]
-                current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
+                current_app.logger.debug("Found the following valid bibcodes: {}".format(valid_bibcodes))
 
             library.add_bibcodes(valid_bibcodes)
 
@@ -561,7 +561,7 @@ class QueryView(BaseView):
         response = cls.standard_ADS_bibcode_query(params=document_data.get('params'))
         solr_resp = response.json()
         status_code = response.status_code
-        current_app.logger.info("SOLR response: {}".format(solr_resp))
+        current_app.logger.info("SOLR returned status: {}".format(status_code))
 
         if "error" in solr_resp.keys():
             #If SOLR request fails, pass the error back to the user
@@ -573,7 +573,7 @@ class QueryView(BaseView):
             current_app.logger.info("docs: {}".format(solr_resp.get('response').get("docs")))
             #If SOLR query succeeds generate list of valid bibcodes from response
             valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('response').get('docs')]
-            current_app.logger.info("Found the following valid bibcodes: {}".format(valid_bibcodes))
+            current_app.logger.debug("Found the following valid bibcodes: {}".format(valid_bibcodes))
 
         with current_app.session_scope() as session:
             library = session.query(Library).filter_by(id=library_id).one()
