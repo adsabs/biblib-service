@@ -81,16 +81,11 @@ class DocumentView(BaseView):
                 session.add(library)
                 session.commit()
 
-                current_app.logger.info('Added: {0} to {1}'.format(
+                current_app.logger.debug('Added: {0} to {1}'.format(
                     valid_bibcodes,
                     library_id)
                 )
-                
-                current_app.logger.debug('Added: {0} is now {1}'.format(
-                    valid_bibcodes,
-                    library.bibcode)
-                )
-            
+
             end_length = len(library.bibcode)
 
             #Generate a list of invalid bibcodes
@@ -530,7 +525,7 @@ class QueryView(BaseView):
             session.add(library)
             session.commit()
 
-            current_app.logger.info('Added: {0} is now {1}'.format(
+            current_app.logger.debug('Added: {0} is now {1}'.format(
                 valid_bibcodes,
                 library.bibcode)
             )
