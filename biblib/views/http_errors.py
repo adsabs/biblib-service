@@ -33,6 +33,11 @@ WRONG_TYPE_ERROR = dict(
          .format(API_HELP),
     number=400
 )
+BAD_QUERY_ERROR = dict(
+    body='You passed a query that was not parseable. Please See the API documentation: {0}'
+         .format(API_HELP),
+    number=400
+)
 API_MISSING_USER_EMAIL = dict(
     body='User does not have an ADS account',
     number=404
@@ -67,5 +72,9 @@ def INVALID_BIBCODE_SPECIFIED_ERROR(output_dict):
         body='No specified identifiers were able to be added. invalid_bibcodes: {}'.format(
         output_dict.get("invalid_bibcodes")),
         number=400
-        )
-    
+    )
+
+INVALID_QUERY_PARAMETERS_SPECIFIED = dict(
+    body = "Invalid /search parameters specified.",
+    number = 400
+) 

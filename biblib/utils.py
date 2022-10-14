@@ -6,6 +6,24 @@ project, and so do not belong to anything specific.
 
 from collections import Counter
 
+def get_GET_params(request, types={}):
+    """
+    Attempt to coerce GET params data into json from request, falling
+    back to the raw data if json could not be coerced.
+    :param request: flask.request
+    :param types: types that the incoming request object must cohere to
+    """
+    try:
+        get_params = request.args.to_dict()
+    except ValueError:
+        msg = "Failed to parse input parameters: {}. Please confirm request is properly formatted.".format(request)
+        raise ValueError(msg)
+    if "q" in get_params.keys():
+        return get_params
+    else:
+        msg = "Query: {} is missing parameter 'q'. Please confirm request conforms to ADS /search syntax.".format(get_params)
+        raise ValueError(msg)
+
 def get_post_data(request, types={}):
     """
     Attempt to coerce POST json data from the request, falling

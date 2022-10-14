@@ -245,6 +245,7 @@ class MockSolrBigqueryService(MockADSWSAPI):
         HTTPretty.reset()
         HTTPretty.disable()
 
+
 class MockSolrQueryService(MockADSWSAPI):
     """
     Thin wrapper around the MockADSWSAPI class specficically for the Solr
@@ -277,11 +278,21 @@ class MockSolrQueryService(MockADSWSAPI):
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
                     for i in range(len(canonical_bibcodes)):
                         docs.append({'bibcode': canonical_bibcodes[i]})
-                    input_query ="identifier:(" + " OR ".join(canonical_bibcodes)+")"
+                    input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
+                    params = {
+                        'fl': 'bibcode',
+                        'q': input_query,
+                        'wt': 'json'
+                    }
                 else:
                     docs = [{'bibcode': 'bibcode'} for i
-                            in range(self.kwargs.get('number_of_bibcodes', 1))]
+                            in range(kwargs.get('number_of_bibcodes', 1))]
                     input_query = ""
+                    params = {
+                        'fl': 'bibcode',
+                        'q': input_query,
+                        'wt': 'json'
+                    }
             
             else:
                 if self.kwargs.get('canonical_bibcode'):
@@ -291,21 +302,29 @@ class MockSolrQueryService(MockADSWSAPI):
                     for i in range(len(canonical_bibcodes)):
                         if i%2-1 == 0:
                             docs.append({'bibcode': canonical_bibcodes[i]})
-                    input_query ="identifier:(" + " OR ".join(canonical_bibcodes)+")"
+                    input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
+                    params = {
+                        'fl': 'bibcode',
+                        'q': input_query,
+                        'wt': 'json'
+                    }
                 else:
                     docs = [{'bibcode': 'bibcode'} for i
                             in range(self.kwargs.get('number_of_bibcodes', 1))]
                     input_query = ""
+                    params = {
+                        'fl': 'bibcode',
+                        'q': input_query,
+                        'wt': 'json'
+                    }
+
+            if self.kwargs.get('params'): params = self.kwargs.get('params')
 
             resp = {
                 'responseHeader': {
                     'status': 0,
                     'QTime': 152,
-                    'params': {
-                        'fl': 'bibcode',
-                        'q': input_query,
-                        'wt': 'json'
-                    }
+                    'params': params
                 },
                 'response': {
                     'numFound': len(docs),

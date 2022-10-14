@@ -8,7 +8,7 @@ from biblib.models import User, Library, Permissions, MutableDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
-    BaseView, TransferView, ClassicView, OperationsView
+    BaseView, TransferView, ClassicView, OperationsView, QueryView
 from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
 from biblib.utils import get_item
@@ -1510,9 +1510,7 @@ class TestDocumentViews(TestCaseDatabase):
             library_id = library.id
 
             # Get stub data for the document
-
             # Add a document to the library
-            
             with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')):
                 output = self.document_view.add_document_to_library(
                     library_id=library_id,
@@ -1757,13 +1755,13 @@ class TestDocumentViews(TestCaseDatabase):
                 )
                 #Checks to make sure paging stops when we have all valid bibcodes.
                 self.assertEqual(pages, 1)
-            self.assertEqual(output.get("number_added"), int(len(self.stub_library_max.document_view_post_data('add').get('bibcode'))/4))
+            self.assertEqual(output.get("number_added"), round(len(self.stub_library_max.document_view_post_data('add').get('bibcode'))/4))
 
             # Check that the first document is not in the library but the 597th one is.
             library = session.query(Library).filter(Library.id == library_id).all()
             for _lib in library:
                 self.assertNotIn(list(self.stub_library_max.bibcode.keys())[0], _lib.bibcode)
-                self.assertIn(list(self.stub_library_max.bibcode.keys())[-3], _lib.bibcode)
+                self.assertIn(list(self.stub_library_max.bibcode.keys())[597], _lib.bibcode)
 
     def test_user_can_add_more_than_BIGQUERY_MAX_ROWS(self):
         """
@@ -1855,10 +1853,11 @@ class TestDocumentViews(TestCaseDatabase):
             session.expunge(library)
 
         # Remove the bibcode from the library
-        number_removed = self.document_view.remove_documents_from_library(
+        output_dict = self.document_view.remove_documents_from_library(
             library_id=library.id,
             document_data=self.stub_library.document_view_post_data('remove')
         )
+        number_removed = output_dict.get('number_removed')
         self.assertEqual(number_removed, len(self.stub_library.bibcode))
 
         # Check it worked
@@ -2101,6 +2100,219 @@ class TestDocumentViews(TestCaseDatabase):
                 service_uid=user.id,
                 library_id=library.id
             )
+            self.assertFalse(access)
+
+class TestQueryViews(TestCaseDatabase):
+    """
+    Base class to test the Document view for POST/DELETE (PUT for tags?)
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor of the class
+
+        :param args: to pass on to the super class
+        :param kwargs: to pass on to the super class
+
+        :return: no return
+        """
+
+        super(TestQueryViews, self).__init__(*args, **kwargs)
+        self.query_view = QueryView
+        self.document_view = DocumentView
+        # Stub data
+        self.stub_user = self.stub_user_1 = UserShop()
+        self.stub_user_2 = UserShop()
+
+        self.stub_library = self.stub_library_1 = LibraryShop()
+        self.stub_library_2 = LibraryShop()
+
+    def test_user_can_add_to_library(self):
+        """
+        Tests that adding a bibcode to a library works correctly
+
+        :return:
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+
+            library_id = library.id
+
+            # Get stub data for the document
+
+            # Add a document to the library
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')) as SQ:
+                output_dict = self.query_view.add_query_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library.query_view_post_data()
+                )
+            self.assertEqual(output_dict.get("number_added"), len(self.stub_library.bibcode))
+
+            # Check that the document is in the library
+            library = session.query(Library).filter(Library.id == library_id).all()
+            for _lib in library:
+                self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
+
+            # Add a different document to the library
+            with MockSolrQueryService(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode')) as SQ:
+                output_dict = self.query_view.add_query_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library_2.query_view_post_data()
+                )
+            self.assertEqual(output_dict.get("number_added"), len(self.stub_library.bibcode))
+
+            # Check that the document is in the library
+            library = session.query(Library).filter(Library.id == library_id).all()
+            for _lib in library:
+                self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
+
+    def test_user_cannot_duplicate_same_document_in_library(self):
+        """
+        Tests that adding a bibcode to a library works correctly
+
+        :return:
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+
+            library_id = library.id
+
+            # Get stub data for the document
+
+            # Add a document to the library
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')) as SQ:
+                output_dict = self.query_view.add_query_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library.query_view_post_data()
+                )
+            self.assertEqual(output_dict.get('number_added'), len(self.stub_library.bibcode))
+
+            # Shouldn't add the same document again
+            with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')) as SQ:
+                output_dict = self.query_view.add_query_to_library(
+                    library_id=library_id,
+                    document_data=self.stub_library.query_view_post_data()
+                )
+            self.assertEqual(0, output_dict.get('number_added'))
+
+    def test_user_can_remove_document_from_library(self):
+        """
+        Test that can remove a document from the library
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            session.refresh(library)
+            session.expunge(library)
+
+        # Remove the bibcode from the library
+        with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('remove').get('bibcode')) as SQ:
+            output_dict = self.query_view.remove_query_from_library(
+                library_id=library.id,
+                document_data=self.stub_library.query_view_post_data()
+            )
+        self.assertEqual(output_dict.get("number_removed"), len(self.stub_library.bibcode))
+
+        # Check it worked
+        library = session.query(Library).filter(Library.id == library.id).one()
+
+        self.assertTrue(
+            len(library.bibcode) == 0,
+            'There should be no bibcodes: {0}'.format(library.bibcode)
+        )
+
+    def test_user_without_permission_cannot_edit_private_library(self):
+        """
+        Tests that the user requesting to edit the contents of a library has
+        the correct permissions. In this case, they do not, and are refused to
+        see the library content.
+
+        :return: no return
+        """
+
+        # Make a fake user and library
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+
+            # add 1 to the UID to represent a random user
+            access = self.query_view.write_access(
+                service_uid=self.stub_user_2.absolute_uid,
+                library_id=library.id
+            )
+            self.assertIsNotNone(access)
             self.assertFalse(access)
 
 class TestOperationsViews(TestCaseDatabase):

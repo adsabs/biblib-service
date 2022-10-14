@@ -4,9 +4,11 @@ Base view
 import uuid
 import base64
 
+from biblib.views.http_errors import INVALID_QUERY_PARAMETERS_SPECIFIED
+
 from ..views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
     USER_ID_KEYWORD
-from flask import request, current_app
+from flask import request, current_app, make_response, jsonify
 from flask_restful import Resource
 from flask_mail import Message
 from ..models import User, Library, Permissions
@@ -15,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy import Boolean
 from ..biblib_exceptions import BackendIntegrityError, PermissionDeniedError
-from ..utils import uniquify
+from ..utils import uniquify, err
 from ..emails import Email
 
 class BaseView(Resource):
@@ -23,6 +25,8 @@ class BaseView(Resource):
     A base view class to keep a single version of common functions used between
     all of the views.
     """
+    #default permissions for write_access()
+    write_allowed = ['write', 'admin', 'owner']
 
     @staticmethod
     def helper_uuid_to_slug(library_uuid):
@@ -185,6 +189,59 @@ class BaseView(Resource):
             raise NoResultFound('API does not have this user')
         else:
             raise Exception('Unknown internal error')
+
+    @classmethod
+    def update_access(cls, service_uid, library_id):
+        """
+        Defines which type of user has delete permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+        update_allowed = ['admin', 'owner']
+        for access_type in update_allowed:
+            if cls.helper_access_allowed(service_uid=service_uid,
+                                         library_id=library_id,
+                                         access_type=access_type):
+                return True
+
+        return False
+    
+    @classmethod
+    def delete_access(cls, service_uid, library_id):
+        """
+        Defines which type of user has delete permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+        delete_allowed = cls.helper_access_allowed(service_uid=service_uid,
+                                                   library_id=library_id,
+                                                   access_type='owner')
+        return delete_allowed 
+    
+    @classmethod
+    def write_access(cls, service_uid, library_id):
+        """
+        Defines which type of user has write permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+
+        for access_type in cls.write_allowed:
+            if cls.helper_access_allowed(service_uid=service_uid,
+                                         library_id=library_id,
+                                         access_type=access_type):
+                return True
+
+        return False
 
     @staticmethod
     def helper_access_allowed(service_uid, library_id, access_type):
@@ -387,6 +444,33 @@ class BaseView(Resource):
             except Exception:
                 session.rollback()
                 raise
+            
+    @staticmethod
+    def library_name_exists(service_uid, library_name):
+        """
+        Checks to see if a library name already exists in the user's created
+        libraries
+
+        :param service_uid: the user ID within this microservice
+        :param library_name: name to check if it exists
+
+        :return: True (exists), False (does not exist)
+        """
+
+        with current_app.session_scope() as session:
+            library_names = \
+                [i.library.name for i in
+                 session.query(Permissions)\
+                     .filter_by(user_id = service_uid)\
+                     .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True)).all()]
+
+        if library_name in library_names:
+            current_app.logger.error('Name supplied for the library already '
+                                     'exists: "{0}"'.format(library_name))
+
+            return True
+        else:
+            return False
 
     @staticmethod
     def send_email(email_addr, payload_plain, payload_html, email_template=Email):
@@ -482,36 +566,38 @@ class BaseView(Resource):
         return solr_resp
 
     @staticmethod
-    def standard_ADS_bibcode_query(input_bibcodes,
-            start=0,
-            rows=20,
-            sort='date desc',
-            fl='bibcode'):
+    def standard_ADS_bibcode_query(params):
         """
         Validates identifiers by collecting all bibcodes returned from a standard query.
         """
-        bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
-        if fl == '':
-            fl = 'bibcode'
-        else:
-            fl_split = fl.split(',')
-            for required_fl in ['bibcode']:
-                if required_fl not in fl_split:
-                    fl = '{},{}'.format(fl, required_fl)
-
-        params = {
-            'q': bibcode_query,
-            'wt': 'json',
-            'fl': fl,
-            'rows': rows,
-            'start': start,
-            'sort': sort
-        }
-
         headers = {
             'Content-Type': 'application/json',
             'Authorization': current_app.config.get('SERVICE_TOKEN', request.headers.get('X-Forwarded-Authorization', request.headers.get('Authorization', '')))
         }
+        solr_query_fields=["q", "wt", "rows", "start", "fl", "fq", "sort"]
+        valid_params = {}
+        
+        for key in params.keys():
+            if key in solr_query_fields:
+                valid_params[key] = params.get(key)
+            else:
+                error_resp = err(INVALID_QUERY_PARAMETERS_SPECIFIED)
+                for key in headers.keys():
+                    error_resp.headers[key] = headers[key]
+                return error_resp
+
+        if params.get('fl', '') == '':
+            params['fl'] = 'bibcode'
+        
+        else:
+            fl_split = valid_params.get('fl').split(',')
+            for required_fl in ['bibcode']:
+                if required_fl not in fl_split:
+                    valid_params['fl'] = '{},{}'.format(valid_params.get('fl'), required_fl)
+
+        valid_params['wt'] = 'json'
+        valid_params['rows'] = min(params.get('rows', current_app.config.get('BIBLIB_MAX_ROWS')), current_app.config.get('BIBLIB_MAX_ROWS'))
+
         current_app.logger.info('Querying Search microservice: {0}'
                                 .format(params))
         solr_resp = client().get(

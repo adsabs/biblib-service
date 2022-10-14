@@ -2,15 +2,15 @@
 Document view
 """
 
-from ..utils import err, get_post_data
+from ..utils import err, get_post_data, get_GET_params
 from ..models import Library, Permissions
-from .base_view import BaseView
 from ..client import client
+from .base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy import Boolean
-from .http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
+from .http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, BAD_QUERY_ERROR, \
     WRONG_TYPE_ERROR, NO_PERMISSION_ERROR, MISSING_LIBRARY_ERROR, BAD_LIBRARY_ID_ERROR, INVALID_BIBCODE_SPECIFIED_ERROR
 from ..biblib_exceptions import PermissionDeniedError
 
@@ -47,12 +47,14 @@ class DocumentView(BaseView):
 
             #Validate supplied bibcodes to confirm they exist in SOLR
             valid_bibcodes = []
-            page_size = min(current_app.config.get('BIGQUERY_MAX_ROWS', len(document_data['bibcode'])), len(document_data['bibcode']))
+            doc_bibcodes = document_data['bibcode']
+            len_bibcodes = len(doc_bibcodes)
+            page_size = min(current_app.config.get('BIGQUERY_MAX_ROWS', len_bibcodes), len_bibcodes)
             #Check if there are more than the allowed number of bibcodes. Iterate over pages if needed.
-            pages = len(document_data['bibcode']) // page_size + (len(document_data['bibcode']) % page_size > 0)
+            pages = len_bibcodes // page_size + (len_bibcodes % page_size > 0)
             
             for page in range(0, pages):
-                solr_resp, status_code = cls.query_valid_bibcodes(document_data['bibcode'], start=page*page_size, rows=page_size)
+                solr_resp, status_code = cls.query_valid_bibcodes(doc_bibcodes, start=page*page_size, rows=page_size)
 
                 if "error" in solr_resp.keys():
                     #If SOLR request fails, pass the error back to the user
@@ -79,27 +81,21 @@ class DocumentView(BaseView):
                 session.add(library)
                 session.commit()
 
-                current_app.logger.info('Added: {0} to {1}'.format(
+                current_app.logger.debug('Added: {0} to {1}'.format(
                     valid_bibcodes,
                     library_id)
                 )
-                
-                current_app.logger.debug('Added: {0} is now {1}'.format(
-                    valid_bibcodes,
-                    library.bibcode)
-                )
-            
+
             end_length = len(library.bibcode)
 
             #Generate a list of invalid bibcodes
-            invalid_bibcodes = list(set(document_data['bibcode']) - set(valid_bibcodes))
+            invalid_bibcodes = list(set(doc_bibcodes) - set(valid_bibcodes))
             
             #Generate output that contains the number added and the number of invalid bibcodes.
             output_dict = {"number_added": end_length - start_length}
             if invalid_bibcodes: output_dict['invalid_bibcodes'] = invalid_bibcodes
             
             return  output_dict
-
 
     @classmethod
     def query_valid_bibcodes(cls, input_bibcodes, start, rows):
@@ -109,9 +105,19 @@ class DocumentView(BaseView):
         on the query length.
         """
         bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
+
         if len(input_bibcodes) < bigquery_min:
+            bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
+            params = {
+                'q': bibcode_query,
+                'wt': 'json',
+                'fl': 'bibcode',
+                'rows': rows,
+                'start': start,
+                'sort': 'date desc'
+                }
             try:
-                response = cls.standard_ADS_bibcode_query(input_bibcodes)
+                response = cls.standard_ADS_bibcode_query(params=params)
                 solr_resp = response.json()
                 status = response.status_code
             except Exception as err:
@@ -146,6 +152,7 @@ class DocumentView(BaseView):
         with current_app.session_scope() as session:
             library = session.query(Library).filter_by(id=library_id).one()
             start_length = len(library.bibcode)
+            bibcodes_removed = list(set(document_data['bibcode']) & set(library.bibcode))
 
             library.remove_bibcodes(document_data['bibcode'])
 
@@ -154,8 +161,14 @@ class DocumentView(BaseView):
             current_app.logger.info('Removed document successfully: {0}'
                                     .format(library.bibcode))
             end_length = len(library.bibcode)
+            
+            number_removed = start_length - end_length
+            if number_removed != 0:
+                output_dict = {"number_removed": number_removed, "bibcodes": bibcodes_removed}
+            else:
+                output_dict = {"number_removed": number_removed, "bibcodes": ""}
 
-            return start_length - end_length
+            return output_dict
 
     @staticmethod
     def update_library(library_id, library_data):
@@ -196,87 +209,6 @@ class DocumentView(BaseView):
             library = session.query(Library).filter_by(id=library_id).one()
             session.delete(library)
             session.commit()
-
-    @classmethod
-    def update_access(cls, service_uid, library_id):
-        """
-        Defines which type of user has delete permissions to a library.
-
-        :param service_uid: the user ID within this microservice
-        :param library_id: the unique ID of the library
-
-        :return: boolean, access (True), no access (False)
-        """
-        update_allowed = ['admin', 'owner']
-        for access_type in update_allowed:
-            if cls.helper_access_allowed(service_uid=service_uid,
-                                         library_id=library_id,
-                                         access_type=access_type):
-                return True
-
-        return False
-
-    @classmethod
-    def delete_access(cls, service_uid, library_id):
-        """
-        Defines which type of user has delete permissions to a library.
-
-        :param service_uid: the user ID within this microservice
-        :param library_id: the unique ID of the library
-
-        :return: boolean, access (True), no access (False)
-        """
-        delete_allowed = cls.helper_access_allowed(service_uid=service_uid,
-                                                   library_id=library_id,
-                                                   access_type='owner')
-        return delete_allowed
-
-    @classmethod
-    def write_access(cls, service_uid, library_id):
-        """
-        Defines which type of user has write permissions to a library.
-
-        :param service_uid: the user ID within this microservice
-        :param library_id: the unique ID of the library
-
-        :return: boolean, access (True), no access (False)
-        """
-
-        read_allowed = ['write', 'admin', 'owner']
-        for access_type in read_allowed:
-            if cls.helper_access_allowed(service_uid=service_uid,
-                                         library_id=library_id,
-                                         access_type=access_type):
-                return True
-
-        return False
-
-    @staticmethod
-    def library_name_exists(service_uid, library_name):
-        """
-        Checks to see if a library name already exists in the user's created
-        libraries
-
-        :param service_uid: the user ID within this microservice
-        :param library_name: name to check if it exists
-
-        :return: True (exists), False (does not exist)
-        """
-
-        with current_app.session_scope() as session:
-            library_names = \
-                [i.library.name for i in
-                 session.query(Permissions)\
-                     .filter_by(user_id = service_uid)\
-                     .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True)).all()]
-
-        if library_name in library_names:
-            current_app.logger.error('Name supplied for the library already '
-                                     'exists: "{0}"'.format(library_name))
-
-            return True
-        else:
-            return False
 
     def post(self, library):
         """
@@ -365,15 +297,15 @@ class DocumentView(BaseView):
 
         elif data['action'] == 'remove':
             current_app.logger.info('User requested to remove a document')
-            number_removed = self.remove_documents_from_library(
+            output_dict = self.remove_documents_from_library(
                 library_id=library,
                 document_data=data
             )
             current_app.logger.info(
                 'Successfully removed {0} documents to {1} by {2}'
-                .format(number_removed, library, user_editing_uid)
+                .format(output_dict.get('number_removed'), library, user_editing_uid)
                 )
-            return {'number_removed': number_removed}, 200
+            return output_dict, 200
 
         else:
             current_app.logger.info('User requested a non-standard action')
@@ -540,3 +472,286 @@ class DocumentView(BaseView):
             return err(NO_PERMISSION_ERROR)
 
         return {}, 200
+
+class QueryView(BaseView):
+    """
+    End point to interact with a specific library, by adding documents and
+    removing documents.
+    """
+    # TODO: adding tags using PUT for RESTful endpoint?
+
+    decorators = [advertise('scopes', 'rate_limit')]
+    scopes = ['user']
+    rate_limit = [1000, 60*60*24]
+
+    @classmethod
+    def add_query_to_library(cls, library_id, document_data):
+        """
+        Adds a the results of a query to a user's library
+        :param library_id: the library id to update
+        :param document_data: the /search query parameters
+
+        :return: {number_added: number of documents successfully added, valid_bibcodes: corresponding bibcodes}
+        """
+        current_app.logger.info('Adding queried documents: {0} to library_uuid: {1}'
+                                .format(document_data, library_id))
+
+        with current_app.session_scope() as session:
+            # Find the specified library
+            library = session.query(Library).filter_by(id=library_id).one()
+
+            start_length = len(library.bibcode)
+            #Validate supplied bibcodes to confirm they exist in SOLR
+            current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
+            response = cls.standard_ADS_bibcode_query(params=document_data.get('params'))
+            solr_resp = response.json()
+            status_code = response.status_code
+            current_app.logger.info("SOLR returned status: {}".format(status_code))
+            
+            if "error" in solr_resp.keys():
+                #If SOLR request fails, pass the error back to the user
+                current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
+                valid_bibcodes = []
+                output_dict = {"error": solr_resp.get("error"), "number_added": 0, "status": status_code}
+                return output_dict
+            else:
+                current_app.logger.info("docs: {}".format(solr_resp.get('response').get("docs")))
+                #If SOLR query succeeds generate list of valid bibcodes from response
+                valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('response').get('docs')]
+                current_app.logger.debug("Found the following valid bibcodes: {}".format(valid_bibcodes))
+
+            library.add_bibcodes(valid_bibcodes)
+
+            session.add(library)
+            session.commit()
+
+            current_app.logger.debug('Added: {0} is now {1}'.format(
+                valid_bibcodes,
+                library.bibcode)
+            )
+
+            end_length = len(library.bibcode)
+            added_bibcodes = end_length - start_length
+            if added_bibcodes != 0:
+                output_dict = {"number_added": added_bibcodes, "bibcodes": list(set(valid_bibcodes) & set(library.bibcode))}
+            else:
+                output_dict = {"number_added": added_bibcodes, "bibcodes": ""}
+
+
+            return output_dict
+
+    @classmethod
+    def remove_query_from_library(cls, library_id, document_data):
+        """
+        Remove the results of a given query from a specific library
+
+        :param library_id: the unique ID of the library
+        :param document_data: the /search query parameters
+
+        :return: {number_removed: number of documents successfully removed, valid_bibcodes: Corresponding bibcodes}
+        """
+        current_app.logger.info('Removing queried documents: {0} from library_uuid: '
+                                '{1}'.format(document_data, library_id))
+        current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
+        response = cls.standard_ADS_bibcode_query(params=document_data.get('params'))
+        solr_resp = response.json()
+        status_code = response.status_code
+        current_app.logger.info("SOLR returned status: {}".format(status_code))
+
+        if "error" in solr_resp.keys():
+            #If SOLR request fails, pass the error back to the user
+            current_app.logger.error("Failed to retrieve bibcodes with error: {}".format(solr_resp.get("error")))
+            valid_bibcodes = []
+            output_dict = {"error": solr_resp.get("error"), "number_removed": 0, "status": status_code}
+            return output_dict
+        else:
+            current_app.logger.info("docs: {}".format(solr_resp.get('response').get("docs")))
+            #If SOLR query succeeds generate list of valid bibcodes from response
+            valid_bibcodes = [doc.get('bibcode') for doc in solr_resp.get('response').get('docs')]
+            current_app.logger.debug("Found the following valid bibcodes: {}".format(valid_bibcodes))
+
+        with current_app.session_scope() as session:
+            library = session.query(Library).filter_by(id=library_id).one()
+            start_length = len(library.bibcode)
+            bibcodes_removed = list(set(valid_bibcodes) & set(library.bibcode))
+
+            library.remove_bibcodes(valid_bibcodes)
+
+            session.add(library)
+            session.commit()
+            current_app.logger.info('Removed queried documents successfully: {0}'
+                                    .format(library.bibcode))
+            end_length = len(library.bibcode)
+            number_removed = start_length - end_length
+            if number_removed != 0:
+                output_dict = {"number_removed": number_removed, "bibcodes": bibcodes_removed}
+            else:
+                output_dict = {"number_removed": number_removed, "bibcodes": ""}
+
+            return output_dict
+
+    def post(self, library):
+        """
+        HTTP POST request that adds a document to a library for a given user
+        :param library: library ID
+
+        :return: the response for if the library was successfully created
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        Post body:
+        ----------
+        KEYWORD, VALUE
+
+        query:  dict         parameters of a solr query
+        action:   add, remove     add - adds a bibcode, remove - removes a
+                                  bibcode
+
+        Return data:
+        -----------
+        number_added: number of documents added (if 'add' is used)
+        number_removed: number of documents removed (if 'remove' is used)
+        valid_bibcodes: The list of valid bibcodes
+
+        Permissions:
+        -----------
+        The following type of user can add documents:
+          - owner
+          - admin
+          - write
+        """
+        # Get the user requesting this from the header
+        try:
+            user_editing = self.helper_get_user_id()
+        except KeyError:
+            return err(MISSING_USERNAME_ERROR)
+
+        # URL safe base64 string to UUID
+        try:
+            library = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
+
+        user_editing_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
+
+        # Check the permissions of the user
+        if not self.write_access(service_uid=user_editing_uid,
+                                 library_id=library):
+            return err(NO_PERMISSION_ERROR)
+
+        try:
+            data = get_post_data(
+                request,
+                types=dict(params=dict, action=str)
+            )
+        except TypeError as error:
+            current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
+                                     .format(request.data, error))
+            return err(WRONG_TYPE_ERROR)
+
+        if data['action'] == 'add':
+            current_app.logger.info('User requested to add documents from query')
+            output_dict = self.add_query_to_library(
+                library_id=library,
+                document_data=data
+            )
+            if "error" in output_dict.keys():
+                return err(dict(body=output_dict.get("error"), number=output_dict.get("status")))
+            else:
+                current_app.logger.info(
+                'Successfully added {0} documents to {1} by {2}'
+                .format(output_dict.get('number_added'), library, user_editing_uid)
+            )
+            return {'number_added': output_dict.get('number_added'), "bibcodes": output_dict.get('bibcodes')}, 200
+
+        elif data['action'] == 'remove':
+            current_app.logger.info('User requested to remove documents by query')
+            output_dict = self.remove_query_from_library(
+                library_id=library,
+                document_data=data
+            )
+            if "error" in output_dict.keys():
+                return err(dict(body=output_dict.get("error"), number=output_dict.get("status")))
+            else:
+                current_app.logger.info(
+                'Successfully removed {0} documents to {1} by {2}'
+                .format(output_dict.get('number_removed'), library, user_editing_uid)
+            )
+            return {'number_removed': output_dict.get('number_removed'), "bibcodes": output_dict.get('bibcodes')}, 200
+
+        else:
+            current_app.logger.info('User requested a non-standard action')
+            return {}, 400
+
+    def get(self, library):
+        """
+        HTTP GET request that adds documents to a library for a given user
+        :param library: library ID based on a /search query.
+
+        :return: the response for if the document was successfully added
+
+        Header:
+        -------
+        Must contain the API forwarded user ID of the user accessing the end
+        point
+
+        GET params:
+        Any params that would be passed to the /search endpoint.
+        'fl' will automatically be reset to only bibcode.
+
+        Return data:
+        -----------
+        number_added: number of documents added
+        valid_bibcode: the list of valid bibcodes
+
+        Permissions:
+        -----------
+        The following type of user can add documents:
+          - owner
+          - admin
+          - write
+        """
+        # Get the user requesting this from the header
+        try:
+            user_editing = self.helper_get_user_id()
+        except KeyError:
+            return err(MISSING_USERNAME_ERROR)
+
+        # URL safe base64 string to UUID
+        try:
+            library = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
+
+        user_editing_uid = \
+            self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
+
+        # Check the permissions of the user
+        if not self.write_access(service_uid=user_editing_uid,
+                                 library_id=library):
+            return err(NO_PERMISSION_ERROR)
+
+        try:
+            data = {"params": get_GET_params(request)}
+        except ValueError as error:
+            current_app.logger.error('Improperly formatted query passed to GET: {0} [{1}]'
+                                     .format(request.data, error))
+            return err(BAD_QUERY_ERROR)
+
+        current_app.logger.info('User requested to add documents from query')
+        output_dict = self.add_query_to_library(
+            library_id=library,
+            document_data=data
+        )
+        if "error" in output_dict.keys():
+            return err(dict(body=output_dict.get("error"), number=output_dict.get("status")))
+        else:
+            current_app.logger.info(
+                'Successfully added {0} documents to {1} by {2}'
+                .format(output_dict.get('number_added'), library, user_editing_uid)
+            )
+            return {'number_added': output_dict.get('number_added'), "bibcodes": output_dict.get('bibcodes')}, 200

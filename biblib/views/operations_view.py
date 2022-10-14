@@ -26,26 +26,6 @@ class OperationsView(BaseView):
     rate_limit = [1000, 60 * 60 * 24]
 
     @classmethod
-    def write_access(cls, service_uid, library_id):
-        """
-        Defines which type of user has write permissions to a library.
-
-        :param service_uid: the user ID within this microservice
-        :param library_id: the unique ID of the library
-
-        :return: boolean, access (True), no access (False)
-        """
-
-        read_allowed = ['write', 'admin', 'owner']
-        for access_type in read_allowed:
-            if cls.helper_access_allowed(service_uid=service_uid,
-                                         library_id=library_id,
-                                         access_type=access_type):
-                return True
-
-        return False
-
-    @classmethod
     def setops_libraries(cls, library_id, document_data, operation='union'):
         """
         Takes the union of two or more libraries

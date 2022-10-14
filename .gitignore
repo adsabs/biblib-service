@@ -17,3 +17,6 @@ venv
 python
 .cache
 **/.DS_Store
+docker-compose*
+Dockerfile
+scripts/pytest/*
