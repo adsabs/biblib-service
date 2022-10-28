@@ -37,6 +37,9 @@ BIBLIB_SOLR_BIG_QUERY_MIN = 10
 
 MAIL_DEFAULT_SENDER = 'no-reply@adslabs.org'
 
+NUMBER_REVISIONS = 7
+REVISION_TIME = 1
+
 # when set, the service will use it instead of the user's token
 # (for requests where it makes sense - not all)
 SERVICE_TOKEN = None

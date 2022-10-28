@@ -15,37 +15,10 @@ from biblib.models import Base, User, Permissions, Library
 from biblib.app import create_app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
+import sqlalchemy_continuum
 
 # Load the app with the factory
 app = create_app()
-
-
-class CreateDatabase(Command):
-    """
-    Creates the database based on models.py
-    """
-    @staticmethod
-    def run(app=app):
-        """
-        Creates the database in the application context
-        :return: no return
-        """
-        Base.metadata.create_all(bind=app.db.engine)
-
-
-class DestroyDatabase(Command):
-    """
-    Creates the database based on models.py
-    """
-    @staticmethod
-    def run(app=app):
-        """
-        Creates the database in the application context
-        :return: no return
-        """
-        app.db.session.remove()
-        Base.metadata.drop_all(bind=app.db.engine)
-
 
 class DeleteStaleUsers(Command):
     """
@@ -92,10 +65,11 @@ class DeleteStaleUsers(Command):
                             session.rollback()
                 current_app.logger.info('Deleted {} stale users: {}'.format(len(removal_list), removal_list))
 
-class DeleteObsoleteVersions(Command):
+class DeleteObsoleteVersionsTime(Command):
     """
     Clears obsolete library versions older than chosen time.
     """
+    @staticmethod
     def run(app=app):
         """
         Carries out the deletion of older versions
@@ -103,22 +77,57 @@ class DeleteObsoleteVersions(Command):
         with app.app_context():
             with current_app.session_scope() as session:
                 # Obtain a list of all versions older than 1 year.
+                LibraryVersion = sqlalchemy_continuum.version_class(Library)
                 current_date = datetime.now()
-                current_offset = current_date - relativedelta(years=1)
-                postgres_search_text = 'DELETE FROM library_version WHERE date_last_modified < {current_offset};'.format(current_offset)
-                result = session.execute(postgres_search_text)
+                current_offset = current_date - relativedelta(years = current_app.config.get('REVISION_TIME', 1))
+                try:
+                    results = session.query(LibraryVersion).filter(LibraryVersion.date_last_modified<current_offset).all()
+                    d = [session.delete(revision) for revision in results]
+                    d = len(d)
+                    session.commit()
+                    current_app.logger.info('Removed {} obsolete revisions'.format(d))
+                except Exception as error:
+                        current_app.logger.info('Problem with database, could not remove revisions: {}'
+                                                .format(error))
+                        session.rollback()
 
+class DeleteObsoleteVersionsNumber(Command):
+    """
+    Clears obsolete library versions older than chosen time.
+    """
+    @staticmethod
+    def run(app=app):
+        """
+        Carries out the deletion of older versions
+        """
+        with app.app_context():
+            with current_app.session_scope() as session:
+                LibraryVersion = sqlalchemy_continuum.version_class(Library)
+                for service_user in session.query(User).all():
+                    permissions = session.query(Permissions).filter(Permissions.user_id == service_user.id).all()
+                    libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
+                    try:
+                        for library in libraries:
+                            revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
+                            # Obtain the revisions for a given library
+                            d = [session.delete(revision) for revision in revisions[:current_app.config.get('NUMBER_REVISIONS', 7)]]
+                            #deletes all but the 7 most recent revisions.
+                            d = len(d)
+                            session.commit()
+                            current_app.logger.info('Removed {} obsolete revisions for library: {}'.format(d, library.id))
 
+                    except Exception as error:
+                        current_app.logger.info('Problem with database, could not remove revisions for user {}: {}'
+                                                .format(service_user, error))
+                        session.rollback()
 # Set up the alembic migration
 migrate = Migrate(app, app.db, compare_type=True, directory='migrations')
 
 # Setup the command line arguments using Flask-Script
 manager = Manager(app)
-manager.add_command('db', MigrateCommand)
-manager.add_command('createdb', CreateDatabase())
-manager.add_command('destroydb', DestroyDatabase())
 manager.add_command('syncdb', DeleteStaleUsers())
-manager.add_command('clean_verions', DeleteObsoleteVersions())
+manager.add_command('clean_versions_time', DeleteObsoleteVersionsTime())
+manager.add_command('clean_versions_number', DeleteObsoleteVersionsNumber())
 
 if __name__ == '__main__':
     manager.run()
