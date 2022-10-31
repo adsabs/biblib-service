@@ -96,10 +96,12 @@ class DeleteObsoleteVersionsNumber(Command):
     Clears obsolete library versions older than chosen time.
     """
     @staticmethod
-    def run(app=app):
+    def run(app=app, n_revisions = None):
         """
         Carries out the deletion of older versions
         """
+        if not n_revisions: n_revisions = current_app.config.get('NUMBER_REVISIONS', 7)
+
         with app.app_context():
             with current_app.session_scope() as session:
                 LibraryVersion = sqlalchemy_continuum.version_class(Library)
@@ -110,8 +112,9 @@ class DeleteObsoleteVersionsNumber(Command):
                         for library in libraries:
                             revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
                             # Obtain the revisions for a given library
-                            d = [session.delete(revision) for revision in revisions[:current_app.config.get('NUMBER_REVISIONS', 7)]]
-                            #deletes all but the 7 most recent revisions.
+                            current_app.logger.debug('Found {} revisions for library: {}'.format(len(revisions), library.id))
+                            d = [session.delete(revision) for revision in revisions[:-n_revisions]]
+                            #deletes all but the n_revisions most recent revisions.
                             d = len(d)
                             session.commit()
                             current_app.logger.info('Removed {} obsolete revisions for library: {}'.format(d, library.id))
