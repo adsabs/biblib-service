@@ -70,16 +70,19 @@ class DeleteObsoleteVersionsTime(Command):
     Clears obsolete library versions older than chosen time.
     """
     @staticmethod
-    def run(app=app):
+    def run(app=app, n_years=None):
         """
         Carries out the deletion of older versions
         """
         with app.app_context():
+
+            if not n_years: n_years = current_app.config.get('REVISION_TIME', 7)
+
             with current_app.session_scope() as session:
                 # Obtain a list of all versions older than 1 year.
                 LibraryVersion = sqlalchemy_continuum.version_class(Library)
                 current_date = datetime.now()
-                current_offset = current_date - relativedelta(years = current_app.config.get('REVISION_TIME', 1))
+                current_offset = current_date - relativedelta(years=n_years)
                 try:
                     results = session.query(LibraryVersion).filter(LibraryVersion.date_last_modified<current_offset).all()
                     d = [session.delete(revision) for revision in results]
@@ -93,10 +96,10 @@ class DeleteObsoleteVersionsTime(Command):
 
 class DeleteObsoleteVersionsNumber(Command):
     """
-    Clears obsolete library versions older than chosen time.
+    Limits number of revisions saved per library to n_revisions.
     """
     @staticmethod
-    def run(app=app, n_revisions = None):
+    def run(app=app, n_revisions=None):
         """
         Carries out the deletion of older versions
         """
@@ -105,26 +108,22 @@ class DeleteObsoleteVersionsNumber(Command):
         with app.app_context():
             with current_app.session_scope() as session:
                 LibraryVersion = sqlalchemy_continuum.version_class(Library)
-                for service_user in session.query(User).all():
-                    permissions = session.query(Permissions).filter(Permissions.user_id == service_user.id).all()
-                    libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
+                for library in session.query(Library).all():
                     try:
-                        for library in libraries:
-                            revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
-                            # Obtain the revisions for a given library
-                            current_app.logger.debug('Found {} revisions for library: {}'.format(len(revisions), library.id))
-                            d = [session.delete(revision) for revision in revisions[:-n_revisions]]
-                            #deletes all but the n_revisions most recent revisions.
-                            d = len(d)
-                            session.commit()
-                            current_app.logger.info('Removed {} obsolete revisions for library: {}'.format(d, library.id))
+                        #for library in libraries:
+                        revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
+                        # Obtain the revisions for a given library
+                        current_app.logger.debug('Found {} revisions for library: {}'.format(len(revisions), library.id))
+                        d = [session.delete(revision) for revision in revisions[:-n_revisions]]
+                        #deletes all but the n_revisions most recent revisions.
+                        d = len(d)
+                        session.commit()
+                        current_app.logger.info('Removed {} obsolete revisions for library: {}'.format(d, library.id))
 
                     except Exception as error:
-                        current_app.logger.info('Problem with database, could not remove revisions for user {}: {}'
-                                                .format(service_user, error))
+                        current_app.logger.info('Problem with database, could not remove revisions for library {}: {}'
+                                                .format(library, error))
                         session.rollback()
-# Set up the alembic migration
-migrate = Migrate(app, app.db, compare_type=True, directory='migrations')
 
 # Setup the command line arguments using Flask-Script
 manager = Manager(app)
