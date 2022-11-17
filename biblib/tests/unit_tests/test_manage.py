@@ -178,8 +178,8 @@ class TestManagePy(TestCaseDatabase):
 
     def test_delete_obsolete_versions_number(self):
         """
-        Tests that the DeleteStaleUsers action that propogates the deletion of
-        users from the API database to that of the microservice.
+        Tests that the DeleteObsoleteVersionsNumber action that removes 
+        LibraryVersions older than a given number of years.
 
         :return: no return
         """
@@ -318,8 +318,8 @@ class TestManagePy(TestCaseDatabase):
 
     def test_delete_obsolete_versions_time(self):
         """
-        Tests that the DeleteStaleUsers action that propogates the deletion of
-        users from the API database to that of the microservice.
+        Tests that the DeleteObsoleteVersionsTime action that removes 
+        LibraryVersions older than a given number of years.
 
         :return: no return
         """

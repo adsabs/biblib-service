@@ -13,7 +13,7 @@ from flask_script import Manager, Command, Option
 from flask_migrate import Migrate, MigrateCommand
 from biblib.models import Base, User, Permissions, Library
 from biblib.app import create_app
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, desc
 from sqlalchemy.orm import sessionmaker, scoped_session
 import sqlalchemy_continuum
 
@@ -52,11 +52,11 @@ class DeleteStaleUsers(Command):
                             # By cascade this should delete all the permissions
                             d = [session.delete(library) for library in libraries]
                             p = [session.delete(permission) for permission in permissions]
-                            d = len(d)
+                            d_len = len(d)
 
                             session.delete(service_user)
                             session.commit()
-                            current_app.logger.info('Removed stale user: {} and {} libraries'.format(service_user, d))
+                            current_app.logger.info('Removed stale user: {} and {} libraries'.format(service_user, d_len))
                             removal_list.append(service_user)
 
                         except Exception as error:
@@ -86,9 +86,9 @@ class DeleteObsoleteVersionsTime(Command):
                 try:
                     results = session.query(LibraryVersion).filter(LibraryVersion.date_last_modified<current_offset).all()
                     d = [session.delete(revision) for revision in results]
-                    d = len(d)
+                    d_len = len(d)
                     session.commit()
-                    current_app.logger.info('Removed {} obsolete revisions'.format(d))
+                    current_app.logger.info('Removed {} obsolete revisions'.format(d_len))
                 except Exception as error:
                         current_app.logger.info('Problem with database, could not remove revisions: {}'
                                                 .format(error))
@@ -111,14 +111,15 @@ class DeleteObsoleteVersionsNumber(Command):
                 for library in session.query(Library).all():
                     try:
                         #for library in libraries:
-                        revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
+                        revisions = session.query(LibraryVersion).filter_by(id=library.id).order_by(LibraryVersion.date_last_modified.asc()).all()
                         # Obtain the revisions for a given library
                         current_app.logger.debug('Found {} revisions for library: {}'.format(len(revisions), library.id))
-                        d = [session.delete(revision) for revision in revisions[:-n_revisions]]
+                        obsolete_revisions = revisions[:-n_revisions]
+                        d = [session.delete(revision) for revision in obsolete_revisions]
                         #deletes all but the n_revisions most recent revisions.
-                        d = len(d)
+                        d_len = len(d)
                         session.commit()
-                        current_app.logger.info('Removed {} obsolete revisions for library: {}'.format(d, library.id))
+                        current_app.logger.info('Removed {} obsolete revisions for library: {}'.format(d_len, library.id))
 
                     except Exception as error:
                         current_app.logger.info('Problem with database, could not remove revisions for library {}: {}'
