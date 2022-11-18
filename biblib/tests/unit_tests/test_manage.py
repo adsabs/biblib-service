@@ -63,8 +63,6 @@ class TestManagePy(TestCaseDatabase):
                 # Add some content to the users, libraries, and permissions within
                 # the microservices
                 user_1 = User(absolute_uid=1)
-                session.add(user_1)
-                session.commit()
 
                 user_2 = User(absolute_uid=2)
 
@@ -196,8 +194,6 @@ class TestManagePy(TestCaseDatabase):
                 # Add some content to the users, libraries, and permissions within
                 # the microservices
                 user_1 = User(absolute_uid=1)
-                session.add(user_1)
-                session.commit()
 
                 user_2 = User(absolute_uid=2)
 
@@ -336,8 +332,6 @@ class TestManagePy(TestCaseDatabase):
                 # Add some content to the users, libraries, and permissions within
                 # the microservices
                 user_1 = User(absolute_uid=1)
-                session.add(user_1)
-                session.commit()
 
                 user_2 = User(absolute_uid=2)
 
