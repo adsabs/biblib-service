@@ -1,15 +1,15 @@
 """
 Transfer view
 """
-from ..utils import err, get_post_data
-from ..models import Permissions
-from .base_view import BaseView
+from biblib.utils import err, get_post_data
+from biblib.models import Permissions
+from biblib.views.base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
-from .http_errors import MISSING_USERNAME_ERROR, WRONG_TYPE_ERROR, \
+from biblib.views.http_errors import MISSING_USERNAME_ERROR, WRONG_TYPE_ERROR, \
     API_MISSING_USER_EMAIL, NO_PERMISSION_ERROR, BAD_LIBRARY_ID_ERROR
 from sqlalchemy.orm.exc import NoResultFound
-from ..emails import PermissionsChangedEmail
+from biblib.emails import PermissionsChangedEmail
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 env = Environment(

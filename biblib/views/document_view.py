@@ -2,17 +2,19 @@
 Document view
 """
 
-from ..utils import err, get_post_data, get_GET_params
-from ..models import Library, Permissions
-from ..client import client
-from .base_view import BaseView
+from biblib.utils import err, get_post_data, get_GET_params
+from biblib.client import client
+from biblib.utils import err, get_post_data
+from biblib.models import Library, Permissions
+from biblib.views.base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy import Boolean
-from .http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, BAD_QUERY_ERROR, \
-    WRONG_TYPE_ERROR, NO_PERMISSION_ERROR, MISSING_LIBRARY_ERROR, BAD_LIBRARY_ID_ERROR, INVALID_BIBCODE_SPECIFIED_ERROR
-from ..biblib_exceptions import PermissionDeniedError
+from biblib.views.http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
+    WRONG_TYPE_ERROR, NO_PERMISSION_ERROR, MISSING_LIBRARY_ERROR, \
+    BAD_LIBRARY_ID_ERROR, INVALID_BIBCODE_SPECIFIED_ERROR, BAD_QUERY_ERROR
+from biblib.biblib_exceptions import PermissionDeniedError
 
 
 class DocumentView(BaseView):

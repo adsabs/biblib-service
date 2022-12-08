@@ -2,15 +2,15 @@
 User view
 """
 
-from ..utils import err
-from ..models import User, Library, Permissions
-from ..client import client
-from .base_view import BaseView
+from biblib.utils import err
+from biblib.models import User, Library, Permissions
+from biblib.client import client
+from biblib.views.base_view import BaseView
 from flask import current_app
 from flask_discoverer import advertise
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
-from .http_errors import MISSING_USERNAME_ERROR
+from biblib.views.http_errors import MISSING_USERNAME_ERROR
 from sqlalchemy import Boolean
 
 

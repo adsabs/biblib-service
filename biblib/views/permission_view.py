@@ -4,15 +4,15 @@ Perimssion view
 
 from flask import request, current_app
 from flask_discoverer import advertise
-from ..models import User, Library, Permissions
-from ..client import client
-from .base_view import BaseView
+from biblib.models import User, Library, Permissions
+from biblib.client import client
+from biblib.views.base_view import BaseView
 from sqlalchemy.orm.exc import NoResultFound
-from ..utils import get_post_data, err
-from .http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
+from biblib.utils import get_post_data, err
+from biblib.views.http_errors import MISSING_USERNAME_ERROR, NO_PERMISSION_ERROR, \
     WRONG_TYPE_ERROR, API_MISSING_USER_EMAIL, BAD_LIBRARY_ID_ERROR
-from ..biblib_exceptions import PermissionDeniedError
-from ..emails import PermissionsChangedEmail
+from biblib.biblib_exceptions import PermissionDeniedError
+from biblib.emails import PermissionsChangedEmail
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 env = Environment(

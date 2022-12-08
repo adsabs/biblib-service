@@ -6,7 +6,7 @@ Application
 import logging.config
 
 from werkzeug.serving import run_simple
-from .views import UserView, LibraryView, DocumentView, QueryView, PermissionView, \
+from biblib.views import UserView, LibraryView, DocumentView, QueryView, PermissionView, \
     TransferView, ClassicView, TwoPointOhView, OperationsView
 from flask_restful import Api
 from flask_discoverer import Discoverer

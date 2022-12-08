@@ -6,19 +6,19 @@ import base64
 
 from biblib.views.http_errors import INVALID_QUERY_PARAMETERS_SPECIFIED
 
-from ..views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
+from biblib.views import DEFAULT_LIBRARY_NAME_PREFIX, DEFAULT_LIBRARY_DESCRIPTION, \
     USER_ID_KEYWORD
 from flask import request, current_app, make_response, jsonify
 from flask_restful import Resource
 from flask_mail import Message
-from ..models import User, Library, Permissions
-from ..client import client
+from biblib.models import User, Library, Permissions
+from biblib.client import client
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy import Boolean
-from ..biblib_exceptions import BackendIntegrityError, PermissionDeniedError
-from ..utils import uniquify, err
-from ..emails import Email
+from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
+from biblib.utils import uniquify, err
+from biblib.emails import Email
 
 class BaseView(Resource):
     """

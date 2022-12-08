@@ -1,15 +1,15 @@
 """
 Library view
 """
-from ..views import USER_ID_KEYWORD
-from ..utils import err
-from ..models import User, Library, Permissions
-from ..client import client
-from .base_view import BaseView
+from biblib.views import USER_ID_KEYWORD
+from biblib.utils import err
+from biblib.models import User, Library, Permissions
+from biblib.client import client
+from biblib.views.base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy import Boolean
-from .http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
+from biblib.views.http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
     MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR, BAD_LIBRARY_ID_ERROR
 
 

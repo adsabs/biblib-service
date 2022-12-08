@@ -57,14 +57,7 @@ python3 wsgi.py
 
 ## deployment
 
-The only thing to take care of when making a deployment is the migration of the backend database. Libraries uses specific features of PostgreSQL, such as `UUID` and `JSON`-store, so you should think carefully if you wish to change the backend. It is recommended you implement the migrations using the *Flask-migrate* scripts within *manage.py* and not use `alembic` as is used elsewhere. When you have access to the DB:
-
-```bash
-cd biblib/
-python manage.py db upgrade
-```
-
-If you wish to do anything else, then just look at the default behaviour of *Flask-migrate* scripts (https://flask-migrate.readthedocs.io/en/latest/) or within the source code.
+The only thing to take care of when making a deployment is the migration of the backend database. Libraries uses specific features of PostgreSQL, such as `UUID` and `JSON`-store, so you should think carefully if you wish to change the backend. The use of `flask-migrate` for database migrations has been replaced by directly calling `alembic`.  
 
 ## Feature additions
 
