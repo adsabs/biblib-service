@@ -505,7 +505,11 @@ class QueryView(BaseView):
             start_length = len(library.bibcode)
             #Validate supplied bibcodes to confirm they exist in SOLR
             current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
+            
             response = cls.standard_ADS_bibcode_query(params=document_data.get('params'))
+            if "error" in response:
+                return response
+
             solr_resp = response.json()
             status_code = response.status_code
             current_app.logger.info("SOLR returned status: {}".format(status_code))
