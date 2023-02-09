@@ -46,7 +46,7 @@ class UserView(BaseView):
             raise
 
     @staticmethod
-    @functools.lru_cache()
+    @functools.lru_cache(maxsize=32)
     def retrieve_user_email(owner_absolute_uid):
         service = '{api}/{uid}'.format(
                     api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
