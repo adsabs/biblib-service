@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from biblib.views.http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
     WRONG_TYPE_ERROR
 from biblib.biblib_exceptions import BackendIntegrityError
+import functools
 
 class UserView(BaseView):
     """
@@ -43,6 +44,20 @@ class UserView(BaseView):
                                      'added. Full traceback: {1}'
                                      .format(absolute_uid, error))
             raise
+
+    @staticmethod
+    @functools.lru_cache(maxsize=32)
+    def retrieve_user_email(owner_absolute_uid):
+        service = '{api}/{uid}'.format(
+                    api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
+                    uid=owner_absolute_uid
+                )
+        current_app.logger.info('Obtaining email of user: {0} [API UID]'
+                                        .format(owner_absolute_uid))
+        response = client().get(
+                    service
+                )
+        return response
 
     @classmethod
     def get_libraries(cls, service_uid, absolute_uid):
@@ -105,19 +120,11 @@ class UserView(BaseView):
                 else:
                     owner_absolute_uid = absolute_uid
 
-                service = '{api}/{uid}'.format(
-                    api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
-                    uid=owner_absolute_uid
-                )
-                current_app.logger.info('Obtaining email of user: {0} [API UID]'
-                                        .format(owner_absolute_uid))
-                response = client().get(
-                    service
-                )
+                response = cls.retrieve_user_email(owner_absolute_uid)
 
                 if response.status_code != 200:
                     current_app.logger.error('Could not find user in the API'
-                                             'database: {0}.'.format(service))
+                                             'database: {0}.'.format(owner_absolute_uid))
                     owner = 'Not available'
                 else:
                     owner = response.json()['email'].split('@')[0]

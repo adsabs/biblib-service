@@ -581,13 +581,11 @@ class BaseView(Resource):
             if key in solr_query_fields:
                 valid_params[key] = params.get(key)
             else:
-                error_resp = err(INVALID_QUERY_PARAMETERS_SPECIFIED)
-                for key in headers.keys():
-                    error_resp.headers[key] = headers[key]
-                return error_resp
+                error_resp = INVALID_QUERY_PARAMETERS_SPECIFIED
+                return {"error": error_resp, "status": error_resp["number"]}
 
-        if params.get('fl', '') == '':
-            params['fl'] = 'bibcode'
+        if valid_params.get('fl', '') == '':
+            valid_params['fl'] = 'bibcode'
         
         else:
             fl_split = valid_params.get('fl').split(',')
@@ -596,13 +594,13 @@ class BaseView(Resource):
                     valid_params['fl'] = '{},{}'.format(valid_params.get('fl'), required_fl)
 
         valid_params['wt'] = 'json'
-        valid_params['rows'] = min(params.get('rows', current_app.config.get('BIBLIB_MAX_ROWS')), current_app.config.get('BIBLIB_MAX_ROWS'))
+        valid_params['rows'] = min(int(params.get('rows', current_app.config.get('BIBLIB_MAX_ROWS'))), current_app.config.get('BIBLIB_MAX_ROWS'))
 
         current_app.logger.info('Querying Search microservice: {0}'
-                                .format(params))
+                                .format(valid_params))
         solr_resp = client().get(
             url=current_app.config['BIBLIB_SOLR_SEARCH_URL'],
-            params=params,
+            params=valid_params,
             headers=headers
         )
         return solr_resp
