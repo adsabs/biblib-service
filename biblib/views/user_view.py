@@ -60,7 +60,7 @@ class UserView(BaseView):
         return response
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid, start=None, end=None):
+    def get_libraries(cls, service_uid, absolute_uid, start=None, rows=None):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
@@ -77,9 +77,11 @@ class UserView(BaseView):
                 .join(Permissions.library)\
                 .filter(Permissions.user_id == service_uid)\
                 .all()
-
+            
+            if rows: rows=start+rows
+            
             output_libraries = []
-            for permission, library in result[start:end]:
+            for permission, library in result[start:rows]:
 
                 # For this library get all the people who have permissions
                 users = session.query(Permissions).filter_by(
@@ -193,9 +195,9 @@ class UserView(BaseView):
         
         try:
             get_params = request.args
-            start = get_params.get('start', type=int)
-            end = get_params.get('end', type=int)
-            current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, end))
+            start = get_params.get('start', default=0, type=int)
+            rows = get_params.get('rows', type=int)
+            current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, rows))
         except ValueError:
             msg = "Failed to parse input parameters: {}. Please confirm request is properly formatted.".format(request)
             current_app.logger.exception(msg)
@@ -205,7 +207,7 @@ class UserView(BaseView):
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
         user_libraries = self.get_libraries(service_uid=service_uid,
-                                            absolute_uid=user, start=start, end=end)
+                                            absolute_uid=user, start=start, rows=rows)
         return {'libraries': user_libraries}, 200
 
     def post(self):
