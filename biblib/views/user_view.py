@@ -60,7 +60,7 @@ class UserView(BaseView):
         return response
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid, start=None, rows=None):
+    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
