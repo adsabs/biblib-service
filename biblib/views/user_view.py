@@ -11,7 +11,7 @@ from flask_discoverer import advertise
 from sqlalchemy import Boolean
 from sqlalchemy.exc import IntegrityError
 from biblib.views.http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
-    WRONG_TYPE_ERROR, BAD_QUERY_ERROR
+    WRONG_TYPE_ERROR, BAD_PARAMS_ERROR
 from biblib.biblib_exceptions import BackendIntegrityError
 import functools
 
@@ -201,7 +201,7 @@ class UserView(BaseView):
         except ValueError:
             msg = "Failed to parse input parameters: {}. Please confirm request is properly formatted.".format(request)
             current_app.logger.exception(msg)
-            return err(BAD_QUERY_ERROR)
+            return err(BAD_PARAMS_ERROR)
 
         service_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
