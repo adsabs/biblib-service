@@ -155,7 +155,7 @@ class UserView(BaseView):
         user
 
         :param start: The index of the library list to start on (int).  default: 0
-        :param rows: The number of rows to return from the start point (int). default: None
+        :param rows: The number of rows to return from the start point (int).  default: None (returns all libraries)
 
         :return: list of the users libraries with the relevant information
 
