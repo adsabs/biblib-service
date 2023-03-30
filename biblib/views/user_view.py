@@ -154,6 +154,9 @@ class UserView(BaseView):
         HTTP GET request that returns all the libraries that belong to a given
         user
 
+        :param start: The index of the library list to start on (int).  default: 0
+        :param rows: The number of rows to return from the start point (int). default: None
+
         :return: list of the users libraries with the relevant information
 
         Header:
