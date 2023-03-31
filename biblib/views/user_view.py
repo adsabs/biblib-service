@@ -11,7 +11,7 @@ from flask_discoverer import advertise
 from sqlalchemy import Boolean
 from sqlalchemy.exc import IntegrityError
 from biblib.views.http_errors import MISSING_USERNAME_ERROR, DUPLICATE_LIBRARY_NAME_ERROR, \
-    WRONG_TYPE_ERROR
+    WRONG_TYPE_ERROR, BAD_PARAMS_ERROR
 from biblib.biblib_exceptions import BackendIntegrityError
 import functools
 
@@ -60,7 +60,7 @@ class UserView(BaseView):
         return response
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid):
+    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
@@ -77,9 +77,11 @@ class UserView(BaseView):
                 .join(Permissions.library)\
                 .filter(Permissions.user_id == service_uid)\
                 .all()
-
+            
+            if rows: rows=start+rows
+            
             output_libraries = []
-            for permission, library in result:
+            for permission, library in result[start:rows]:
 
                 # For this library get all the people who have permissions
                 users = session.query(Permissions).filter_by(
@@ -152,6 +154,9 @@ class UserView(BaseView):
         HTTP GET request that returns all the libraries that belong to a given
         user
 
+        :param start: The index of the library list to start on (int).  default: 0
+        :param rows: The number of rows to return from the start point (int).  default: None (returns all libraries)
+
         :return: list of the users libraries with the relevant information
 
         Header:
@@ -190,12 +195,22 @@ class UserView(BaseView):
             user = self.helper_get_user_id()
         except KeyError:
             return err(MISSING_USERNAME_ERROR)
+        
+        try:
+            get_params = request.args
+            start = get_params.get('start', default=0, type=int)
+            rows = get_params.get('rows', type=int)
+            current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, rows))
+        except ValueError:
+            msg = "Failed to parse input parameters: {}. Please confirm request is properly formatted.".format(request)
+            current_app.logger.exception(msg)
+            return err(BAD_PARAMS_ERROR)
 
         service_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
         user_libraries = self.get_libraries(service_uid=service_uid,
-                                            absolute_uid=user)
+                                            absolute_uid=user, start=start, rows=rows)
         return {'libraries': user_libraries}, 200
 
     def post(self):
