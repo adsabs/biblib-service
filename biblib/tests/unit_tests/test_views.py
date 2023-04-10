@@ -559,10 +559,13 @@ class TestUserViews(TestCaseDatabase):
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
                                                    .format(key))
-        for i in range(number_of_libs):
+
+        
+        for j in range(number_of_libs):
+            i = len(libraries) - j - 1
             for key in ['name', 'description', 'public']:
                 self.assertEqual(libraries[i][key],
-                                 libs[i].user_view_post_data[key])
+                                libs[j].user_view_post_data[key])
 
             self.assertEqual(libraries[i]['num_documents'], 0)
 

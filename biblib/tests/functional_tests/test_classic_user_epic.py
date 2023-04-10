@@ -64,10 +64,10 @@ class TestClassicUserEpic(TestCaseDatabase):
                 url,
                 headers=user_gpa.headers
             )
-        self.assertEqual(response.json['libraries'][0]['name'], stub_library_1.name)
-        self.assertEqual(response.json['libraries'][1]['name'], stub_library_2.name)
-        library_id_1 = response.json['libraries'][0]['id']
-        library_id_2 = response.json['libraries'][1]['id']
+        self.assertEqual(response.json['libraries'][1]['name'], stub_library_1.name)
+        self.assertEqual(response.json['libraries'][0]['name'], stub_library_2.name)
+        library_id_1 = response.json['libraries'][1]['id']
+        library_id_2 = response.json['libraries'][0]['id']
 
         # Gpa clicks the library page and checks that the content is as expected
         for library_id, stub_library in [[library_id_1, stub_library_1], [library_id_2, stub_library_2]]:
