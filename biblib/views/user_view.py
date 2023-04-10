@@ -76,6 +76,7 @@ class UserView(BaseView):
             result = session.query(Permissions, Library)\
                 .join(Permissions.library)\
                 .filter(Permissions.user_id == service_uid)\
+                .order_by(Library.date_created.desc())\
                 .all()
             
             if rows: rows=start+rows
