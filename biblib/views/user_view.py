@@ -76,11 +76,13 @@ class UserView(BaseView):
         # Get all the permissions for a user
         # This can be improved into one database call rather than having
         # one per each permission, but needs some checks in place.
+        # The nested getattr calls allow us to request a column from the library model,
+        # and then request the proper sort order from that column.
         with current_app.session_scope() as session:
             result = session.query(Permissions, Library)\
                 .join(Permissions.library)\
                 .filter(Permissions.user_id == service_uid)\
-                .order_by(getattr(getattr(Library, sort_col), sort_dir)())\
+                .order_by(getattr(getattr(Library, sort_col), sort_order)())\
                 .all()
             
             if rows: rows=start+rows
