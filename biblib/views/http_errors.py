@@ -39,7 +39,7 @@ BAD_QUERY_ERROR = dict(
     number=400
 )
 BAD_PARAMS_ERROR = dict(
-    body='You passed GET arguments that was not parseable. Please See the API documentation: {0}'
+    body='You passed GET arguments that were not parseable. Please See the API documentation: {0}'
          .format(API_HELP),
     number=400
 )
