@@ -213,14 +213,14 @@ class UserView(BaseView):
             if sort_col not in ['date_created', 'date_last_modified']: 
                 raise ValueError
             
-            sort_order = get_params.get('order', default='desc', type=str)
+            sort_order = get_params.get('order', default='asc', type=str)
             if sort_order not in ['asc', 'desc']:
                 raise ValueError
 
             current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, rows))
 
         except ValueError:
-            msg = "Failed to parse input parameters: {}. Please confirm request the is properly formatted.".format(request)
+            msg = "Failed to parse input parameters: {}. Please confirm the request is properly formatted.".format(request)
             current_app.logger.exception(msg)
             return err(BAD_PARAMS_ERROR)
 
