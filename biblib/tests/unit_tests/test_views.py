@@ -559,10 +559,72 @@ class TestUserViews(TestCaseDatabase):
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
                                                    .format(key))
+
+        
+        for j in range(number_of_libs):
+            i = len(libraries) - j - 1
+            for key in ['name', 'description', 'public']:
+                self.assertEqual(libraries[i][key],
+                                libs[j].user_view_post_data[key])
+
+            self.assertEqual(libraries[i]['num_documents'], 0)
+
+            if libraries[i]['id'] == _lib['id']:
+                self.assertEqual(libraries[i]['num_users'], 2)
+            else:
+                self.assertEqual(libraries[i]['num_users'], 1)
+
+            self.assertEqual(libraries[i]['permission'], 'owner')
+
+        # Get the library created with a different sort order
+        with MockEmailService(stub_user_1, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user.id,
+                absolute_uid=user.absolute_uid,
+                sort_order='asc'
+            )
+
+        self.assertTrue(len(libraries) == number_of_libs)
+        for library in libraries:
+            for key in self.stub_library.user_view_get_response():
+                self.assertIn(key, library.keys(), 'Missing key: {0}'
+                                                   .format(key))
+
+        
         for i in range(number_of_libs):
             for key in ['name', 'description', 'public']:
                 self.assertEqual(libraries[i][key],
-                                 libs[i].user_view_post_data[key])
+                                libs[i].user_view_post_data[key])
+
+            self.assertEqual(libraries[i]['num_documents'], 0)
+
+            if libraries[i]['id'] == _lib['id']:
+                self.assertEqual(libraries[i]['num_users'], 2)
+            else:
+                self.assertEqual(libraries[i]['num_users'], 1)
+
+            self.assertEqual(libraries[i]['permission'], 'owner')
+        
+        # Get the library created with a different sort order and sort column
+        with MockEmailService(stub_user_1, end_type='uid'):
+            libraries = self.user_view.get_libraries(
+                service_uid=user.id,
+                absolute_uid=user.absolute_uid,
+                sort_col='date_last_modified',
+                sort_order='asc'
+            )
+
+        self.assertTrue(len(libraries) == number_of_libs)
+        for library in libraries:
+            for key in self.stub_library.user_view_get_response():
+                self.assertIn(key, library.keys(), 'Missing key: {0}'
+                                                   .format(key))
+
+        
+        for i in range(number_of_libs):
+            for key in ['name', 'description', 'public']:
+                self.assertEqual(libraries[i][key],
+                                libs[i].user_view_post_data[key])
 
             self.assertEqual(libraries[i]['num_documents'], 0)
 

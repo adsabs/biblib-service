@@ -60,11 +60,15 @@ class UserView(BaseView):
         return response
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None):
+    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc"):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
         :param absolute_uid: unique UID of the user in the API
+        :param start: Index of the first library to return
+        :param rows: Number of libraries to return (default all)
+        :param sort_col: Library column to sort on (date_created, date_last_modified)
+        :param sort_dir: Direction sort libraries (asc, desc)
 
         :return: list of libraries in json format
         """
@@ -72,10 +76,13 @@ class UserView(BaseView):
         # Get all the permissions for a user
         # This can be improved into one database call rather than having
         # one per each permission, but needs some checks in place.
+        # The nested getattr calls allow us to request a column from the library model,
+        # and then request the proper sort order from that column.
         with current_app.session_scope() as session:
             result = session.query(Permissions, Library)\
                 .join(Permissions.library)\
                 .filter(Permissions.user_id == service_uid)\
+                .order_by(getattr(getattr(Library, sort_col), sort_order)())\
                 .all()
             
             if rows: rows=start+rows
@@ -156,7 +163,8 @@ class UserView(BaseView):
 
         :param start: The index of the library list to start on (int).  default: 0
         :param rows: The number of rows to return from the start point (int).  default: None (returns all libraries)
-
+        :param sort_col: Library column to sort on. default: date_created (date_created, date_last_modified)
+        :param sort_dir: Direction sort libraries. default: desc (asc, desc)
         :return: list of the users libraries with the relevant information
 
         Header:
@@ -200,9 +208,19 @@ class UserView(BaseView):
             get_params = request.args
             start = get_params.get('start', default=0, type=int)
             rows = get_params.get('rows', type=int)
+            
+            sort_col = get_params.get('sort', default='date_created', type=str)
+            if sort_col not in ['date_created', 'date_last_modified']: 
+                raise ValueError
+            
+            sort_order = get_params.get('order', default='asc', type=str)
+            if sort_order not in ['asc', 'desc']:
+                raise ValueError
+
             current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, rows))
+
         except ValueError:
-            msg = "Failed to parse input parameters: {}. Please confirm request is properly formatted.".format(request)
+            msg = "Failed to parse input parameters: {}. Please confirm the request is properly formatted.".format(request)
             current_app.logger.exception(msg)
             return err(BAD_PARAMS_ERROR)
 
@@ -210,7 +228,7 @@ class UserView(BaseView):
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
         user_libraries = self.get_libraries(service_uid=service_uid,
-                                            absolute_uid=user, start=start, rows=rows)
+                                            absolute_uid=user, start=start, rows=rows, sort_col=sort_col, sort_order=sort_order)
         return {'libraries': user_libraries}, 200
 
     def post(self):
