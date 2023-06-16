@@ -297,7 +297,7 @@ class LibraryView(BaseView):
         except ValueError:
             start = 0
             rows = 20
-            raw_library = False
+            raw_library = bool(request.args.get('raw', False))
 
         sort = request.args.get('sort', 'date desc')
         fl = request.args.get('fl', 'bibcode')
@@ -367,6 +367,9 @@ class LibraryView(BaseView):
                     documents = documents[start:start+rows]
             
             else:
+                solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
+                current_app.logger.warning('User: {0} requested only raw library output'
+                                            .format(user))
                 updates = {}
                 documents = library.get_bibcodes()
                 documents.sort()

@@ -53,7 +53,7 @@ API_MISSING_USER_UID = dict(
 )
 SOLR_RESPONSE_MISMATCH_ERROR = dict(
     body='Solr response does not contain the same number of bibcodes as the '
-         'request.',
+         'request, or only the raw library was requested.',
     number=404
 )
 NO_CLASSIC_ACCOUNT = dict(
