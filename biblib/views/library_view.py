@@ -292,6 +292,8 @@ class LibraryView(BaseView):
             )
             max_rows = int(max_rows)
             rows = min(int(request.args.get('rows', 20)), max_rows)
+            raw_library = bool(request.args.get('raw', False))
+
         except ValueError:
             start = 0
             rows = 20
@@ -327,35 +329,42 @@ class LibraryView(BaseView):
             )
             # pay attention to any functions that try to mutate the list
             # this will alter expected returns later
-            try:
-                solr = self.solr_big_query(
-                    bibcodes=library.bibcode,
-                    start=start,
-                    rows=rows,
-                    sort=sort,
-                    fl=fl
-                ).json()
-            except Exception as error:
-                current_app.logger.warning('Could not parse solr data: {0}'
-                                           .format(error))
-                solr = {'error': 'Could not parse solr data'}
+            if not raw_library:
+                try:
+                    solr = self.solr_big_query(
+                        bibcodes=library.bibcode,
+                        start=start,
+                        rows=rows,
+                        sort=sort,
+                        fl=fl
+                    ).json()
+                except Exception as error:
+                    current_app.logger.warning('Could not parse solr data: {0}'
+                                            .format(error))
+                    solr = {'error': 'Could not parse solr data'}
 
-            # Now check if we can update the library database based on the
-            # returned canonical bibcodes
-            if solr.get('response'):
-                # Update bibcodes based on solrs response
-                updates = self.solr_update_library(
-                    library_id=library.id,
-                    solr_docs=solr['response']['docs']
-                )
+                # Now check if we can update the library database based on the
+                # returned canonical bibcodes
+                if solr.get('response'):
+                    # Update bibcodes based on solrs response
+                    updates = self.solr_update_library(
+                        library_id=library.id,
+                        solr_docs=solr['response']['docs']
+                    )
 
-                documents = [i['bibcode'] for i in solr['response']['docs']]
+                    documents = [i['bibcode'] for i in solr['response']['docs']]
+                else:
+                    # Some problem occurred, we will just ignore it, but will
+                    # definitely log it.
+                    solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
+                    current_app.logger.warning('Problem with solr response: {0}'
+                                            .format(solr))
+                    updates = {}
+                    documents = library.get_bibcodes()
+                    documents.sort()
+                    documents = documents[start:start+rows]
+            
             else:
-                # Some problem occurred, we will just ignore it, but will
-                # definitely log it.
-                solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
-                current_app.logger.warning('Problem with solr response: {0}'
-                                           .format(solr))
                 updates = {}
                 documents = library.get_bibcodes()
                 documents.sort()
