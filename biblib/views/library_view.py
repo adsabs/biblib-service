@@ -297,6 +297,8 @@ class LibraryView(BaseView):
         except ValueError:
             start = 0
             rows = 20
+            raw_library = False
+
         sort = request.args.get('sort', 'date desc')
         fl = request.args.get('fl', 'bibcode')
         current_app.logger.info('User gave pagination parameters:'
