@@ -2,7 +2,7 @@
 Library view
 """
 from biblib.views import USER_ID_KEYWORD
-from biblib.utils import err
+from biblib.utils import err, check_boolean
 from biblib.models import User, Library, Permissions
 from biblib.client import client
 from biblib.views.base_view import BaseView
@@ -292,12 +292,13 @@ class LibraryView(BaseView):
             )
             max_rows = int(max_rows)
             rows = min(int(request.args.get('rows', 20)), max_rows)
-            raw_library = bool(request.args.get('raw', False))
+            raw_library = check_boolean(request.args.get('raw', 'false'))
 
         except ValueError:
+            current_app.logger.debug("Raised value error")
             start = 0
             rows = 20
-            raw_library = bool(request.args.get('raw', False))
+            raw_library = False
 
         sort = request.args.get('sort', 'date desc')
         fl = request.args.get('fl', 'bibcode')
@@ -305,7 +306,8 @@ class LibraryView(BaseView):
                                 'start: {}, '
                                 'rows: {}, '
                                 'sort: "{}", '
-                                'fl: "{}"'.format(start, rows, sort, fl))
+                                'fl: "{}", '
+                                'raw: "{}"'.format(start, rows, sort, fl, raw_library))
 
         try:
             library = self.helper_slug_to_uuid(library)
