@@ -14,7 +14,6 @@ from biblib.views.http_errors import DUPLICATE_LIBRARY_NAME_ERROR, \
 from biblib.tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint, MockClassicService, MockSolrQueryService
-from biblib.views import DocumentView
 from biblib.utils import get_item
 
 

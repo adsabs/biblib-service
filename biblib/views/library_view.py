@@ -369,8 +369,8 @@ class LibraryView(BaseView):
                     documents = documents[start:start+rows]
             
             else:
-                solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
-                current_app.logger.warning('User: {0} requested only raw library output'
+                solr = 'Only the raw library was requested.'
+                current_app.logger.info('User: {0} requested only raw library output'
                                             .format(user))
                 updates = {}
                 documents = library.get_bibcodes()
