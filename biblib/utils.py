@@ -5,6 +5,7 @@ project, and so do not belong to anything specific.
 """
 
 from collections import Counter
+import json
 
 def get_GET_params(request, types={}):
     """
@@ -101,3 +102,10 @@ def get_item(list_of_dictionaries, key):
     return next(
         item[key]for item in list_of_dictionaries if key in item.keys()
     )
+
+def check_boolean(value):
+    if str(value).lower() not in ['true', 'false']: 
+        raise ValueError
+    else:
+        #safe way to convert string to boolean
+        return json.loads(value.lower())

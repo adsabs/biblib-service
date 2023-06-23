@@ -14,7 +14,6 @@ from biblib.views.http_errors import DUPLICATE_LIBRARY_NAME_ERROR, \
 from biblib.tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint, MockClassicService, MockSolrQueryService
-from biblib.views import DocumentView
 from biblib.utils import get_item
 
 
@@ -238,6 +237,43 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('documents', response.json)
         self.assertIn('solr', response.json)
+
+    def test_get_raw_data_for_documents(self):
+        """
+        Test the /libraries/<> route to check that solr data is returned by
+        the service
+
+        :return: no return
+        """
+
+        # Stub data
+        stub_user = UserShop()
+        stub_library = LibraryShop(want_bibcode=True)
+
+        # Make the library
+        url = url_for('userview')
+        response = self.client.post(
+            url,
+            data=stub_library.user_view_post_data_json,
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        library_id = response.json['id']
+        for key in ['name', 'id', 'bibcode', 'description']:
+            self.assertIn(key, response.json)
+
+        # Check the library exists in the database
+        url = url_for('libraryview', library=library_id)
+        with MockSolrBigqueryService() as BQ, \
+                MockEmailService(stub_user, end_type='uid') as ES:
+            response = self.client.get(
+                url,
+                headers=stub_user.headers, query_string={"raw":"true"}
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('documents', response.json)
+        self.assertIn('solr', response.json)
+        self.assertEqual(response.json['solr'], 'Only the raw library was requested.')
 
     def test_pagination_when_someone_passes_strings(self):
         """
