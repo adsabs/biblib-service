@@ -1713,6 +1713,11 @@ class TestDocumentViews(TestCaseDatabase):
             library = session.query(Library).filter(Library.id == library_id).all()
             for _lib in library:
                 self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
+            #Check that timestamps have been assigned
+            for _lib in library:
+                for bib in _lib.bibcode:
+                    self.assertIn("timestamp", _lib.bibcode[bib].keys())
+                    self.assertEqual(type(_lib.bibcode[bib]["timestamp"]), float)
 
     def test_user_cannot_duplicate_same_document_in_library(self):
         """
