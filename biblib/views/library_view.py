@@ -335,6 +335,12 @@ class LibraryView(BaseView):
             raw_library = False
 
         sort = request.args.get('sort', 'date desc')
+        #timestamp sorting is handled in biblib so we need to change the sort to something SOLR understands.
+        if "time" in sort:
+            add_sort = sort 
+            sort = 'date desc'
+        else: add_sort = None
+        
         fl = request.args.get('fl', 'bibcode')
         current_app.logger.info('User gave pagination parameters:'
                                 'start: {}, '
