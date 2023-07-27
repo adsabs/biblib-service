@@ -389,6 +389,11 @@ class LibraryView(BaseView):
                         library_id=library.id,
                         solr_docs=solr['response']['docs']
                     )
+                    if add_sort:
+                        if 'asc' in add_sort: 
+                            solr = self.timestamp_sort(solr, library.id, reverse=True)
+                        else:
+                            solr = self.timestamp_sort(solr, library.id)
 
                     documents = [i['bibcode'] for i in solr['response']['docs']]
                 else:
