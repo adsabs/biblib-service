@@ -6,9 +6,11 @@ from biblib.utils import err, check_boolean
 from biblib.models import User, Library, Permissions
 from biblib.client import client
 from biblib.views.base_view import BaseView
+from datetime import datetime
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy import Boolean
+from sqlalchemy.orm.attributes import flag_modified
 from biblib.views.http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
     MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR, BAD_LIBRARY_ID_ERROR
 
@@ -164,7 +166,7 @@ class LibraryView(BaseView):
             current_app.logger.warn("SOLR bigquery returned status code {}. Stopping.".format(solr['response'].status_code))
 
         return solr
-
+        
     @staticmethod
     def solr_update_library(library_id, solr_docs):
         """
@@ -183,6 +185,7 @@ class LibraryView(BaseView):
         canonical_bibcodes = []
         alternate_bibcodes = {}
         new_bibcode = {}
+        default_timestamp = datetime.timestamp(datetime(2022,1,1))
 
         # Constants for the return dictionary
         num_updated = 0
@@ -201,7 +204,10 @@ class LibraryView(BaseView):
         with current_app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library_id).one()
             for bibcode in library.bibcode:
-
+                if "timestamp" not in library.bibcode[bibcode].keys():
+                    update = True
+                    library.bibcode[bibcode]["timestamp"] = default_timestamp
+                
                 # Skip if its already canonical
                 if bibcode in canonical_bibcodes:
                     new_bibcode[bibcode] = library.bibcode[bibcode]
@@ -228,6 +234,7 @@ class LibraryView(BaseView):
                 # Update the database
                 library.bibcode = new_bibcode
                 session.add(library)
+                flag_modified(library, "bibcode")
                 session.commit()
 
             updates = dict(
