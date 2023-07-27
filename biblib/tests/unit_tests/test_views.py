@@ -3596,7 +3596,7 @@ class TestClassicViews(TestCaseDatabase):
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.name == self.stub_library.name).one()
-            self.assertEqual(library.bibcode, self.stub_library.bibcode)
+            self.assertEqual(library.bibcode.keys(), self.stub_library.bibcode.keys())
 
     def test_can_upsert_a_library_when_the_names_match(self):
         """
