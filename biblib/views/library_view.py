@@ -185,7 +185,6 @@ class LibraryView(BaseView):
         canonical_bibcodes = []
         alternate_bibcodes = {}
         new_bibcode = {}
-        default_timestamp = datetime.timestamp(datetime(2022,1,1))
 
         # Constants for the return dictionary
         num_updated = 0
@@ -203,6 +202,8 @@ class LibraryView(BaseView):
 
         with current_app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library_id).one()
+            default_timestamp = datetime.timestamp(library.date_created)
+
             for bibcode in library.bibcode:
                 if "timestamp" not in library.bibcode[bibcode].keys():
                     update = True
