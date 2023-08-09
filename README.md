@@ -48,8 +48,22 @@ docker run -d -e POSTGRES_USER="postgres" -e POSTGRES_PASSWORD="postgres" -p 543
 docker exec -it postgres bash -c "psql -c \"CREATE ROLE biblib_service WITH LOGIN PASSWORD 'biblib_service';\""
 docker exec -it postgres bash -c "psql -c \"CREATE DATABASE biblib_service;\""
 docker exec -it postgres bash -c "psql -c \"GRANT CREATE ON DATABASE biblib_service TO biblib_service;\""
-python3 manage.py createdb
 ```
+
+Once the database has been created, `alembic` can be used to upgrade the database to the correct alembic revision
+```bash
+#In order for alembic to have access to the models metadata, the biblib-service directory must be added to the PYTHONPATH
+export PYTHONPATH=$(pwd):$PYTHONPATH
+alembic upgrade head
+```
+
+A new revision can be created by doing the following:
+```bash
+#In order for alembic to have access to the models metadata, the biblib-service directory must be added to the PYTHONPATH
+export PYTHONPATH=$(pwd):$PYTHONPATH
+alembic revision -m "<revision-name>" --autogenerate
+```
+
 A test version of the microservice can then be deployed using
 ```bash
 python3 wsgi.py
@@ -57,7 +71,7 @@ python3 wsgi.py
 
 ## deployment
 
-The only thing to take care of when making a deployment is the migration of the backend database. Libraries uses specific features of PostgreSQL, such as `UUID` and `JSON`-store, so you should think carefully if you wish to change the backend. The use of `flask-migrate` for database migrations has been replaced by directly calling `alembic`.  
+The only thing to take care of when making a deployment is the migration of the backend database. Libraries uses specific features of PostgreSQL, such as `UUID` and `JSON`-store, so you should think carefully if you wish to change the backend. **The use of `flask-migrate` for database migrations has been replaced by directly calling `alembic`.**  
 
 ## Feature additions
 
