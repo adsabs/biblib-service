@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.types import TypeDecorator, CHAR, String as StringType
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, UnicodeText, UniqueConstraint
 from sqlalchemy.orm import relationship, configure_mappers
 from sqlalchemy_continuum import make_versioned
 make_versioned(user_cls=None)
@@ -172,7 +172,52 @@ class User(Base):
         return '<User {0}, {1}>'\
             .format(self.id, self.absolute_uid)
 
+class Notes(Base): 
+    """ 
+    Notes table 
+    """
+             
+    __tablename__ = 'notes'
+    versioned = {}
+    id = Column(Integer, primary_key=True)
+    content = Column(UnicodeText)
+    bibcode = Column(String(50), nullable=False)
+    library_id = Column(GUID, ForeignKey('library.id'))
+    date_created = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+    date_last_modified = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
 
+    def __repr__(self):
+        return '<Note, Note id: {0}, library: {1}, bibcode: {2}, ' \
+        'content: {3}>'.format(self.id, 
+                            self.library, 
+                            self.bibcode, 
+                            self.content)
+    @classmethod
+    def create_unique(cls, session, content, bibcode, library): 
+        """
+        Creates a new note in the database
+        """
+        if bibcode not in library.bibcode.keys(): 
+            raise ValueError('Bibcode {0} not in library {1}'.format(bibcode, library))
+        existing_note = session.query(Notes).filter_by(bibcode=bibcode, library_id=library.id).first()
+
+        if existing_note:
+            raise ValueError("A note for the same bibcode and library already exists.")
+
+        note = Notes(content=content, bibcode=bibcode, library_id=library.id)
+        session.add(note)
+        session.commit()
+        return note
+          
 class Library(Base):
     """
     Library table
@@ -186,6 +231,9 @@ class Library(Base):
     description = Column(String(200))
     public = Column(Boolean)
     bibcode = Column(MutableDict.as_mutable(JSON), default={})
+    notes = relationship('Notes',
+                            backref='library',
+                            cascade='all, delete-orphan')
     date_created = Column(
         DateTime,
         nullable=False,
@@ -200,7 +248,7 @@ class Library(Base):
     permissions = relationship('Permissions',
                                   backref='library',
                                   cascade='delete')
-
+    
     def __repr__(self):
         return '<Library, library_id: {0} name: {1}, ' \
                'description: {2}, public: {3},' \
@@ -235,7 +283,7 @@ class Library(Base):
 
     def remove_bibcodes(self, bibcodes):
         """
-        Removes a bibcode(s) from the bibcode field.
+        Removes a bibcode(s) and their associated notes from the bibcode field.
 
         Given the way in which bibcodes are stored may change, it seems simpler
         to keep the method of adding/removing in a small wrapper so that only
@@ -243,7 +291,14 @@ class Library(Base):
 
         :param bibcodes: list of bibcodes
         """
-        [self.bibcode.pop(key, None) for key in bibcodes]
+
+        bibcode_to_notes = {note.bibcode: note for note in self.notes}
+    
+        for bibcode in bibcodes: 
+            if bibcode in bibcode_to_notes: 
+                note = bibcode_to_notes[bibcode]
+                self.notes.remove(note)
+            self.bibcode.pop(bibcode, None)
 
 
 class Permissions(Base):
