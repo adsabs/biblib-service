@@ -140,6 +140,13 @@ class LibraryView(BaseView):
 
     @staticmethod
     def get_alternate_bibcodes(solr_docs):
+        """
+        Gets all the alternate bibcodes from solr docs 
+        :param solr_docs: solr docs from the bigquery response
+    
+
+        :return: dict of alternate bibcodes and their corresponding canonical bibcodes {alternate_bibcode: canonical_bibcode}
+        """
         alternate_bibcodes = {} 
         for doc in solr_docs:
             canonical_bibcode = doc['bibcode']
@@ -151,20 +158,23 @@ class LibraryView(BaseView):
     
     @staticmethod
     def update_notes(session, library, updated_list):
-        # Get all notes in library
+        """
+        Updates the notes based on the solr canonical bibcodes response
+        :param session: necessary for all the queries 
+        :param library: library of the library to update
+        :param updated_list: update_list: list of changed bibcodes {'before': 'after'}
+
+        :return: updated_notes: list with all the notes that have been updated 
+        """
         notes = session.query(Notes).filter(Notes.library_id == library.id).all() 
-        # Turn updated list into dictionary for faster lookup 
         updated_dict = {}
 
         for list_item in updated_list: 
             for key, value in list_item.items(): 
                 updated_dict[key] = value
         
-        # Create updated_notes list to be returned 
         updated_notes = []
-        # For notes in library 
         for note in notes: 
-            # If its bibcode was updated 
             if note.bibcode in updated_dict:  
                 updated_notes.append(note)
                 canonical_bibcode = updated_dict[note.bibcode]
@@ -230,10 +240,26 @@ class LibraryView(BaseView):
 
             if updates['update_list']:                
                 LibraryView.update_database(session, library, new_library_bibcodes, updates)
+
+            breakpoint()
+
             return updates
         
     @staticmethod
     def update_database(session, library, new_library_bibcodes, updates):
+        """
+        Carries the actual database update for the library and notes tables. 
+        :param session: Necessary for the updates 
+        :param library: Library to update
+        :param new_library_bibcodes: The updated versions of all the bibcodes in the library
+        :
+
+        :return: dictionary with details of files modified
+                 num_updated: number of documents modified
+                 duplicates_removed: number of files removed for duplication
+                 update_list: list of changed bibcodes {'before': 'after'}
+        """
+
         library.bibcode = new_library_bibcodes
         session.add(library)
         session.commit()

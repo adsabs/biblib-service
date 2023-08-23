@@ -1292,12 +1292,15 @@ class TestLibraryViews(TestCaseDatabase):
 
             self.assertUnsortedEqual(library.bibcode, result)
 
-    def test_that_solr_updates_canonical_bibcodes_with_multi_alternates(self): # in canonical and not in canonical and not in alternates
+    def test_that_solr_updates_canonical_bibcodes_with_multi_alternates(self): 
         """
         Tests that a comparison between the solr data and the stored data is
         carried out. Mismatching documents are then updated appropriately.
         This specifically considers the case when fewer documents are returned
         as there exists two alternates.
+
+        It also tests that the notes are updated accordingly. 
+        Meaning that their content will be merged if the bibcodes are updated.
 
         :return: no return
         """
