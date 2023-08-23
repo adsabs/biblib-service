@@ -4,7 +4,7 @@ Tests Views of the application
 
 import unittest
 import uuid
-from biblib.models import User, Library, Permissions, MutableDict
+from biblib.models import User, Library, Permissions, MutableDict, Notes
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
@@ -1174,7 +1174,9 @@ class TestLibraryViews(TestCaseDatabase):
             library = Library(name='MyLibrary',
                               description='My library',
                               public=True,
-                              bibcode={k: {} for k in original_bibcodes})
+                              bibcode={bibcode: {} for bibcode in original_bibcodes})
+            
+            
 
             # Give the user and library permissions
             permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
@@ -1185,38 +1187,46 @@ class TestLibraryViews(TestCaseDatabase):
 
             session.add_all([library, permission, user])
             session.commit()
+
+            note = Notes.create_unique(session=session, library=library, content='arxivtest3content', bibcode='arXivtest3')
+
             for obj in [library, permission, user]:
                 session.refresh(obj)
                 session.expunge(obj)
 
-        # Retrieve the bibcodes using the web services
-        with MockSolrBigqueryService(solr_docs=solr_docs):
-            response_library = self.library_view.solr_big_query(
-                bibcodes=library.bibcode
-            ).json()
-        self.assertIn('responseHeader', response_library)
+            # Retrieve the bibcodes using the web services
+            with MockSolrBigqueryService(solr_docs=solr_docs):
+                response_library = self.library_view.solr_big_query(
+                    bibcodes=library.bibcode
+                ).json()
+            self.assertIn('responseHeader', response_library)
 
-        # Now check solr updates the records correctly
-        solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library_id=library.id,
-                                                        solr_docs=solr_docs)
+            # Now check solr updates the records correctly
+            solr_docs = response_library['response']['docs']
+            updates = self.library_view.solr_update_library(library_id=library.id,
+                                                            solr_docs=solr_docs)
 
-        # Check the data returned is correct on what files were updated and why
-        self.assertEqual(updates['num_updated'], 1)
-        self.assertEqual(updates['duplicates_removed'], 0)
-        update_list = updates['update_list']
-        self.assertEqual(update_list[0]['arXivtest3'],
-                         'test3')
+            # Check the data returned is correct on what files were updated and why
+            self.assertEqual(updates['num_updated'], 1)
+            self.assertEqual(updates['duplicates_removed'], 0)
+            self.assertEqual(updates['updated_notes'], [note])
+            update_list = updates['update_list']
+            self.assertEqual(update_list[0]['arXivtest3'],
+                            'test3')
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library.id).one()
+            notes = session.query(Notes).filter(Notes.library_id == library.id).all()
+
+            self.assertEqual(len(notes), 2)
+            self.assertUnsortedEqual([note.bibcode for note in notes], ['test3', 'arXivtest3'])
 
             self.assertUnsortedNotEqual(library.get_bibcodes(),
                                         original_bibcodes)
             self.assertUnsortedEqual(library.get_bibcodes(),
                                      canonical_bibcodes)
-
-    def test_that_solr_updates_canonical_bibcodes_with_multi_alternates(self):
+            
+    def test_that_solr_maintains_bibcode_info(self):
         """
         Tests that a comparison between the solr data and the stored data is
         carried out. Mismatching documents are then updated appropriately.
@@ -1232,7 +1242,73 @@ class TestLibraryViews(TestCaseDatabase):
             session.add(user)
             session.commit()
 
-            original_bibcodes = ['test1', 'test2', 'arXivtest3', 'conftest3']
+            original_bibcodes = ['test1', 'test2', 'arXivtest3']
+            result = {'test1': {'0': 0}, 'test2': {'1': 1}, 'test3': {'2': 2}}
+            solr_docs = [
+                {'bibcode': 'test1'},
+                {'bibcode': 'test2'},
+                {'bibcode': 'test3', 'alternate_bibcode': ['arXivtest3']}
+            ]
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={k: {} for k in original_bibcodes})
+            
+            for i, element in enumerate(library.bibcode):
+                library.bibcode[element] = {i: i}
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+
+        # Retrieve the bibcodes using the web services
+        with MockSolrBigqueryService(solr_docs=solr_docs):
+            response_library = self.library_view.solr_big_query(
+                bibcodes=library.bibcode
+            ).json()
+        self.assertIn('responseHeader', response_library)
+
+        # Now check solr updates the records correctly
+        solr_docs = response_library['response']['docs']
+        updates = self.library_view.solr_update_library(library_id=library.id,
+                                                        solr_docs=solr_docs)
+        
+        self.assertEqual(len(updates['update_list']), 1)
+
+        with self.app.session_scope() as session:
+            library = session.query(Library).filter(Library.id == library.id).one()
+
+            self.assertUnsortedEqual(library.bibcode, result)
+
+    def test_that_solr_updates_canonical_bibcodes_with_multi_alternates(self): # in canonical and not in canonical and not in alternates
+        """
+        Tests that a comparison between the solr data and the stored data is
+        carried out. Mismatching documents are then updated appropriately.
+        This specifically considers the case when fewer documents are returned
+        as there exists two alternates.
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            original_bibcodes = ['test1', 'test2', 'test3', 'arXivtest3', 'conftest3']
             canonical_bibcodes = ['test1', 'test2', 'test3']
             solr_docs = [
                 {'bibcode': 'test1'},
@@ -1256,37 +1332,48 @@ class TestLibraryViews(TestCaseDatabase):
 
             session.add_all([library, permission, user])
             session.commit()
+
+            Notes.create_unique(session=session, library=library, content='test3content', bibcode='test3')
+            Notes.create_unique(session=session, library=library, content='arxivtest3content', bibcode='arXivtest3')
+            Notes.create_unique(session=session, library=library, content='conftest3content', bibcode='conftest3')
+
             for obj in [library, permission, user]:
                 session.refresh(obj)
                 session.expunge(obj)
+             
+            # Retrieve the bibcodes using the web services
+            with MockSolrBigqueryService(solr_docs=solr_docs):
+                response_library = self.library_view.solr_big_query(
+                    bibcodes=library.bibcode
+                ).json()
+            self.assertIn('responseHeader', response_library)
 
-        # Retrieve the bibcodes using the web services
-        with MockSolrBigqueryService(solr_docs=solr_docs):
-            response_library = self.library_view.solr_big_query(
-                bibcodes=library.bibcode
-            ).json()
-        self.assertIn('responseHeader', response_library)
+            # Now check solr updates the records correctly
+            solr_docs = response_library['response']['docs']
+            updates = self.library_view.solr_update_library(library_id=library.id,
+                                                            solr_docs=solr_docs)
 
-        # Now check solr updates the records correctly
-        solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library_id=library.id,
-                                                        solr_docs=solr_docs)
+            self.assertEqual(updates['num_updated'], 2)
+            self.assertEqual(updates['duplicates_removed'], 2)
+            update_list = updates['update_list']
 
-        self.assertEqual(updates['num_updated'], 2)
-        self.assertEqual(updates['duplicates_removed'], 1)
-        update_list = updates['update_list']
-
-        self.assertEqual(
-            get_item(update_list, 'arXivtest3'),
-            'test3'
-        )
-        self.assertEqual(
-            get_item(update_list, 'conftest3'),
-            'test3'
-        )
+            self.assertEqual(
+                get_item(update_list, 'arXivtest3'),
+                'test3'
+            )
+            self.assertEqual(
+                get_item(update_list, 'conftest3'),
+                'test3'
+            )
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library.id).one()
+
+            notes = session.query(Notes).filter(Notes.library_id ==library.id).all()
+
+            self.assertEqual(len(notes), 3)
+            self.assertUnsortedEqual([note.bibcode for note in notes], ['test3', 'arXivtest3', 'conftest3'])
+            self.assertUnsortedEqual([note.content for note in notes], ['arxivtest3content', 'conftest3content', 'test3content arxivtest3content conftest3content'])
 
             self.assertUnsortedNotEqual(library.get_bibcodes(),
                                         original_bibcodes)

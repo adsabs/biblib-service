@@ -211,7 +211,7 @@ class Notes(Base):
         existing_note = session.query(Notes).filter_by(bibcode=bibcode, library_id=library.id).first()
 
         if existing_note:
-            raise ValueError("A note for the same bibcode and library already exists.")
+            raise ValueError('A note for the same bibcode {0}  and library {1} already exists.'.format(bibcode, library))
 
         note = Notes(content=content, bibcode=bibcode, library_id=library.id)
         session.add(note)

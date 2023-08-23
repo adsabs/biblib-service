@@ -3,7 +3,7 @@ Library view
 """
 from biblib.views import USER_ID_KEYWORD
 from biblib.utils import err, check_boolean
-from biblib.models import User, Library, Permissions
+from biblib.models import User, Library, Permissions, Notes
 from biblib.client import client
 from biblib.views.base_view import BaseView
 from flask import request, current_app
@@ -139,6 +139,51 @@ class LibraryView(BaseView):
         return False
 
     @staticmethod
+    def get_alternate_bibcodes(solr_docs):
+        alternate_bibcodes = {} 
+        for doc in solr_docs:
+            canonical_bibcode = doc['bibcode']
+            if doc.get('alternate_bibcode'):
+                alternate_bibcodes.update(
+                    {alternate_bibcode: canonical_bibcode for alternate_bibcode in doc['alternate_bibcode']}
+                )
+        return alternate_bibcodes
+    
+    @staticmethod
+    def update_notes(session, library, updated_list):
+        # Get all notes in library
+        notes = session.query(Notes).filter(Notes.library_id == library.id).all() 
+        # Turn updated list into dictionary for faster lookup 
+        updated_dict = {}
+
+        for list_item in updated_list: 
+            for key, value in list_item.items(): 
+                updated_dict[key] = value
+        
+        # Create updated_notes list to be returned 
+        updated_notes = []
+        # For notes in library 
+        for note in notes: 
+            # If its bibcode was updated 
+            if note.bibcode in updated_dict:  
+                updated_notes.append(note)
+                canonical_bibcode = updated_dict[note.bibcode]
+                canonical_note = session.query(Notes).filter(Notes.library_id == library.id, 
+                                                             Notes.bibcode == canonical_bibcode).one_or_none()
+                if not canonical_note: 
+                    new_note = Notes.create_unique(session=session, 
+                                                content=note.content, 
+                                                bibcode=canonical_bibcode, 
+                                                library=note.library)
+                    session.add(new_note)
+                else: 
+                    canonical_note.content = '{0} {1}'.format(canonical_note.content, note.content)
+                
+        session.commit()
+        return updated_notes
+
+
+    @staticmethod
     def solr_update_library(library_id, solr_docs):
         """
         Updates the library based on the solr canonical bibcodes response
@@ -152,64 +197,48 @@ class LibraryView(BaseView):
         """
 
         # Definitions
-        update = False
-        canonical_bibcodes = []
-        alternate_bibcodes = {}
-        new_bibcode = {}
+        new_library_bibcodes = {}
 
-        # Constants for the return dictionary
-        num_updated = 0
-        duplicates_removed = 0
-        update_list = []
-
-        # Extract the canonical bibcodes and create a hashmap for the
-        # alternate bibcodes
-        for doc in solr_docs:
-            canonical_bibcodes.append(doc['bibcode'])
-            if doc.get('alternate_bibcode'):
-                alternate_bibcodes.update(
-                    {i: doc['bibcode'] for i in doc['alternate_bibcode']}
-                )
+        # Output dictionary
+        updates = dict(
+                num_updated=0,
+                duplicates_removed=0,
+                update_list=[],
+                updated_notes=[]
+            )
+        # Extract the canonical bibcodes and create a hashmap 
+        # in which the alternate bibcode is the key and the canonical bibcode is the value
+        alternate_bibcodes = LibraryView.get_alternate_bibcodes(solr_docs)
 
         with current_app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library_id).one()
             for bibcode in library.bibcode:
 
-                # Skip if its already canonical
-                if bibcode in canonical_bibcodes:
-                    new_bibcode[bibcode] = library.bibcode[bibcode]
-                    continue
-
                 # Update if its an alternate
-                if bibcode in alternate_bibcodes.keys():
-                    update = True
-                    num_updated += 1
-                    update_list.append({bibcode: alternate_bibcodes[bibcode]})
+                if bibcode in alternate_bibcodes:
+                    canonical = alternate_bibcodes[bibcode]
+                    updates['num_updated'] += 1
+                    updates['update_list'].append({bibcode: canonical})
 
-                    # Only add the bibcode if it is not there
-                    if alternate_bibcodes[bibcode] not in new_bibcode:
-                        new_bibcode[alternate_bibcodes[bibcode]] = \
-                            library.bibcode[bibcode]
+                    # Only add the bibcode to the library if it is not there
+                    if canonical not in new_library_bibcodes:
+                        new_library_bibcodes[canonical] = library.bibcode[bibcode]
                     else:
-                        duplicates_removed += 1
+                        updates['duplicates_removed'] += 1
+                else:
+                    new_library_bibcodes[bibcode] = library.bibcode[bibcode]
 
-                elif bibcode not in canonical_bibcodes and\
-                        bibcode not in alternate_bibcodes.keys():
-                    new_bibcode[bibcode] = library.bibcode[bibcode]
-
-            if update:
-                # Update the database
-                library.bibcode = new_bibcode
-                session.add(library)
-                session.commit()
-
-            updates = dict(
-                num_updated=num_updated,
-                duplicates_removed=duplicates_removed,
-                update_list=update_list
-            )
-
+            if updates['update_list']:                
+                LibraryView.update_database(session, library, new_library_bibcodes, updates)
             return updates
+        
+    @staticmethod
+    def update_database(session, library, new_library_bibcodes, updates):
+        library.bibcode = new_library_bibcodes
+        session.add(library)
+        session.commit()
+
+        updates['updated_notes'] = LibraryView.update_notes(session, library, updates['update_list'])
 
     # Methods
     def get(self, library):
