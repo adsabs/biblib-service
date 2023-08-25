@@ -46,7 +46,8 @@ class LibraryView(BaseView):
                 .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True))\
                 .one()
             owner_permissions, owner = result
-
+            
+            # Format service for later call
             service = '{api}/{uid}'.format(
                 api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
                 uid=owner.absolute_uid
@@ -58,7 +59,7 @@ class LibraryView(BaseView):
                 service
             )
 
-            # For this library get all the people who have permissions
+            # Get all the people who have permissions in this library
             users = session.query(Permissions).filter_by(
                 library_id = library.id
             ).all()
@@ -71,32 +72,26 @@ class LibraryView(BaseView):
                 owner = response.json()['email'].split('@')[0]
 
             # User requesting to see the content
+            main_permission = 'none'
             if service_uid:
-                try:
-                    permission = session.query(Permissions).filter(
-                        Permissions.user_id == service_uid
-                    ).filter(
-                        Permissions.library_id == library_id
-                    ).one()
+                
+                permission = session.query(Permissions).filter(
+                    Permissions.user_id == service_uid
+                ).filter(
+                    Permissions.library_id == library_id
+                ).one_or_none()
 
-                    if permission.permissions['owner']:
-                        main_permission = 'owner'
-                    elif permission.permissions['admin']:
-                        main_permission = 'admin'
-                    elif permission.permissions['write']:
-                        main_permission = 'write'
-                    elif permission.permissions['read']:
-                        main_permission = 'read'
-                    else:
-                        main_permission = 'none'
-                except:
-                    main_permission = 'none'
-            else:
-                main_permission = 'none'
+                if permission and permission.permissions['owner']:
+                    main_permission = 'owner'
+                elif permission and permission.permissions['admin']:
+                    main_permission = 'admin'
+                elif permission and permission.permissions['write']:
+                    main_permission = 'write'
+                elif permission and permission.permissions['read']:
+                    main_permission = 'read'
+                   
 
-            if main_permission == 'owner' or main_permission == 'admin':
-                num_users = len(users)
-            elif library.public:
+            if main_permission in ['owner', 'admin'] or library.public:
                 num_users = len(users)
             else:
                 num_users = 0
@@ -241,8 +236,6 @@ class LibraryView(BaseView):
             if updates['update_list']:                
                 LibraryView.update_database(session, library, new_library_bibcodes, updates)
 
-            breakpoint()
-
             return updates
         
     @staticmethod
@@ -266,6 +259,34 @@ class LibraryView(BaseView):
 
         updates['updated_notes'] = LibraryView.update_notes(session, library, updates['update_list'])
 
+    @staticmethod
+    def load_parameters(request): 
+        try:
+            start = int(request.args.get('start', 0))
+            max_rows = current_app.config.get('BIBLIB_MAX_ROWS', 100)
+            max_rows *= float(
+                request.headers.get('X-Adsws-Ratelimit-Level', 1.0)
+            )
+            max_rows = int(max_rows)
+            rows = min(int(request.args.get('rows', 20)), max_rows)
+            raw_library = check_boolean(request.args.get('raw', 'false'))
+
+        except ValueError:
+            current_app.logger.debug("Raised value error")
+            start = 0
+            rows = 20
+            raw_library = False
+
+        sort = request.args.get('sort', 'date desc')
+        fl = request.args.get('fl', 'bibcode')
+        current_app.logger.info('User gave pagination parameters:'
+                                'start: {}, '
+                                'rows: {}, '
+                                'sort: "{}", '
+                                'fl: "{}", '
+                                'raw: "{}"'.format(start, rows, sort, fl, raw_library))
+        return start, rows, sort, fl, raw_library
+    
     # Methods
     def get(self, library):
         """
@@ -316,6 +337,9 @@ class LibraryView(BaseView):
                                           bibcode (key) and the updated bibcode
                                           now being stored (item)
 
+          updated_notes:        <list>    List of all the notes that have been updated 
+
+
         Permissions:
         -----------
         The following type of user can read a library:
@@ -332,6 +356,7 @@ class LibraryView(BaseView):
         - fl: 'bibcode'
 
         """
+        # Get user 
         try:
             user = int(request.headers[USER_ID_KEYWORD])
         except KeyError:
@@ -339,31 +364,9 @@ class LibraryView(BaseView):
             return err(MISSING_USERNAME_ERROR)
 
         # Parameters to be forwarded to Solr: pagination, and fields
-        try:
-            start = int(request.args.get('start', 0))
-            max_rows = current_app.config.get('BIBLIB_MAX_ROWS', 100)
-            max_rows *= float(
-                request.headers.get('X-Adsws-Ratelimit-Level', 1.0)
-            )
-            max_rows = int(max_rows)
-            rows = min(int(request.args.get('rows', 20)), max_rows)
-            raw_library = check_boolean(request.args.get('raw', 'false'))
-
-        except ValueError:
-            current_app.logger.debug("Raised value error")
-            start = 0
-            rows = 20
-            raw_library = False
-
-        sort = request.args.get('sort', 'date desc')
-        fl = request.args.get('fl', 'bibcode')
-        current_app.logger.info('User gave pagination parameters:'
-                                'start: {}, '
-                                'rows: {}, '
-                                'sort: "{}", '
-                                'fl: "{}", '
-                                'raw: "{}"'.format(start, rows, sort, fl, raw_library))
-
+        start, rows, sort, fl, raw_library = LibraryView.load_parameters(request)
+        
+        # Get library
         try:
             library = self.helper_slug_to_uuid(library)
         except TypeError:
@@ -372,6 +375,7 @@ class LibraryView(BaseView):
         current_app.logger.info('User: {0} requested library: {1}'
                                 .format(user, library))
 
+        # If user exists, get their service uid 
         user_exists = self.helper_user_exists(absolute_uid=user)
         if user_exists:
             service_uid = \
@@ -411,7 +415,7 @@ class LibraryView(BaseView):
                         solr_docs=solr['response']['docs']
                     )
 
-                    documents = [i['bibcode'] for i in solr['response']['docs']]
+                    documents = [doc['bibcode'] for doc in solr['response']['docs']]
                 else:
                     # Some problem occurred, we will just ignore it, but will
                     # definitely log it.
