@@ -132,7 +132,7 @@ class LibraryView(BaseView):
                 return True
 
         return False
-
+    
     @staticmethod
     def get_alternate_bibcodes(solr_docs):
         """
@@ -187,6 +187,27 @@ class LibraryView(BaseView):
         session.commit()
         return updated_notes
 
+    @staticmethod
+    def update_database(session, library, new_library_bibcodes, updates):
+        """
+        Carries the actual database update for the library and notes tables. 
+        :param session: Necessary for the updates 
+        :param library: Library to update
+        :param new_library_bibcodes: The updated versions of all the bibcodes in the library
+        :
+
+        :return: dictionary with details of files modified
+                 num_updated: number of documents modified
+                 duplicates_removed: number of files removed for duplication
+                 update_list: list of changed bibcodes {'before': 'after'}
+        """
+
+        library.bibcode = new_library_bibcodes
+        session.add(library)
+        session.commit()
+
+        updates['updated_notes'] = LibraryView.update_notes(session, library, updates['update_list'])
+
 
     @staticmethod
     def solr_update_library(library_id, solr_docs):
@@ -238,29 +259,15 @@ class LibraryView(BaseView):
 
             return updates
         
-    @staticmethod
-    def update_database(session, library, new_library_bibcodes, updates):
-        """
-        Carries the actual database update for the library and notes tables. 
-        :param session: Necessary for the updates 
-        :param library: Library to update
-        :param new_library_bibcodes: The updated versions of all the bibcodes in the library
-        :
-
-        :return: dictionary with details of files modified
-                 num_updated: number of documents modified
-                 duplicates_removed: number of files removed for duplication
-                 update_list: list of changed bibcodes {'before': 'after'}
-        """
-
-        library.bibcode = new_library_bibcodes
-        session.add(library)
-        session.commit()
-
-        updates['updated_notes'] = LibraryView.update_notes(session, library, updates['update_list'])
-
-    @staticmethod
-    def load_parameters(request): 
+    def get_user_id_from_headers(self, request): 
+        try:
+            user = int(request.headers[USER_ID_KEYWORD])
+            return user, None
+        except KeyError:
+            current_app.logger.error('No username passed')
+            return None, err(MISSING_USERNAME_ERROR)
+        
+    def load_parameters(self, request): 
         try:
             start = int(request.args.get('start', 0))
             max_rows = current_app.config.get('BIBLIB_MAX_ROWS', 100)
@@ -287,19 +294,14 @@ class LibraryView(BaseView):
                                 'raw: "{}"'.format(start, rows, sort, fl, raw_library))
         return start, rows, sort, fl, raw_library
     
-    def get_user_id_from_headers(self): 
+    def get_library_from_slug(self, user, library):
         try:
-            return int(request.headers[USER_ID_KEYWORD])
-        except KeyError:
-            current_app.logger.error('No username passed')
-            return err(MISSING_USERNAME_ERROR)
-    
-    def get_library_from_slug(self, library):
-        # Get library
-        try:
-            return self.helper_slug_to_uuid(library)
+            library = self.helper_slug_to_uuid(library)
+            current_app.logger.info('User: {0} requested library: {1}'
+                                .format(user, library))
+            return library, None
         except TypeError:
-            return err(BAD_LIBRARY_ID_ERROR)
+            return None, err(BAD_LIBRARY_ID_ERROR)
         
     def get_service_uid(self, user): 
         # If user exists, get their service uid 
@@ -307,69 +309,6 @@ class LibraryView(BaseView):
         if user_exists:
             return self.helper_absolute_uid_to_service_uid(absolute_uid=user) 
         
-    def process_library(self, user, service_uid, library_id, start, rows, sort, fl, raw_library):
-        updates = {}
-        documents = []
-        # Try to load the dictionary and obtain the solr content
-        library, metadata = self.get_documents_from_library(
-            library_id=library_id,
-            service_uid=service_uid
-        )
-        if raw_library: 
-            solr = 'Only the raw library was requested.'
-            current_app.logger.info('User: {0} requested only raw library output'
-                                        .format(user))
-        else: 
-            solr, updates, documents = self._process_library_with_solr(library, start, rows, sort, fl)
-
-        if not documents: 
-            documents = library.get_bibcodes() 
-            documents.sort() 
-            documents = documents[start:start+rows] 
-
-        response = {
-            'documents': documents, 
-            'solr': solr, 
-            'metadata': metadata, 
-            'updates': updates
-        }
-        return response
-    
-    def _process_library_with_solr(self, library, start, rows, sort, fl, updates, documents): 
-        try:
-            solr = self.solr_big_query(
-                bibcodes=library.bibcode,
-                start=start,
-                rows=rows,
-                sort=sort,
-                fl=fl
-            ).json()
-
-            # Now check if we can update the library database based on the
-            # returned canonical bibcodes
-            if solr.get('response'):
-                # Update bibcodes based on solrs response
-                updates = self.solr_update_library(
-                    library_id=library.id,
-                    solr_docs=solr['response']['docs']
-                )
-                documents = [doc['bibcode'] for doc in solr['response']['docs']]
-            else:
-                # Some problem occurred, we will log it
-                solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
-                current_app.logger.warning('Problem with solr response: {0}'
-                                        .format(solr))
-        except Exception as error:
-            current_app.logger.warning('Could not parse solr data: {0}'
-                                    .format(error))
-            solr = {'error': 'Could not parse solr data'}
-        return solr, updates, documents 
-    
-
-    def has_readonly_all_libraries_token(self):
-        special_token = current_app.config.get('READONLY_ALL_LIBRARIES_TOKEN')
-        return special_token and request.headers.get('Authorization', '').endswith(special_token)
-    
     def has_read_access(self, service_uid, library):
         if not self.read_access(service_uid=service_uid,
                                 library_id=library.id):
@@ -387,7 +326,125 @@ class LibraryView(BaseView):
                                         'privileges to view the library: {1}'
                                         .format(user, library.id))
         return err(NO_PERMISSION_ERROR)
+    
+    def process_solr(self, library, start, rows, sort, fl):
+        try:
+            solr = self.solr_big_query(
+                bibcodes=library.bibcode,
+                start=start,
+                rows=rows,
+                sort=sort,
+                fl=fl
+            ).json()
+        except Exception as error:
+            current_app.logger.warning('Could not parse solr data: {0}'
+                                    .format(error))
+            solr = {'error': 'Could not parse solr data'}
 
+        # Now check if we can update the library database based on the
+        # returned canonical bibcodes
+        if solr.get('response'):
+            # Update bibcodes based on solr's response
+            updates = self.solr_update_library(
+                library_id=library.id,
+                solr_docs=solr['response']['docs']
+            )
+
+            documents = [i['bibcode'] for i in solr['response']['docs']]
+        else:
+            # Some problem occurred, we will just ignore it, but will
+            # definitely log it.
+            solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
+            current_app.logger.warning('Problem with solr response: {0}'
+                                    .format(solr))
+            updates = {}
+            documents = library.get_bibcodes()
+            documents.sort()
+            documents = documents[start:start+rows]
+        return solr, updates, documents
+    
+    def process_raw_library(self, user, library, start, rows):
+        solr = 'Only the raw library was requested.'
+        current_app.logger.info('User: {0} requested only raw library output'
+                                    .format(user))
+        updates = {}
+        documents = library.get_bibcodes()
+        documents.sort()
+        documents = documents[start:start+rows]
+        return solr, updates, documents
+
+    def process_library_request(self, user, service_uid, library,
+                            start, rows, sort, fl, raw_library):
+        try:
+            # If the library is public, allow access
+            library, metadata = self.get_documents_from_library(
+                library_id=library,
+                service_uid=service_uid
+            )
+            # Try to load the dictionary and obtain the solr content
+            
+            # pay attention to any functions that try to mutate the list
+            # this will alter expected returns later
+            if not raw_library:
+                solr, updates, documents = self.process_solr(library, start, rows, sort, fl)
+            else:
+                solr, updates, documents = self.process_raw_library(user, library, start, rows)
+                
+
+            # Make the response dictionary
+            response = dict(
+                documents=documents,
+                solr=solr,
+                metadata=metadata,
+                updates=updates
+            )
+
+            return library, response, None
+
+        except Exception as error:
+            current_app.logger.warning(
+                'Library missing or solr endpoint failed: {0}'
+                .format(error)
+            )
+            
+            return library, None, err(MISSING_LIBRARY_ERROR)
+        
+    def is_library_public_or_has_special_token(self, library, request):
+        special_token = current_app.config.get('READONLY_ALL_LIBRARIES_TOKEN')
+        return library.public or (
+            special_token and request.headers.get('Authorization', '').endswith(special_token)
+        )
+    
+
+    def handle_no_permission(self, user, service_uid, library):
+        if not self.check_user_and_access(user, service_uid, library):
+            return err(NO_PERMISSION_ERROR)
+
+    def check_user_and_access(self, user, service_uid, library):
+        return self.check_user_has_read_access(service_uid, library) and \
+            self.check_user_exists_and_has_permissions(user, library)
+            
+
+    def check_user_exists_and_has_permissions(self, user, library):
+        if not self.helper_user_exists(absolute_uid=user):
+            current_app.logger.error(
+                'User: {0} does not exist in the database. '
+                'Therefore will not have extra privileges to view the library: {1}'
+                .format(user, library.id)
+            )
+            return False
+
+        return True
+
+    def check_user_has_read_access(self, service_uid, library):
+        if not self.read_access(service_uid=service_uid, library_id=library.id):
+            current_app.logger.error(
+                'User: {0} does not have access to library: {1}. DENIED'
+                .format(service_uid, library.id)
+            )
+            return False
+
+        return True
 
     # Methods
     def get(self, library):
@@ -439,9 +496,6 @@ class LibraryView(BaseView):
                                           bibcode (key) and the updated bibcode
                                           now being stored (item)
 
-          updated_notes:        <list>    List of all the notes that have been updated 
-
-
         Permissions:
         -----------
         The following type of user can read a library:
@@ -458,37 +512,42 @@ class LibraryView(BaseView):
         - fl: 'bibcode'
 
         """
+
+        # Get user 
+        user, user_error = self.get_user_id_from_headers(request)
+        if user_error: 
+            return user_error
         
-        user = self.get_user_id_from_headers()
         # Parameters to be forwarded to Solr: pagination, and fields
-        start, rows, sort, fl, raw_library = LibraryView.load_parameters(request)
-        library = self.get_library_from_slug(library)
-        current_app.logger.info('User: {0} requested library: {1}'
-                                .format(user, library))
-        
-        service_uid = self.get_service_uid(user)
+        start, rows, sort, fl, raw_library = self.load_parameters(request)
 
-        if not service_uid or not self.has_read_access(service_uid, library_id=library.id):
-            # no_service_uid is going to be True if service_uid is False
-            no_service_uid = not service_uid 
-            return self.handle_no_permission(user, library, no_service_uid) 
-        
-        try: 
-            response = self.process_library(user, service_uid, library, start, rows, sort, fl, raw_library)
-        except Exception as error: 
-            current_app.logger.warning(
-                'Library missing or solr endpoint failed: {0}'
-                .format(error)
-            )
-            return err(MISSING_LIBRARY_ERROR)
+        # Get library 
+        library, library_error = self.get_library_from_slug(user, library)
+        if library_error: 
+            return library_error
 
-    
-        if library.public or self.has_readonly_all_libraries_token():
+        # Get user id for service 
+        service_uid = self.get_service_uid(user) 
+
+        library, response, solr_error = self.process_library_request(user, service_uid, library,
+                            start, rows, sort, fl, raw_library)
+        
+        if solr_error: 
+            return solr_error
+
+        # Skip anymore logic if the library is public or the exception token is present
+        if self.is_library_public_or_has_special_token(library, request):
             current_app.logger.info('Library: {0} is public'
                                     .format(library.id))
-        else:
-            current_app.logger.warning('Library: {0} is private'
-                                       .format(library.id)) 
+            return response, 200
+        
+        current_app.logger.warning('Library: {0} is private'.format(library.id))
+        
+        service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
+
+        no_permission = self.handle_no_permission(user, service_uid, library)
+        if no_permission: 
+            return no_permission
 
         # If they have access, let them obtain the requested content
         current_app.logger.info('User: {0} has access to library: {1}. '
