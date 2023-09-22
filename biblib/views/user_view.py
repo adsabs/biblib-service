@@ -163,8 +163,8 @@ class UserView(BaseView):
 
         :param start: The index of the library list to start on (int).  default: 0
         :param rows: The number of rows to return from the start point (int).  default: None (returns all libraries)
-        :param sort_col: Library column to sort on. default: date_created (date_created, date_last_modified)
-        :param sort_dir: Direction sort libraries. default: desc (asc, desc)
+        :param sort: Library column to sort on. default: date_created (date_created, date_last_modified)
+        :param order: Direction sort libraries. default: desc (asc, desc)
         :return: list of the users libraries with the relevant information
 
         Header:
