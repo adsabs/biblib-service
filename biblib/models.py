@@ -178,7 +178,7 @@ class Notes(Base):
     """
              
     __tablename__ = 'notes'
-    versioned = {}
+    __versioned__ = {}
     id = Column(Integer, primary_key=True)
     content = Column(UnicodeText)
     bibcode = Column(String(50), nullable=False)

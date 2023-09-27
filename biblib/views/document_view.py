@@ -99,45 +99,7 @@ class DocumentView(BaseView):
             
             return  output_dict
 
-    @classmethod
-    def query_valid_bibcodes(cls, input_bibcodes, start, rows):
-        """
-        Takes a list of input bibcodes and validates there existence in ADS
-        through the API. Calls either standard search or bigquery depending 
-        on the query length.
-        """
-        bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10)
-
-        if len(input_bibcodes) < bigquery_min:
-            bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
-            params = {
-                'q': bibcode_query,
-                'wt': 'json',
-                'fl': 'bibcode',
-                'rows': rows,
-                'start': start,
-                'sort': 'date desc'
-                }
-            try:
-                response = cls.standard_ADS_bibcode_query(params=params)
-                solr_resp = response.json()
-                status = response.status_code
-            except Exception as err:
-                current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}.".format(err))
-                solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
-                status = 500
-        else:
-            try:
-                #For calls to bigquery, we limit the number of rows allowed in config.
-                response = cls.solr_big_query(input_bibcodes, start=start, rows=rows)
-                solr_resp = response.json()
-                status = response.status_code
-            except Exception as err:
-                current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}".format(err))
-                solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
-                status = 500
-
-        return solr_resp.get("response"), status
+    
     
     @classmethod
     def remove_documents_from_library(cls, library_id, document_data):
@@ -390,7 +352,7 @@ class DocumentView(BaseView):
                                            .format(key))
                 library_data.pop(key)
 
-        # Check for duplicate namaes
+        # Check for duplicate names
         if 'name' in library_data and \
                 self.library_name_exists(service_uid=user_updating_uid,
                                          library_name=library_data['name']):
@@ -506,7 +468,7 @@ class QueryView(BaseView):
             #Validate supplied bibcodes to confirm they exist in SOLR
             current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
             
-            response = cls.standard_ADS_bibcode_query(params=document_data.get('params'))
+            response = cls.process_standard_ADS_bibcode_query(params=document_data.get('params'))
             if "error" in response:
                 return response
 
@@ -559,7 +521,7 @@ class QueryView(BaseView):
         current_app.logger.info('Removing queried documents: {0} from library_uuid: '
                                 '{1}'.format(document_data, library_id))
         current_app.logger.info("Calling SOLR Query with params: {}".format(document_data.get('params')))
-        response = cls.standard_ADS_bibcode_query(params=document_data.get('params'))
+        response = cls.process_standard_ADS_bibcode_query(params=document_data.get('params'))
         solr_resp = response.json()
         status_code = response.status_code
         current_app.logger.info("SOLR returned status: {}".format(status_code))

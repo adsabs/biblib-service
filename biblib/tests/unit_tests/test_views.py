@@ -1,7 +1,7 @@
 """
 Tests Views of the application
 """
-
+import json
 import unittest
 import uuid
 from biblib.models import User, Library, Permissions, MutableDict, Notes
@@ -10,7 +10,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
     BaseView, TransferView, ClassicView, OperationsView, QueryView
 from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
-from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
+from biblib.tests.stubdata.stub_data import UserShop, LibraryShop, fake_biblist
 from biblib.utils import get_item
 from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
@@ -1018,7 +1018,8 @@ class TestLibraryViews(TestCaseDatabase):
             response_library, meta_data = \
                 self.library_view.get_documents_from_library(
                     library_id=library.id,
-                    service_uid=user.id
+                    service_uid=user.id, 
+                    session=session
                 )
         self.assertEqual(library.bibcode, response_library.bibcode)
 
@@ -1057,7 +1058,8 @@ class TestLibraryViews(TestCaseDatabase):
         with MockEmailService(self.stub_user, end_type='uid'):
             library, metadata = self.library_view.get_documents_from_library(
                 library_id=library.id,
-                service_uid=user.id
+                service_uid=user.id, 
+                session=session
             )
 
         for key in self.stub_library.library_view_get_response():
@@ -1099,7 +1101,8 @@ class TestLibraryViews(TestCaseDatabase):
         with MockEmailService(self.stub_user, end_type='uid'):
             library, metadata = self.library_view.get_documents_from_library(
                 library_id=library.id,
-                service_uid=user_random.id
+                service_uid=user_random.id,
+                session=session
             )
 
         for key in self.stub_library.library_view_get_response():
@@ -1142,7 +1145,7 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Retrieve the bibcodes using the web services
         with MockSolrBigqueryService():
-            response_library = self.library_view.solr_big_query(
+            response_library = self.library_view._solr_big_query(
                 bibcodes=library.bibcode
             )
         self.assertIn('responseHeader', response_library.json())
@@ -1196,7 +1199,7 @@ class TestLibraryViews(TestCaseDatabase):
 
             # Retrieve the bibcodes using the web services
             with MockSolrBigqueryService(solr_docs=solr_docs):
-                response_library = self.library_view.solr_big_query(
+                response_library = self.library_view._solr_big_query(
                     bibcodes=library.bibcode
                 ).json()
             self.assertIn('responseHeader', response_library)
@@ -1275,7 +1278,7 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Retrieve the bibcodes using the web services
         with MockSolrBigqueryService(solr_docs=solr_docs):
-            response_library = self.library_view.solr_big_query(
+            response_library = self.library_view._solr_big_query(
                 bibcodes=library.bibcode
             ).json()
         self.assertIn('responseHeader', response_library)
@@ -1346,7 +1349,7 @@ class TestLibraryViews(TestCaseDatabase):
              
             # Retrieve the bibcodes using the web services
             with MockSolrBigqueryService(solr_docs=solr_docs):
-                response_library = self.library_view.solr_big_query(
+                response_library = self.library_view._solr_big_query(
                     bibcodes=library.bibcode
                 ).json()
             self.assertIn('responseHeader', response_library)
@@ -1427,7 +1430,7 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Retrieve the bibcodes using the web services
         with MockSolrBigqueryService(solr_docs=solr_docs):
-            response_library = self.library_view.solr_big_query(
+            response_library = self.library_view._solr_big_query(
                 bibcodes=library.bibcode
             ).json()
         self.assertIn('responseHeader', response_library)
@@ -1544,6 +1547,61 @@ class TestLibraryViews(TestCaseDatabase):
         name = self.library_view.helper_library_name(library_id=library.id)
         self.assertEqual(name, library.name)
 
+
+    def test_get_notes_from_library_retrieves_notes_and_orphan_notes(self):
+        """
+        Tests if get_notes_from_library retrieves notes and orphan notes when using big query
+
+        :return: no return
+        """
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            bibcodes = fake_biblist(15)
+            canonical_bibcodes = bibcodes[:5]
+
+            for i in range(len(canonical_bibcodes), len(bibcodes)):
+                bibcodes[i] = 'arXiv' + bibcodes[i]
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={bibcode: {} for bibcode in bibcodes})
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+            
+            self.assertEqual(library.get_bibcodes(), bibcodes) 
+
+            # add notes to the library 
+            for i in range(len(bibcodes)): 
+                bibcode = bibcodes[i]
+                Notes.create_unique(library=library, bibcode=bibcode, content="content" + bibcode, session=session)
+    
+            library.bibcode = {bibcode: {} for bibcode in canonical_bibcodes}
+            session.add(library)
+            session.commit()
+            
+            
+            response = self.library_view.get_notes_from_library(library, session)
+            self.assertEqual(len(response['notes']), 5)
+            self.assertEqual(len(response['orphan_notes']), 10)
+            self.assertUnsortedEqual(response['notes'].keys(), canonical_bibcodes)
+            self.assertUnsortedEqual(response['orphan_notes'].keys(), bibcodes[5:])
+                
 
 class TestDocumentViews(TestCaseDatabase):
     """

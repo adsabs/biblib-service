@@ -500,7 +500,7 @@ class BaseView(Resource):
         return msg
 
     @staticmethod
-    def solr_big_query(
+    def _solr_big_query(
             bibcodes,
             start=0,
             rows=20,
@@ -566,7 +566,7 @@ class BaseView(Resource):
         return solr_resp
 
     @staticmethod
-    def standard_ADS_bibcode_query(params):
+    def process_standard_ADS_bibcode_query(params):
         """
         Validates identifiers by collecting all bibcodes returned from a standard query.
         """
@@ -604,3 +604,64 @@ class BaseView(Resource):
             headers=headers
         )
         return solr_resp
+    
+    @classmethod 
+    def standard_ADS_bibcode_query(cls, input_bibcodes, start, rows): 
+        bibcode_query ="identifier:("+" OR ".join(input_bibcodes)+")"
+        
+        params = {
+            'q': bibcode_query,
+            'wt': 'json',
+            'fl': 'bibcode',
+            'rows': rows,
+            'start': start,
+            'sort': 'date desc'
+            }
+        
+        try:
+            response = cls.process_standard_ADS_bibcode_query(params=params)
+            solr_resp = response.json()
+            status = response.status_code
+        except Exception as err:
+            current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}.".format(err))
+            solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
+            status = 500
+        return solr_resp, status
+    
+    @classmethod 
+    def solr_big_query(cls, input_bibcodes, start, rows): 
+        try:
+            #For calls to bigquery, we limit the number of rows allowed in config. Max rows = 2000
+            response = cls._solr_big_query(input_bibcodes, start=start, rows=rows)
+            solr_resp = response.json()
+            status = response.status_code
+        except Exception as err:
+            current_app.logger.error("Failed to collect valid bibcodes from input due to internal error: {}".format(err))
+            solr_resp = {"response": {"error": "An internal error occurred when querying SOLR. Please try again later."}}
+            status = 500
+        return solr_resp, status
+    
+    @classmethod
+    def query_valid_bibcodes(cls, input_bibcodes, start, rows):
+        """
+        Takes a list of input bibcodes and validates their existence in ADS
+        through the API. Calls either standard search or bigquery depending 
+        on the query length.
+
+        :param input_bibcodes: list of input bibcodes to be validated 
+        :param start: delimits where the search should start
+        :param rows: delimits how many rows should be returned 
+
+
+        :return solr response and status 
+        """
+        bigquery_min = current_app.config.get('BIBLIB_SOLR_BIG_QUERY_MIN', 10) 
+
+        if len(input_bibcodes) < bigquery_min:
+            solr_resp, status = cls.standard_ADS_bibcode_query(input_bibcodes, start, rows)
+        else: 
+            solr_resp, status = cls.solr_big_query(input_bibcodes, start, rows)
+
+        return solr_resp.get("response"), status
+    
+    
