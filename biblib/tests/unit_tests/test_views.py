@@ -1550,7 +1550,7 @@ class TestLibraryViews(TestCaseDatabase):
 
     def test_get_notes_from_library_retrieves_notes_and_orphan_notes(self):
         """
-        Tests if get_notes_from_library retrieves notes and orphan notes when using big query
+        Tests if get_notes_from_library retrieves notes and orphan notes
 
         :return: no return
         """
