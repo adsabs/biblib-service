@@ -399,7 +399,7 @@ class LibraryView(BaseView):
                     if add_sort:
                         if 'asc' in add_sort: 
                             solr = self.timestamp_sort(solr, library.id, reverse=True)
-                        else:
+                        elif 'desc' in add_sort:
                             solr = self.timestamp_sort(solr, library.id)
 
                     documents = [i['bibcode'] for i in solr['response']['docs']]
@@ -410,8 +410,23 @@ class LibraryView(BaseView):
                     current_app.logger.warning('Problem with solr response: {0}'
                                             .format(solr))
                     updates = {}
-                    documents = library.get_bibcodes()
-                    documents.sort()
+                    if add_sort:
+                        with current_app.session_scope() as session:
+                            # Find the specified library (we have to do this to have full access to the library)
+                            temp_library = session.query(Library).filter_by(id=library.id).one()
+                            sortable_list = [(bibcode, library.bibcode[bibcode]["timestamp"]) for bibcode in temp_library.get_bibcodes()]
+                        if 'asc' in add_sort: 
+                             sortable_list.sort(key = lambda stamped: stamped[1])
+                             #documents = sortable_list
+
+                             documents = [doc[0] for doc in sortable_list]
+                        elif 'desc' in add_sort:
+                             sortable_list.sort(key = lambda stamped: stamped[1], reverse=True)
+                             
+                             documents = [doc[0] for doc in sortable_list]         
+                    else:
+                        documents = library.get_bibcodes()
+                        documents.sort()
                     documents = documents[start:start+rows]
             
             else:
