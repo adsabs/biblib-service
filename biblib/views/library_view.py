@@ -168,27 +168,29 @@ class LibraryView(BaseView):
         for updated_bibcode in updated_list: 
             for key, value in updated_bibcode.items(): 
                 updated_dict[key] = value
-        
-        updated_notes = []
-        for note in notes: 
-            if note.bibcode in updated_dict:  
-                updated_notes.append(note)
-                canonical_bibcode = updated_dict[note.bibcode]
-                canonical_note = session.query(Notes).filter(Notes.library_id == library.id, 
-                                                             Notes.bibcode == canonical_bibcode).one_or_none()
-                # If there's no note with the canonical bibcode, create a new note
-                if not canonical_note: 
-                    new_note = Notes.create_unique(session=session, 
-                                                content=note.content, 
-                                                bibcode=canonical_bibcode, 
-                                                library=note.library)
-                    session.add(new_note)
-                # If there's already a note, merge the contents
-                else: 
-                    canonical_note.content = '{0} {1}'.format(canonical_note.content, note.content)
-                
-        session.commit()
-        return updated_notes
+        try: 
+            updated_notes = []
+            for note in notes: 
+                if note.bibcode in updated_dict:  
+                    updated_notes.append(note)
+                    canonical_bibcode = updated_dict[note.bibcode]
+                    canonical_note = session.query(Notes).filter(Notes.library_id == library.id, 
+                                                                Notes.bibcode == canonical_bibcode).one_or_none()
+                    # If there's no note with the canonical bibcode, create a new note
+                    if not canonical_note: 
+                        Notes.create_unique(session=session, 
+                                                    content=note.content, 
+                                                    bibcode=canonical_bibcode, 
+                                                    library=note.library)
+                    # If there's already a note, merge the contents
+                    else: 
+                        canonical_note.content = '{0} {1}'.format(canonical_note.content, note.content)
+                        session.add(canonical_note)
+                        session.commit()
+            return updated_notes
+        except Exception as error: 
+            current_app.logger.warning('Could not update notes: {0}'
+                                    .format(error))
 
     @classmethod
     def update_database(cls, session, library, new_library_bibcodes, updates):
@@ -205,13 +207,16 @@ class LibraryView(BaseView):
                  update_list: list of changed bibcodes {'before': 'after'}
                  updated_notes: list of notes that were updates
         """
-        library.bibcode = new_library_bibcodes
-        session.add(library)
-        session.commit()
+        try: 
+            library.bibcode = new_library_bibcodes
+            session.add(library)
+            session.commit()
 
-        updates['updated_notes'] = cls.update_notes(session, library, updates['update_list'])
-
-
+            updates['updated_notes'] = cls.update_notes(session, library, updates['update_list'])
+        except Exception as error:
+            current_app.logger.warning('Could not update database: {0}'
+                                    .format(error))
+            
     @classmethod
     def solr_update_library(cls, library_id, solr_docs):
         """
@@ -256,7 +261,6 @@ class LibraryView(BaseView):
                         updates['duplicates_removed'] += 1
                 else:
                     new_library_bibcodes[bibcode] = library.bibcode[bibcode]
-
             if updates['update_list']:                
                 cls.update_database(session, library, new_library_bibcodes, updates)
 
@@ -444,10 +448,16 @@ class LibraryView(BaseView):
         for bibcode in bibcode_to_notes_map.keys():
             if bibcode in set(library.get_bibcodes()): 
                 note = bibcode_to_notes_map[bibcode]
-                response['notes'][bibcode] = {'id': note.id, 'content': note.content}
+                response['notes'][bibcode] = {'id': note.id, 
+                                              'content': note.content, 
+                                              'date_created': note.date_created, 
+                                              'date_modified': note.date_last_modified}
             else: 
                 note = bibcode_to_notes_map[bibcode]
-                response['orphan_notes'][bibcode] = {'id': note.id, 'content': note.content}
+                response['orphan_notes'][bibcode] = {'id': note.id, 
+                                                     'content': note.content, 
+                                                     'date_created': note.date_created, 
+                                                     'date_modified': note.date_last_modified}
         return response
 
     def process_library_request(self, data):
