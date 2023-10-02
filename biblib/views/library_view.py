@@ -370,6 +370,18 @@ class LibraryView(BaseView):
         return True
     
     def process_solr(self, library, start, rows, sort, fl):
+        """
+        Processes the request for raw library 
+        :param library: <string> <library ID>
+        :param start: <int> used to delimit the start of pagination 
+        :param rows: <int> used to delimit the start of pagination 
+        :param sort: <int> used to sort 
+        :param fl: <int> field used in the search, usually 'bibcode'
+
+        :return: solr: <str>
+                 updates: <dictionary>
+                 documents: <dictionary> with docs in library 
+        """
         try:
             solr = self._solr_big_query(
                 bibcodes=library.bibcode,
@@ -448,16 +460,10 @@ class LibraryView(BaseView):
         for bibcode in bibcode_to_notes_map.keys():
             if bibcode in set(library.get_bibcodes()): 
                 note = bibcode_to_notes_map[bibcode]
-                response['notes'][bibcode] = {'id': note.id, 
-                                              'content': note.content, 
-                                              'date_created': note.date_created, 
-                                              'date_modified': note.date_last_modified}
+                response['notes'][bibcode] = note
             else: 
                 note = bibcode_to_notes_map[bibcode]
-                response['orphan_notes'][bibcode] = {'id': note.id, 
-                                                     'content': note.content, 
-                                                     'date_created': note.date_created, 
-                                                     'date_modified': note.date_last_modified}
+                response['orphan_notes'][bibcode] = note
         return response
 
     def process_library_request(self, data):
@@ -497,8 +503,9 @@ class LibraryView(BaseView):
                                           single element described the original
                                           bibcode (key) and the updated bibcode
                                           now being stored (item)
-          library_notes:        <dict>    Dictionary of library notes, including orphan 
-                                          notes (those not associated with a bibcode in the library)
+          updated_notes:        <list>  A list of all the notes that were updated   
+        library_notes:        <dict>    Dictionary of library notes, including orphan 
+                                        notes (those not associated with a bibcode in the library)
         """
         
         try:
@@ -535,6 +542,7 @@ class LibraryView(BaseView):
 
             if library_notes and (library_notes.get('notes', {}) or library_notes.get('orphan_notes', {})):
                 response['library_notes'] = library_notes
+
 
             return library, response, None
 
@@ -668,8 +676,9 @@ class LibraryView(BaseView):
                                           single element described the original
                                           bibcode (key) and the updated bibcode
                                           now being stored (item)
-          library_notes:        <dict>    Dictionary of library notes, including orphan 
-                                          notes (those not associated with a bibcode in the library)
+          updated_notes:        <list>  A list of all the notes that were updated 
+        library_notes:        <dict>    Dictionary of library notes, including orphan 
+                                        notes (those not associated with a bibcode in the library)
 
         Permissions:
         -----------

@@ -198,7 +198,7 @@ class Notes(Base):
     def __repr__(self):
         return '<Note, Note id: {0}, library: {1}, bibcode: {2}, ' \
         'content: {3}>'.format(self.id, 
-                            self.library, 
+                            self.library_id, 
                             self.bibcode, 
                             self.content)
     @classmethod
