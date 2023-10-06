@@ -312,6 +312,12 @@ class LibraryView(BaseView):
         - sort: 'date desc'
         - fl: 'bibcode'
 
+        Additional Pagination options:
+        ------------
+        - sort:
+            - "time asc" sort by time added to library with documents added least recently added documents being listed first.
+            - "time desc" sort by time added to library with the most recently added documents being listed first.
+
         """
         try:
             user = int(request.headers[USER_ID_KEYWORD])
