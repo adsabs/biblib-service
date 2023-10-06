@@ -146,7 +146,8 @@ class LibraryView(BaseView):
         Take a solr response and sort it based on the timestamps contained in the library
         :input: response: response from SOLR bigquery
         :input: library: The original library
-
+        :input: reverse: returns library by `time desc` if true, `time asc` otherwise.
+        
         :return: response: SOLR response sorted by when each item was added.
         """
         if "error" not in solr['response'].keys():
@@ -340,6 +341,8 @@ class LibraryView(BaseView):
         if "time" in sort:
             add_sort = sort 
             sort = 'date desc'
+            sort_bool = {"time asc": False, "time desc": True}
+
         else: add_sort = None
         
         fl = request.args.get('fl', 'bibcode')
@@ -396,11 +399,8 @@ class LibraryView(BaseView):
                         library_id=library.id,
                         solr_docs=solr['response']['docs']
                     )
-                    if add_sort:
-                        if 'asc' in add_sort: 
-                            solr = self.timestamp_sort(solr, library.id, reverse=True)
-                        elif 'desc' in add_sort:
-                            solr = self.timestamp_sort(solr, library.id)
+                    if add_sort in ["time asc", "time desc"]:
+                        solr = self.timestamp_sort(solr, library.id, reverse=sort_bool[add_sort])
 
                     documents = [i['bibcode'] for i in solr['response']['docs']]
                 else:
@@ -410,20 +410,13 @@ class LibraryView(BaseView):
                     current_app.logger.warning('Problem with solr response: {0}'
                                             .format(solr))
                     updates = {}
-                    if add_sort:
+                    if add_sort in ["time asc", "time desc"]:
                         with current_app.session_scope() as session:
                             # Find the specified library (we have to do this to have full access to the library)
                             temp_library = session.query(Library).filter_by(id=library.id).one()
                             sortable_list = [(bibcode, library.bibcode[bibcode]["timestamp"]) for bibcode in temp_library.get_bibcodes()]
-                        if 'asc' in add_sort: 
-                             sortable_list.sort(key = lambda stamped: stamped[1])
-                             #documents = sortable_list
-
-                             documents = [doc[0] for doc in sortable_list]
-                        elif 'desc' in add_sort:
-                             sortable_list.sort(key = lambda stamped: stamped[1], reverse=True)
-                             
-                             documents = [doc[0] for doc in sortable_list]         
+                            sortable_list.sort(key = lambda stamped: stamped[1], reverse=sort_bool[add_sort])
+                            documents = [doc[0] for doc in sortable_list]         
                     else:
                         documents = library.get_bibcodes()
                         documents.sort()
