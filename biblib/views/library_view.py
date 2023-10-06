@@ -338,10 +338,13 @@ class LibraryView(BaseView):
 
         sort = request.args.get('sort', 'date desc')
         #timestamp sorting is handled in biblib so we need to change the sort to something SOLR understands.
-        if "time" in sort:
-            add_sort = sort 
+        if sort in ['time asc', 'time desc']:
+            current_app.logger.debug("sort order is set to{}".format(sort))
+            if 'time desc'== sort:
+                add_sort = True
+            else:
+                add_sort = False
             sort = 'date desc'
-            sort_bool = {"time asc": False, "time desc": True}
 
         else: add_sort = None
         
@@ -394,28 +397,30 @@ class LibraryView(BaseView):
                 # Now check if we can update the library database based on the
                 # returned canonical bibcodes
                 if solr.get('response'):
+                    current_app.logger.debug("sort order is set to{}".format(add_sort))
                     # Update bibcodes based on solrs response
                     updates = self.solr_update_library(
                         library_id=library.id,
                         solr_docs=solr['response']['docs']
                     )
-                    if add_sort in ["time asc", "time desc"]:
-                        solr = self.timestamp_sort(solr, library.id, reverse=sort_bool[add_sort])
+                    if add_sort:
+                        solr = self.timestamp_sort(solr, library.id, reverse=add_sort)
 
                     documents = [i['bibcode'] for i in solr['response']['docs']]
                 else:
                     # Some problem occurred, we will just ignore it, but will
                     # definitely log it.
                     solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
+                    current_app.logger.debug("sort order is set to {}".format(add_sort))
                     current_app.logger.warning('Problem with solr response: {0}'
                                             .format(solr))
                     updates = {}
-                    if add_sort in ["time asc", "time desc"]:
+                    if add_sort != None:
                         with current_app.session_scope() as session:
                             # Find the specified library (we have to do this to have full access to the library)
                             temp_library = session.query(Library).filter_by(id=library.id).one()
                             sortable_list = [(bibcode, library.bibcode[bibcode]["timestamp"]) for bibcode in temp_library.get_bibcodes()]
-                            sortable_list.sort(key = lambda stamped: stamped[1], reverse=sort_bool[add_sort])
+                            sortable_list.sort(key = lambda stamped: stamped[1], reverse=add_sort)
                             documents = [doc[0] for doc in sortable_list]         
                     else:
                         documents = library.get_bibcodes()

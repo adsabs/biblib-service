@@ -1152,20 +1152,20 @@ class TestWebservices(TestCaseDatabase):
             response = self.client.get(
                 url,
                 headers=stub_user.headers,
-                query_string={"sort": "time asc"}
+                query_string={'sort': 'time asc'}
             )
 
         self.assertEqual(response.status_code, 200, response)
         self.assertEqual(full_bibcodes,
                          response.json['documents'])
-
+        
         with MockSolrBigqueryService(
                 canonical_bibcode=stub_library.bibcode) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
                 headers=stub_user.headers,
-                query_string={"sort": "time desc"}
+                query_string={"sort": 'time desc'}
             )
 
         self.assertEqual(response.status_code, 200, response)
