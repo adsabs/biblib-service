@@ -93,7 +93,7 @@ def convert_timestamp_datetime(timestamp, return_string=False):
         datetime_obj (datetime): datetime object
         date_string (str): string repr of the datetime object YYYY-MM-DDTHH:MM:SS.ms
     """
-    datetime_obj = datetime.fromtimestamp(timestamp)
+    datetime_obj = datetime.utcfromtimestamp(timestamp)
     if return_string:
         return datetime_obj.isoformat()
     else:
