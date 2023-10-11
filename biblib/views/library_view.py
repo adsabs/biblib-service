@@ -10,8 +10,8 @@ from biblib.views.base_view import BaseView
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy import Boolean
-from biblib.views.http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
-    MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR, BAD_LIBRARY_ID_ERROR
+from biblib.views.http_errors import SOLR_RESPONSE_MISMATCH_ERROR, \
+    MISSING_LIBRARY_ERROR
 
 
 class LibraryView(BaseView):
@@ -157,40 +157,43 @@ class LibraryView(BaseView):
         Updates the notes based on the solr canonical bibcodes response
         :param session: necessary for all the queries 
         :param library: library to update
-        :param updated_list: list of changed bibcodes {'before': 'after'}
+        :param updated_list: list of changed bibcodes [{'before': 'after'}]
 
         :return: updated_notes: list with all the notes that have been updated 
         """
         notes = session.query(Notes).filter(Notes.library_id == library.id).all() 
         updated_dict = {}
-        
+        updated_notes = set()
         # Turn list into a dictionary for fast lookup
         for updated_bibcode in updated_list: 
             for key, value in updated_bibcode.items(): 
                 updated_dict[key] = value
-        try: 
-            updated_notes = []
-            for note in notes: 
-                if note.bibcode in updated_dict:  
-                    updated_notes.append(note)
-                    canonical_bibcode = updated_dict[note.bibcode]
-                    canonical_note = session.query(Notes).filter(Notes.library_id == library.id, 
-                                                                Notes.bibcode == canonical_bibcode).one_or_none()
-                    # If there's no note with the canonical bibcode, create a new note
-                    if not canonical_note: 
-                        Notes.create_unique(session=session, 
-                                                    content=note.content, 
-                                                    bibcode=canonical_bibcode, 
-                                                    library=note.library)
-                    # If there's already a note, merge the contents
-                    else: 
-                        canonical_note.content = '{0} {1}'.format(canonical_note.content, note.content)
-                        session.add(canonical_note)
-                        session.commit()
-            return updated_notes
-        except Exception as error: 
-            current_app.logger.warning('Could not update notes: {0}'
-                                    .format(error))
+        for note in notes: 
+            
+            if note.bibcode in updated_dict:  
+
+                updated_notes.add(note)
+                canonical_bibcode = updated_dict[note.bibcode]
+                canonical_note = session.query(Notes).filter(Notes.library_id == library.id, 
+                                                            Notes.bibcode == canonical_bibcode).one_or_none()
+                
+                # If there's no note with the canonical bibcode, create a new note
+                if not canonical_note:
+                    try:  
+                        new_note = Notes.create_unique(session=session, 
+                                            content=note.content, 
+                                            bibcode=canonical_bibcode, 
+                                            library=library) 
+                        updated_notes.add(new_note)
+                    except Exception as error: 
+                        current_app.logger.error('Error while creating new note with canonical bibcode {0}: {1}'
+                                                .format(canonical_bibcode, error))
+                else: 
+                    canonical_note.content = '{0} {1}'.format(canonical_note.content, note.content)
+                    session.add(canonical_note)
+                    session.commit()
+                    updated_notes.add(canonical_note)
+        return list(updated_notes)
 
     @classmethod
     def update_database(cls, session, library, new_library_bibcodes, updates):
@@ -266,22 +269,6 @@ class LibraryView(BaseView):
 
             return updates
         
-    def get_user_id_from_headers(self, request): 
-        """
-        Gets the user id from the request headers
-        :param request: request object
-
-        :return: user_id if it exists and None otherwise
-                 Error message if the user does not exist and None otherwise
-                 
-        """
-        try:
-            user = int(request.headers[USER_ID_KEYWORD])
-            return user, None
-        except KeyError:
-            current_app.logger.error('No username passed')
-            return None, err(MISSING_USERNAME_ERROR)
-        
     def load_parameters(self, request): 
         """
         Loads parameters necessary for the Solr search
@@ -320,36 +307,6 @@ class LibraryView(BaseView):
                                 'raw: "{}"'.format(start, rows, sort, fl, raw_library))
         return start, rows, sort, fl, raw_library
     
-    def get_library_from_slug(self, user, library):
-        """
-        Retrieves library id from slug
-        :param user: user_id
-        :param library: library slug
-
-        :return: library_id: if it exists and None otherwise
-                 BAD_LIBRARY_ID_ERROR: if the library is not found 
-      
-        """
-        try:
-            library = self.helper_slug_to_uuid(library)
-            current_app.logger.info('User: {0} requested library: {1}'
-                                .format(user, library))
-            return library, None
-        except TypeError:
-            return None, err(BAD_LIBRARY_ID_ERROR)
-        
-    def get_service_uid(self, user): 
-        """
-        Retrieves the user id for service 
-        :param user: user
-        
-
-        :return: uid: if it exists and None otherwise
-        """
-        # If user exists, get their service uid 
-        user_exists = self.helper_user_exists(absolute_uid=user)
-        if user_exists:
-            return self.helper_absolute_uid_to_service_uid(absolute_uid=user) 
         
     def has_read_access(self, service_uid, library):
         """
@@ -552,80 +509,6 @@ class LibraryView(BaseView):
                 .format(error)
             )
             return data["library_id"], None, err(MISSING_LIBRARY_ERROR)
-        
-    def is_library_public_or_has_special_token(self, library, request):
-        """
-        HTTP GET request that returns all the documents inside a given
-        user's library
-        :param library: library
-
-        :return: <boolean> True if the library is public or if header contains 
-        special token
-        """
-
-        special_token = current_app.config.get('READONLY_ALL_LIBRARIES_TOKEN')
-        return library.public or (
-            special_token and request.headers.get('Authorization', '').endswith(special_token)
-        )
-    
-    def handle_no_permission(self, user, service_uid, library):
-        """
-        Checks if user has permission to access the given library
-        :param user: user 
-        :param service_uid: user service id 
-        :param library: library 
-
-        :return: None if user has permission and an error otherwise
-        """
-        if not self.check_user_and_access(user, service_uid, library):
-            return err(NO_PERMISSION_ERROR)
-
-    def check_user_and_access(self, user, service_uid, library):
-        """
-        Checks if user exists and has read access to the library
-        :param user: user 
-        :param service_uid: user service id 
-        :param library: library 
-
-        :return: <boolean> True if the user exists and has permissions 
-        """
-        return self.check_user_has_read_access(service_uid, library) and \
-            self.check_user_exists(user, library)
-            
-    def check_user_exists(self, user, library):
-        """
-        Checks if user exists
-        :param user: user 
-        :param library: library 
-
-        :return: <boolean> True if the user exists
-        """
-        if not self.helper_user_exists(absolute_uid=user):
-            current_app.logger.error(
-                'User: {0} does not exist in the database. '
-                'Therefore will not have extra privileges to view the library: {1}'
-                .format(user, library.id)
-            )
-            return False
-
-        return True
-
-    def check_user_has_read_access(self, service_uid, library):
-        """
-        Checks if user has read access to library
-        :param service_uid: user service id 
-        :param library: library 
-
-        :return: <boolean> True if the user has read access to library
-        """
-        if not self.read_access(service_uid=service_uid, library_id=library.id):
-            current_app.logger.error(
-                'User: {0} does not have access to library: {1}. DENIED'
-                .format(service_uid, library.id)
-            )
-            return False
-
-        return True
 
     # Methods
     def get(self, library):
@@ -698,7 +581,7 @@ class LibraryView(BaseView):
         """
 
         # Get user 
-        user, user_error = self.get_user_id_from_headers(request)
+        user, user_error = self.helper_get_user_id_from_headers(request)
         if user_error: 
             return user_error
         
@@ -706,7 +589,7 @@ class LibraryView(BaseView):
         start, rows, sort, fl, raw_library = self.load_parameters(request)
 
         # Get library id
-        library_id, library_error = self.get_library_from_slug(user, library)
+        library_id, library_error = self.helper_get_library_from_slug(user, library)
         if library_error: 
             return library_error
     
@@ -734,7 +617,7 @@ class LibraryView(BaseView):
                 return solr_error
 
         # Skip any more logic if the library is public or the exception token is present
-        if self.is_library_public_or_has_special_token(library, request):
+        if self.helper_is_library_public_or_has_special_token(library, request):
             current_app.logger.info('Library: {0} is public'
                                     .format(library_id))
             return response, 200
@@ -742,7 +625,7 @@ class LibraryView(BaseView):
         current_app.logger.warning('Library: {0} is private'.format(library_id))
         
         # Check if the user exists and has access to the library
-        no_permission = self.handle_no_permission(user, service_uid, library)
+        no_permission = self.helper_handle_no_permission(user, service_uid, library)
         if no_permission: 
             return no_permission
 

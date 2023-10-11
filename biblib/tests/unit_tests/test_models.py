@@ -5,13 +5,18 @@ Tests the underlying models of the database
 import unittest
 from biblib.models import User, Library, Permissions, MutableDict, Notes
 from biblib.tests.base import TestCaseDatabase
-from sqlalchemy import exc
+from sqlalchemy.exc import IntegrityError
 import pytest
+
+class CustomDatabaseError(Exception):
+    def __init__(self, message="Custom database error occurred in create_unique method."):
+        super().__init__(message)
 
 class TestLibraryModel(TestCaseDatabase):                                                                                                                                                                                                                                                                     
     """
     Class for testing the methods usable by the Library model
     """
+
     def test_get_bibcodes_from_model(self):
         """
         Checks that the get_bibcodes method works as expected
@@ -105,8 +110,6 @@ class TestLibraryModel(TestCaseDatabase):
 
             with self.assertRaises(ValueError) as context:
                 note2 = Notes.create_unique(session, content="Test content 2", bibcode="1", library=lib) 
-                session.add(note2)
-                session.commit()
             
             existing_notes = session.query(Notes).filter_by(bibcode="1", library_id=lib.id).all() 
             self.assertEqual(len(existing_notes), 1) 
@@ -125,7 +128,21 @@ class TestLibraryModel(TestCaseDatabase):
 
             self.assertUnsortedEqual(lib.get_bibcodes(), ['1', '2'])
             self.assertEqual(lib.notes, [])
-            self.assertIn("Bibcode 3 not in library", context.exception.args[0])
+            self.assertIn("Bibcode 3 not in library", context.exception.args[0])  
+
+    def test_create_unique_raises_exception(self):
+        
+        lib = Library(bibcode={'1': {}, '2': {}}, public=True, description="Test description")
+        with self.app.session_scope() as session: 
+            session.add(lib) 
+            session.commit()
+            # Attempt to create a note with a bibcode that is not in the library, which should raise a ValueError
+            with pytest.raises(Exception) as exc_info:
+                Notes.create_unique(session, "Note content", "NonExistentBibcode", lib)
+
+            # Check that the exception message matches the expected message
+            expected_message = 'Bibcode NonExistentBibcode not in library {0}'.format(lib)
+            self.assertEqual(str(exc_info.value), expected_message)       
 
     def test_library_notes_relationship(self): 
         lib = Library(bibcode={'1': {}, '2': {}}, public=True, description="Test description")
@@ -136,10 +153,6 @@ class TestLibraryModel(TestCaseDatabase):
             note1 = Notes.create_unique(session, content="Note 1 Content", bibcode="1", library=lib)
             note2 = Notes.create_unique(session, content="Note 2 Content", bibcode="2", library=lib)
             
-            session.add_all([note1, note2]) 
-            session.commit()
-            
-
             self.assertEqual(lib.notes, [note1, note2])
 
             session.delete(lib) 
@@ -157,10 +170,6 @@ class TestLibraryModel(TestCaseDatabase):
             note1 = Notes.create_unique(session, content="Note 1 Content", bibcode="1", library=lib)
             note2 = Notes.create_unique(session, content="Note 2 Content", bibcode="2", library=lib)
             
-            session.add(note1) 
-            session.add(note2)
-            session.commit()
-
             self.assertEqual(lib.notes, [note1, note2])
             self.assertEqual(session.query(Notes).count(), 2)
 
@@ -176,10 +185,6 @@ class TestLibraryModel(TestCaseDatabase):
             session.add(lib) 
             session.commit()
             note1 = Notes.create_unique(session, content="Note 1 Content", bibcode="1", library=lib)
-            
-            session.add(note1) 
-            
-            session.commit()
 
             self.assertEqual(lib.notes, [note1])
             self.assertEqual(session.query(Notes).count(), 1)

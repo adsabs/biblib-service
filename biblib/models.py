@@ -206,17 +206,22 @@ class Notes(Base):
         """
         Creates a new note in the database
         """
-        if bibcode not in library.bibcode.keys(): 
-            raise ValueError('Bibcode {0} not in library {1}'.format(bibcode, library))
-        existing_note = session.query(Notes).filter_by(bibcode=bibcode, library_id=library.id).first()
 
-        if existing_note:
-            raise ValueError('A note for the same bibcode {0}  and library {1} already exists.'.format(bibcode, library))
+        try: 
+            if bibcode not in library.bibcode.keys(): 
+                raise ValueError('Bibcode {0} not in library {1}'.format(bibcode, library))
+            existing_note = session.query(Notes).filter_by(bibcode=bibcode, library_id=library.id).first()
 
-        note = Notes(content=content, bibcode=bibcode, library_id=library.id)
-        session.add(note)
-        session.commit()
-        return note
+            if existing_note:
+                raise ValueError('A note for the same bibcode {0}  and library {1} already exists.'.format(bibcode, library))
+
+            note = Notes(content=content, bibcode=bibcode, library_id=library.id)
+            session.add(note)
+            session.commit()
+            return note
+        except Exception as error: 
+            session.rollback() 
+            raise error
           
 class Library(Base):
     """

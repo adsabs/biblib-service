@@ -303,9 +303,6 @@ class TestManagePy(TestCaseDatabase):
                     revisions = session.query(NotesVersion).filter_by(id=notes.id).all() 
                     notes_revision_lengths.append(len(revisions))
                 self.assertEqual(notes_revision_lengths, [2, 2])
-
-                
-
                 # Now run the obsolete deletion
                 DeleteObsoleteVersionsNumber().run(app=self.app, n_revisions=self.n_revisions)
                 service_user = user_1_id
@@ -409,10 +406,7 @@ class TestManagePy(TestCaseDatabase):
 
                 # Retain some IDs for when they are deleted
                 user_1_id = user_1.id
-                user_2_id = user_2.id
-                user_1_absolute_uid = user_1.absolute_uid
                 library_1_id = library_1.id
-                library_2_id = library_2.id
 
                 #create multiple versions by adding to library
                 with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')):
@@ -426,11 +420,12 @@ class TestManagePy(TestCaseDatabase):
                     for _lib in library:
                         self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
 
-                #create note 1 and add one revision
+                #create note 1 for document added and add one revision
                 note_1 = Notes.create_unique(session, content="Note 1", bibcode=library[0].get_bibcodes()[0], library=library[0])
                 session.add(note_1)
                 note_1.content = "Note 1 version 2"
                 session.commit()  
+ 
 
                 #Add a different document to the library
                 with MockSolrQueryService(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode')):
@@ -443,12 +438,13 @@ class TestManagePy(TestCaseDatabase):
                     for _lib in library:
                         self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
 
-                #create note 2 and add one revision
+                #create note 2 for another document and add one revision
                 note_2 = Notes.create_unique(session, content="Note 2", bibcode=library[0].get_bibcodes()[1], library=library[0])
                 session.add(note_2)
                 note_2.content = "Note 2 version 2"
-                session.commit()  
+                session.commit() 
 
+                #Add yet another document to the library
                 with MockSolrQueryService(canonical_bibcode = self.stub_library_3.document_view_post_data('add').get('bibcode')):
                     output = self.document_view.add_document_to_library(
                         library_id=library_1_id,
@@ -480,7 +476,8 @@ class TestManagePy(TestCaseDatabase):
                 self.assertEqual(notes_revision_lengths, [2, 2])
                 
                 # Now run the obsolete deletion acting as if we are 1 year in the future.
-                current_offset = datetime.now() + relativedelta(years=1, days=1)
+                # Libraries and notes should persist because n_years is 2 
+                current_offset = datetime.now() + relativedelta(years=1)
                 with freezegun.freeze_time(current_offset):
                     DeleteObsoleteVersionsTime().run(app=self.app, n_years=self.n_years)
                 service_user = user_1_id
@@ -494,7 +491,7 @@ class TestManagePy(TestCaseDatabase):
                     updated_revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
                     updated_revision_lengths.append(len(updated_revisions))
                     self.assertUnsortedEqual(library.bibcode, updated_revisions[-1].bibcode) 
-            
+                
                 NotesVersion = sqlalchemy_continuum.version_class(Notes)
                 notes = session.query(Notes).all()
                 updated_notes_revision_lengths = []
@@ -505,6 +502,7 @@ class TestManagePy(TestCaseDatabase):
                 self.assertEqual(updated_notes_revision_lengths, [2, 2])
 
                 # Run obsolete deletion assuming we are 2 years in the future.
+                # Libraries and notes should be deleted
                 current_offset = datetime.now() + relativedelta(years=2, days=1)
                 with freezegun.freeze_time(current_offset):
                     DeleteObsoleteVersionsTime().run(app=self.app, n_years=self.n_years)

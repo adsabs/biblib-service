@@ -1,7 +1,6 @@
 """
 Tests Views of the application
 """
-import json
 import unittest
 import uuid
 from biblib.models import User, Library, Permissions, MutableDict, Notes
@@ -16,6 +15,7 @@ from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedErro
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService, MockSolrQueryService
 from biblib.emails import PermissionsChangedEmail
+from flask import current_app
 
 class TestBaseViews(TestCaseDatabase):
     """
@@ -1150,6 +1150,129 @@ class TestLibraryViews(TestCaseDatabase):
             )
         self.assertIn('responseHeader', response_library.json())
 
+
+    def test_update_notes_should_create_new_note_if_canonical_note_does_not_exist(self): 
+        original_bibcodes = ['arXivtest1', 'arXivtest2', 'arXivtest3', 'arXivtest4']
+        canonical_bibcodes = ['canonical1', 'canonical2', 'canonical3', 'canonical4']
+        with self.app.session_scope() as session: 
+            # Simulating solr response where original bibcodes have a corresponding canonical bibcodes
+            updated_list = [{original_bibcodes[i]: canonical_bibcodes[i]} for i in range(len(original_bibcodes))]
+            
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={bibcode: {} for bibcode in canonical_bibcodes+original_bibcodes})
+            session.add(library)
+            session.commit()
+            notes_ids = []
+            for bibcode in original_bibcodes: 
+                note = Notes.create_unique(session=session, 
+                                    content='content{0}'.format(bibcode), 
+                                    bibcode=bibcode,
+                                    library=library)
+                notes_ids.append(note.id)
+            
+            
+            LibraryView.update_notes(session, library, updated_list)
+            session.refresh(library)
+            session.expunge(library)
+
+        # Assert the new notes with canonical bibcodes were created and old notes were preserved
+        notes = session.query(Notes).filter(Notes.library_id == library.id).all()
+        self.assertEqual(len(notes), len(original_bibcodes+canonical_bibcodes))
+        self.assertEqual(original_bibcodes + canonical_bibcodes, [note.bibcode for note in notes])
+        self.assertUnsortedNotEqual(notes_ids, [note.id for note in notes])
+        self.assertIn('contentarXivtest1', [note.content for note in notes])
+        self.assertIn('contentarXivtest2', [note.content for note in notes])
+        self.assertIn('contentarXivtest3', [note.content for note in notes])
+        self.assertIn('contentarXivtest4', [note.content for note in notes]) 
+        self.assertNotIn('contentcanonical1', [note.content for note in notes]) 
+
+    def test_update_notes_should_merge_content_if_canonical_already_exists(self): 
+        original_bibcode1 = 'arXivtest1'
+        original_bibcode2 = 'arXivtest2'
+        canonical_bibcode = 'canonical1'
+        with self.app.session_scope() as session:
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={bibcode: {} for bibcode in [original_bibcode1, original_bibcode2, canonical_bibcode]})
+            session.add(library)
+            session.commit()
+            # Create a canonical note 
+            canonical_note = Notes.create_unique(session=session, 
+                                    content='canonical_note_content', 
+                                    bibcode=canonical_bibcode,
+                                    library=library)
+            
+            # Create an arxiv note 1
+            arxiv_note1 = Notes.create_unique(session=session, 
+                                    content='arxiv_note1_content', 
+                                    bibcode=original_bibcode1,
+                                    library=library)
+            
+            # Create an arxiv note 2 
+            arxiv_note2 = Notes.create_unique(session=session, 
+                                    content='arxiv_note2_content', 
+                                    bibcode=original_bibcode2,
+                                    library=library)
+            updated_list = [{original_bibcode1: canonical_bibcode}, {original_bibcode2: canonical_bibcode}]
+
+            updated_notes = LibraryView.update_notes(session, library, updated_list)
+            session.refresh(library)
+            session.expunge(library)
+            notes = session.query(Notes).filter(Notes.library_id == library.id).all()
+            canonical_note = session.query(Notes).filter(Notes.library_id == library.id, Notes.bibcode == canonical_bibcode).one()
+            self.assertEqual(len(notes), 3)
+            self.assertUnsortedEqual([note.bibcode for note in notes], [canonical_bibcode, original_bibcode1, original_bibcode2])
+            self.assertEqual(canonical_note.content, 'canonical_note_content arxiv_note1_content arxiv_note2_content')
+            self.assertUnsortedEqual(updated_notes, [canonical_note, arxiv_note1, arxiv_note2])
+
+    def test_update_notes_should_throw_exception(self): 
+        original_bibcode1 = 'arXivtest1'
+        original_bibcode2 = 'arXivtest2'
+        canonical_bibcode = 'canonical1'
+        with self.app.session_scope() as session:
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={bibcode: {} for bibcode in [original_bibcode1, original_bibcode2, canonical_bibcode]})
+            session.add(library)
+            session.commit()
+
+            # Create an arxiv note 1
+            Notes.create_unique(session=session, 
+                                    content='arxiv_note1_content', 
+                                    bibcode=original_bibcode1,
+                                    library=library)
+            
+            # Create an arxiv note 2 
+            Notes.create_unique(session=session, 
+                                    content='arxiv_note2_content', 
+                                    bibcode=original_bibcode2,
+                                    library=library)
+            updated_list = [{original_bibcode1: canonical_bibcode}, {original_bibcode2: canonical_bibcode}]
+
+            session.add(library)
+            session.commit()
+
+            session.refresh(library)
+            session.expunge(library)
+            
+            def mock_create_unique(**kwargs):
+                raise ValueError('Could not create unique note')
+            Notes.create_unique = mock_create_unique
+
+            with self.assertLogs(logger=current_app.logger, level='ERROR') as log:
+                LibraryView.update_notes(session, library, updated_list)
+
+            self.assertIn("Error while creating new note", log.output[0])
+            self.assertIn('Could not create unique note', log.output[0])
+
+        
     def test_that_solr_updates_canonical_bibcodes(self):
         """
         Tests that a comparison between the solr data and the stored data is
@@ -1196,6 +1319,7 @@ class TestLibraryViews(TestCaseDatabase):
             for obj in [library, permission, user]:
                 session.refresh(obj)
                 session.expunge(obj)
+            
 
             # Retrieve the bibcodes using the web services
             with MockSolrBigqueryService(solr_docs=solr_docs):
@@ -1203,7 +1327,6 @@ class TestLibraryViews(TestCaseDatabase):
                     bibcodes=library.bibcode
                 ).json()
             self.assertIn('responseHeader', response_library)
-
             # Now check solr updates the records correctly
             solr_docs = response_library['response']['docs']
             updates = self.library_view.solr_update_library(library_id=library.id,
@@ -1212,10 +1335,12 @@ class TestLibraryViews(TestCaseDatabase):
             # Check the data returned is correct on what files were updated and why
             self.assertEqual(updates['num_updated'], 1)
             self.assertEqual(updates['duplicates_removed'], 0)
-            self.assertEqual(updates['updated_notes'], [note])
+            # New note was created and old note was also added to updated_notes list
+            self.assertEqual(len(updates['updated_notes']), 2)
             update_list = updates['update_list']
             self.assertEqual(update_list[0]['arXivtest3'],
                             'test3')
+            
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library.id).one()
@@ -1227,8 +1352,7 @@ class TestLibraryViews(TestCaseDatabase):
             self.assertUnsortedNotEqual(library.get_bibcodes(),
                                         original_bibcodes)
             self.assertUnsortedEqual(library.get_bibcodes(),
-                                     canonical_bibcodes)
-            
+                                        canonical_bibcodes)
     def test_that_solr_maintains_bibcode_info(self):
         """
         Tests that a comparison between the solr data and the stored data is

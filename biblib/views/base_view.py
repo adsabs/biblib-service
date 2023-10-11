@@ -19,6 +19,7 @@ from sqlalchemy import Boolean
 from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from biblib.utils import uniquify, err
 from biblib.emails import Email
+from biblib.views.http_errors import MISSING_USERNAME_ERROR, BAD_LIBRARY_ID_ERROR, NO_PERMISSION_ERROR
 
 class BaseView(Resource):
     """
@@ -664,4 +665,124 @@ class BaseView(Resource):
 
         return solr_resp.get("response"), status
     
+    def helper_get_user_id_from_headers(self, request): 
+        """
+        Gets the user id from the request headers
+        :param request: request object
+
+        :return: user_id if it exists and None otherwise
+                 Error message if the user does not exist and None otherwise
+                 
+        """
+        try:
+            user = int(request.headers[USER_ID_KEYWORD])
+            return user, None
+        except KeyError:
+            current_app.logger.error('No username passed')
+            return None, err(MISSING_USERNAME_ERROR)
+        
+    def helper_get_library_from_slug(self, user, library):
+        """
+        Retrieves library id from slug
+        :param user: user_id
+        :param library: library slug
+
+        :return: library_id: if it exists and None otherwise
+                 BAD_LIBRARY_ID_ERROR: if the library is not found 
+      
+        """
+        try:
+            library = self.helper_slug_to_uuid(library)
+            current_app.logger.info('User: {0} requested library: {1}'
+                                .format(user, library))
+            return library, None
+        except TypeError:
+            return None, err(BAD_LIBRARY_ID_ERROR)
+        
+    def get_service_uid(self, user): 
+        """
+        Retrieves the user id for service 
+        :param user: user
+        
+
+        :return: uid: if it exists and None otherwise
+        """
+        # If user exists, get their service uid 
+        user_exists = self.helper_user_exists(absolute_uid=user)
+        if user_exists:
+            return self.helper_absolute_uid_to_service_uid(absolute_uid=user) 
     
+    
+    def helper_is_library_public_or_has_special_token(self, library, request):
+        """
+        HTTP GET request that returns all the documents inside a given
+        user's library
+        :param library: library
+
+        :return: <boolean> True if the library is public or if header contains 
+        special token
+        """
+
+        special_token = current_app.config.get('READONLY_ALL_LIBRARIES_TOKEN')
+        return library.public or (
+            special_token and request.headers.get('Authorization', '').endswith(special_token)
+        )
+    
+    def helper_handle_no_permission(self, user, service_uid, library):
+        """
+        Checks if user has permission to access the given library
+        :param user: user 
+        :param service_uid: user service id 
+        :param library: library 
+
+        :return: None if user has permission and an error otherwise
+        """
+        if not self.helper_check_user_and_access(user, service_uid, library):
+            return err(NO_PERMISSION_ERROR)
+
+    def helper_check_user_and_access(self, user, service_uid, library):
+        """
+        Checks if user exists and has read access to the library
+        :param user: user 
+        :param service_uid: user service id 
+        :param library: library 
+
+        :return: <boolean> True if the user exists and has permissions 
+        """
+        return self.helper_check_user_has_read_access(service_uid, library) and \
+            self.helper_check_user_exists(user, library)
+            
+    def helper_check_user_exists(self, user, library):
+        """
+        Checks if user exists
+        :param user: user 
+        :param library: library 
+
+        :return: <boolean> True if the user exists
+        """
+        if not self.helper_user_exists(absolute_uid=user):
+            current_app.logger.error(
+                'User: {0} does not exist in the database. '
+                'Therefore will not have extra privileges to view the library: {1}'
+                .format(user, library.id)
+            )
+            return False
+
+        return True
+
+    def helper_check_user_has_read_access(self, service_uid, library):
+        """
+        Checks if user has read access to library
+        :param service_uid: user service id 
+        :param library: library 
+
+        :return: <boolean> True if the user has read access to library
+        """
+        if not self.read_access(service_uid=service_uid, library_id=library.id):
+            current_app.logger.error(
+                'User: {0} does not have access to library: {1}. DENIED'
+                .format(service_uid, library.id)
+            )
+            return False
+
+        return True
