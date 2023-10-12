@@ -464,51 +464,51 @@ class LibraryView(BaseView):
         library_notes:        <dict>    Dictionary of library notes, including orphan 
                                         notes (those not associated with a bibcode in the library)
         """
+        with current_app.session_scope() as session:
+            try:
+                library, metadata = self.get_documents_from_library(
+                    library_id=data["library_id"],
+                    service_uid=data["service_uid"],
+                    session=session
+                )
         
-        try:
-            library, metadata = self.get_documents_from_library(
-                library_id=data["library_id"],
-                service_uid=data["service_uid"],
-                session=data["session"]
-            )
-       
-            
-            if data["raw_library"]:
-                solr, updates, documents = self.process_raw_library(data["user"], 
-                                                                    library, 
-                                                                    data["start"], 
-                                                                    data["rows"])
-            else:
-                solr, updates, documents = self.process_solr(library, 
-                                                             data["start"], 
-                                                             data["rows"], 
-                                                             data["sort"], 
-                                                             data["fl"])
+                
+                if data["raw_library"]:
+                    solr, updates, documents = self.process_raw_library(data["user"], 
+                                                                        library, 
+                                                                        data["start"], 
+                                                                        data["rows"])
+                else:
+                    solr, updates, documents = self.process_solr(library, 
+                                                                data["start"], 
+                                                                data["rows"], 
+                                                                data["sort"], 
+                                                                data["fl"])
 
-            library_notes = {}
-            if data["notes"]: 
-                library_notes = self.get_notes_from_library(library, data["session"])
-            
-            # Make the response dictionary
-            response = dict(
-                documents=documents,
-                solr=solr,
-                metadata=metadata,
-                updates=updates,
-            )
+                library_notes = {}
+                if data["notes"]: 
+                    library_notes = self.get_notes_from_library(library, session)
+                
+                # Make the response dictionary
+                response = dict(
+                    documents=documents,
+                    solr=solr,
+                    metadata=metadata,
+                    updates=updates,
+                )
 
-            if library_notes and (library_notes.get('notes', {}) or library_notes.get('orphan_notes', {})):
-                response['library_notes'] = library_notes
+                if library_notes and (library_notes.get('notes', {}) or library_notes.get('orphan_notes', {})):
+                    response['library_notes'] = library_notes
 
 
-            return library, response, None
+                return library, response, None
 
-        except Exception as error:
-            current_app.logger.warning(
-                'Library missing or solr endpoint failed: {0}'
-                .format(error)
-            )
-            return data["library_id"], None, err(MISSING_LIBRARY_ERROR)
+            except Exception as error:
+                current_app.logger.warning(
+                    'Library missing or solr endpoint failed: {0}'
+                    .format(error)
+                )
+                return data["library_id"], None, err(MISSING_LIBRARY_ERROR)
 
     # Methods
     def get(self, library):
@@ -617,11 +617,10 @@ class LibraryView(BaseView):
                 "raw_library": raw_library,
                 "notes": notes}
         
-        with current_app.session_scope() as session:
-            data['session'] = session
-            library, response, solr_error = self.get_library_data(data)
-            if solr_error: 
-                return solr_error
+        
+        library, response, solr_error = self.get_library_data(data)
+        if solr_error: 
+            return solr_error
 
         # Skip any more logic if the library is public or the exception token is present
         if self.helper_is_library_public_or_has_special_token(library, request):
