@@ -11,7 +11,7 @@ from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy import Boolean
 from biblib.views.http_errors import SOLR_RESPONSE_MISMATCH_ERROR, \
-    MISSING_LIBRARY_ERROR
+    MISSING_LIBRARY_ERROR, MISSING_USERNAME_ERROR, BAD_LIBRARY_ID_ERROR, NO_PERMISSION_ERROR \
 
 
 class LibraryView(BaseView):
@@ -423,7 +423,7 @@ class LibraryView(BaseView):
                 response['orphan_notes'][bibcode] = note
         return response
 
-    def process_library_request(self, data):
+    def get_library_data(self, data):
         """
         Processes the get request for the library and assembles a response
         :param data: <dict> containing user, service_uid, library_id, start, rows, sort, fl, 
@@ -580,29 +580,36 @@ class LibraryView(BaseView):
 
         """
 
+        # If set to True, return notes in library
+        notes = request.args.get('notes', type=bool, default=True)
+
         # Get user 
-        user, user_error = self.helper_get_user_id_from_headers(request)
-        if user_error: 
-            return user_error
+        try:
+            user = self.helper_get_user_id()
+        except KeyError:
+            return err(MISSING_USERNAME_ERROR)
+        
+        # Get library id
+        current_app.logger.info('User: {0} requested library: {1}'
+                                .format(user, library))
+        try:
+            library = self.helper_slug_to_uuid(library)
+        except TypeError:
+            return err(BAD_LIBRARY_ID_ERROR)
+        
+        if not self.helper_library_exists(library):
+            return err(MISSING_LIBRARY_ERROR)
+        
+        # Get user id for service 
+        service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
         
         # Parameters to be forwarded to Solr: pagination, and fields
         start, rows, sort, fl, raw_library = self.load_parameters(request)
 
-        # Get library id
-        library_id, library_error = self.helper_get_library_from_slug(user, library)
-        if library_error: 
-            return library_error
-    
-        # If set to True, return notes in library
-        notes = request.args.get('notes', type=bool, default=True)
- 
-        # Get user id for service 
-        service_uid = self.get_service_uid(user) 
-
         # Data needed to process the library request
         data = {"user": user, 
                 "service_uid": service_uid, 
-                "library_id": library_id,
+                "library_id": library,
                 "start": start, 
                 "rows": rows, 
                 "sort": sort, 
@@ -612,25 +619,33 @@ class LibraryView(BaseView):
         
         with current_app.session_scope() as session:
             data['session'] = session
-            library, response, solr_error = self.process_library_request(data)
+            library, response, solr_error = self.get_library_data(data)
             if solr_error: 
                 return solr_error
 
         # Skip any more logic if the library is public or the exception token is present
         if self.helper_is_library_public_or_has_special_token(library, request):
             current_app.logger.info('Library: {0} is public'
-                                    .format(library_id))
+                                    .format(library))
             return response, 200
         
-        current_app.logger.warning('Library: {0} is private'.format(library_id))
-        
-        # Check if the user exists and has access to the library
-        no_permission = self.helper_handle_no_permission(user, service_uid, library)
-        if no_permission: 
-            return no_permission
+        current_app.logger.warning('Library: {0} is private'.format(library))
 
+        # If user does not exist they don't have access to this private library
+        if not self.helper_user_exists(user):
+            current_app.logger.error(
+                'User: {0} does not exist in the database. '
+                'Therefore will not have extra privileges to view the library: {1}'
+                .format(user, library.id)
+            )
+            return err(NO_PERMISSION_ERROR)
+        
+        # Check if the user has read access to this private library
+        if not self.helper_check_user_has_read_access(service_uid, library): 
+            return err(NO_PERMISSION_ERROR)
+        
         # If they have access, let them obtain the requested content
         current_app.logger.info('User: {0} has access to library: {1}. '
                                 'ALLOWED'
-                                .format(user, library_id))
+                                .format(user, library))
         return response, 200
