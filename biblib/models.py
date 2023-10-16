@@ -181,7 +181,7 @@ class Notes(Base):
     __versioned__ = {}
     id = Column(Integer, primary_key=True)
     content = Column(UnicodeText)
-    bibcode = Column(String(50), nullable=False)
+    bibcode = Column(String(19), nullable=False)
     library_id = Column(GUID, ForeignKey('library.id'))
     date_created = Column(
         DateTime,
@@ -201,6 +201,16 @@ class Notes(Base):
                             self.library_id, 
                             self.bibcode, 
                             self.content)
+    def as_dict(self):
+        return {
+            'id': str(self.id),  # Convert UUID to string
+            'content': self.content,
+            'bibcode': self.bibcode, 
+            'library_id': str(self.library_id),
+            'date_created': self.date_created.isoformat(), 
+            'date_last_modified': self.date_last_modified.isoformat(), 
+        }
+    
     @classmethod
     def create_unique(cls, session, content, bibcode, library): 
         """

@@ -163,7 +163,9 @@ class LibraryView(BaseView):
         """
         notes = session.query(Notes).filter(Notes.library_id == library.id).all() 
         updated_dict = {}
-        updated_notes = set()
+        updated_notes = []
+        updated_ids = set()
+        
         # Turn list into a dictionary for fast lookup
         for updated_bibcode in updated_list: 
             for key, value in updated_bibcode.items(): 
@@ -171,11 +173,13 @@ class LibraryView(BaseView):
         for note in notes: 
             
             if note.bibcode in updated_dict:  
-
-                updated_notes.add(note)
+                # Convert to notes to a hashable tuple and add to updated_notes
                 canonical_bibcode = updated_dict[note.bibcode]
                 canonical_note = session.query(Notes).filter(Notes.library_id == library.id, 
                                                             Notes.bibcode == canonical_bibcode).one_or_none()
+                if note.id not in updated_ids: 
+                    updated_ids.add(note.id)
+                    updated_notes.append(note.as_dict())
                 
                 # If there's no note with the canonical bibcode, create a new note
                 if not canonical_note:
@@ -184,7 +188,9 @@ class LibraryView(BaseView):
                                             content=note.content, 
                                             bibcode=canonical_bibcode, 
                                             library=library) 
-                        updated_notes.add(new_note)
+                        if new_note.id not in updated_ids: 
+                            updated_ids.add(new_note.id)
+                            updated_notes.append(new_note.as_dict())
                     except Exception as error: 
                         current_app.logger.error('Error while creating new note with canonical bibcode {0}: {1}'
                                                 .format(canonical_bibcode, error))
@@ -192,8 +198,10 @@ class LibraryView(BaseView):
                     canonical_note.content = '{0} {1}'.format(canonical_note.content, note.content)
                     session.add(canonical_note)
                     session.commit()
-                    updated_notes.add(canonical_note)
-        return list(updated_notes)
+                    if canonical_note.id not in updated_ids: 
+                            updated_ids.add(canonical_note.id)
+                            updated_notes.append(canonical_note.as_dict())
+        return updated_notes
 
     @classmethod
     def update_database(cls, session, library, new_library_bibcodes, updates):
@@ -214,14 +222,14 @@ class LibraryView(BaseView):
             library.bibcode = new_library_bibcodes
             session.add(library)
             session.commit()
-
+            
             updates['updated_notes'] = cls.update_notes(session, library, updates['update_list'])
         except Exception as error:
             current_app.logger.warning('Could not update database: {0}'
                                     .format(error))
             
     @classmethod
-    def solr_update_library(cls, library_id, solr_docs):
+    def solr_update_library(cls, library_id, solr_docs, session):
         """
         Updates the library based on the solr canonical bibcodes response
         :param library: library_id of the library to update
@@ -247,27 +255,26 @@ class LibraryView(BaseView):
         # in which the alternate bibcode is the key and the canonical bibcode is the value
         alternate_bibcodes = cls.get_alternate_bibcodes(solr_docs)
 
-        with current_app.session_scope() as session:
-            library = session.query(Library).filter(Library.id == library_id).one()
-            for bibcode in library.bibcode:
+        library = session.query(Library).filter(Library.id == library_id).one()
+        for bibcode in library.bibcode:
 
-                # Update if its an alternate
-                if bibcode in alternate_bibcodes:
-                    canonical = alternate_bibcodes[bibcode]
-                    updates['num_updated'] += 1
-                    updates['update_list'].append({bibcode: canonical})
+            # Update if its an alternate
+            if bibcode in alternate_bibcodes:
+                canonical = alternate_bibcodes[bibcode]
+                updates['num_updated'] += 1
+                updates['update_list'].append({bibcode: canonical})
 
-                    # Only add the bibcode to the library if it is not there
-                    if canonical not in new_library_bibcodes:
-                        new_library_bibcodes[canonical] = library.bibcode[bibcode]
-                    else:
-                        updates['duplicates_removed'] += 1
+                # Only add the bibcode to the library if it is not there
+                if canonical not in new_library_bibcodes:
+                    new_library_bibcodes[canonical] = library.bibcode[bibcode]
                 else:
-                    new_library_bibcodes[bibcode] = library.bibcode[bibcode]
-            if updates['update_list']:                
-                cls.update_database(session, library, new_library_bibcodes, updates)
+                    updates['duplicates_removed'] += 1
+            else:
+                new_library_bibcodes[bibcode] = library.bibcode[bibcode]
+        if updates['update_list']:                
+            cls.update_database(session, library, new_library_bibcodes, updates)
 
-            return updates
+        return updates
         
     def load_parameters(self, request): 
         """
@@ -326,9 +333,9 @@ class LibraryView(BaseView):
             return False 
         return True
     
-    def process_solr(self, library, start, rows, sort, fl):
+    def process_solr(self, library, start, rows, sort, fl, session):
         """
-        Processes the request for raw library 
+        Processes the request to solr big query
         :param library: <string> <library ID>
         :param start: <int> used to delimit the start of pagination 
         :param rows: <int> used to delimit the start of pagination 
@@ -340,7 +347,7 @@ class LibraryView(BaseView):
                  documents: <dictionary> with docs in library 
         """
         try:
-            solr = self._solr_big_query(
+            solr = self.process_solr_big_query(
                 bibcodes=library.bibcode,
                 start=start,
                 rows=rows,
@@ -358,7 +365,8 @@ class LibraryView(BaseView):
             # Update bibcodes based on solr's response
             updates = self.solr_update_library(
                 library_id=library.id,
-                solr_docs=solr['response']['docs']
+                solr_docs=solr['response']['docs'], 
+                session=session
             )
 
             documents = [doc['bibcode'] for doc in solr['response']['docs']]
@@ -417,10 +425,10 @@ class LibraryView(BaseView):
         for bibcode in bibcode_to_notes_map.keys():
             if bibcode in set(library.get_bibcodes()): 
                 note = bibcode_to_notes_map[bibcode]
-                response['notes'][bibcode] = note
+                response['notes'][bibcode] = note.as_dict()
             else: 
                 note = bibcode_to_notes_map[bibcode]
-                response['orphan_notes'][bibcode] = note
+                response['orphan_notes'][bibcode] = note.as_dict()
         return response
 
     def get_library_data(self, data):
@@ -472,7 +480,6 @@ class LibraryView(BaseView):
                     session=session
                 )
         
-                
                 if data["raw_library"]:
                     solr, updates, documents = self.process_raw_library(data["user"], 
                                                                         library, 
@@ -483,10 +490,11 @@ class LibraryView(BaseView):
                                                                 data["start"], 
                                                                 data["rows"], 
                                                                 data["sort"], 
-                                                                data["fl"])
+                                                                data["fl"], 
+                                                                session)
 
                 library_notes = {}
-                if data["notes"]: 
+                if data["notes"] is True: 
                     library_notes = self.get_notes_from_library(library, session)
                 
                 # Make the response dictionary
@@ -581,7 +589,7 @@ class LibraryView(BaseView):
         """
 
         # If set to True, return notes in library
-        notes = request.args.get('notes', type=bool, default=True)
+        notes = request.args.get('notes', type=check_boolean, default=True)        
 
         # Get user 
         try:

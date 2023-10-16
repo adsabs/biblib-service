@@ -501,7 +501,7 @@ class BaseView(Resource):
         return msg
 
     @staticmethod
-    def _solr_big_query(
+    def process_solr_big_query(
             bibcodes,
             start=0,
             rows=20,
@@ -633,7 +633,7 @@ class BaseView(Resource):
     def solr_big_query(cls, input_bibcodes, start, rows): 
         try:
             #For calls to bigquery, we limit the number of rows allowed in config. Max rows = 2000
-            response = cls._solr_big_query(input_bibcodes, start=start, rows=rows)
+            response = cls.process_solr_big_query(input_bibcodes, start=start, rows=rows)
             solr_resp = response.json()
             status = response.status_code
         except Exception as err:

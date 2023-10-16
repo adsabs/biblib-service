@@ -3,14 +3,10 @@ Tests the underlying models of the database
 """
 
 import unittest
-from biblib.models import User, Library, Permissions, MutableDict, Notes
+from biblib.models import Library, MutableDict, Notes
 from biblib.tests.base import TestCaseDatabase
-from sqlalchemy.exc import IntegrityError
 import pytest
 
-class CustomDatabaseError(Exception):
-    def __init__(self, message="Custom database error occurred in create_unique method."):
-        super().__init__(message)
 
 class TestLibraryModel(TestCaseDatabase):                                                                                                                                                                                                                                                                     
     """

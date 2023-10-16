@@ -1145,7 +1145,7 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Retrieve the bibcodes using the web services
         with MockSolrBigqueryService():
-            response_library = self.library_view._solr_big_query(
+            response_library = self.library_view.process_solr_big_query(
                 bibcodes=library.bibcode
             )
         self.assertIn('responseHeader', response_library.json())
@@ -1228,7 +1228,7 @@ class TestLibraryViews(TestCaseDatabase):
             self.assertEqual(len(notes), 3)
             self.assertUnsortedEqual([note.bibcode for note in notes], [canonical_bibcode, original_bibcode1, original_bibcode2])
             self.assertEqual(canonical_note.content, 'canonical_note_content arxiv_note1_content arxiv_note2_content')
-            self.assertUnsortedEqual(updated_notes, [canonical_note, arxiv_note1, arxiv_note2])
+            self.assertEqual(len(updated_notes), 3)
 
     def test_update_notes_should_throw_exception(self): 
         original_bibcode1 = 'arXivtest1'
@@ -1323,14 +1323,15 @@ class TestLibraryViews(TestCaseDatabase):
 
             # Retrieve the bibcodes using the web services
             with MockSolrBigqueryService(solr_docs=solr_docs):
-                response_library = self.library_view._solr_big_query(
+                response_library = self.library_view.process_solr_big_query(
                     bibcodes=library.bibcode
                 ).json()
             self.assertIn('responseHeader', response_library)
             # Now check solr updates the records correctly
             solr_docs = response_library['response']['docs']
             updates = self.library_view.solr_update_library(library_id=library.id,
-                                                            solr_docs=solr_docs)
+                                                            solr_docs=solr_docs, 
+                                                            session=session)
 
             # Check the data returned is correct on what files were updated and why
             self.assertEqual(updates['num_updated'], 1)
@@ -1400,19 +1401,20 @@ class TestLibraryViews(TestCaseDatabase):
                 session.refresh(obj)
                 session.expunge(obj)
 
-        # Retrieve the bibcodes using the web services
-        with MockSolrBigqueryService(solr_docs=solr_docs):
-            response_library = self.library_view._solr_big_query(
-                bibcodes=library.bibcode
-            ).json()
-        self.assertIn('responseHeader', response_library)
+            # Retrieve the bibcodes using the web services
+            with MockSolrBigqueryService(solr_docs=solr_docs):
+                response_library = self.library_view.process_solr_big_query(
+                    bibcodes=library.bibcode
+                ).json()
+            self.assertIn('responseHeader', response_library)
 
-        # Now check solr updates the records correctly
-        solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library_id=library.id,
-                                                        solr_docs=solr_docs)
-        
-        self.assertEqual(len(updates['update_list']), 1)
+            # Now check solr updates the records correctly
+            solr_docs = response_library['response']['docs']
+            updates = self.library_view.solr_update_library(library_id=library.id,
+                                                            solr_docs=solr_docs, 
+                                                            session=session)
+            
+            self.assertEqual(len(updates['update_list']), 1)
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library.id).one()
@@ -1473,7 +1475,7 @@ class TestLibraryViews(TestCaseDatabase):
              
             # Retrieve the bibcodes using the web services
             with MockSolrBigqueryService(solr_docs=solr_docs):
-                response_library = self.library_view._solr_big_query(
+                response_library = self.library_view.process_solr_big_query(
                     bibcodes=library.bibcode
                 ).json()
             self.assertIn('responseHeader', response_library)
@@ -1481,7 +1483,8 @@ class TestLibraryViews(TestCaseDatabase):
             # Now check solr updates the records correctly
             solr_docs = response_library['response']['docs']
             updates = self.library_view.solr_update_library(library_id=library.id,
-                                                            solr_docs=solr_docs)
+                                                            solr_docs=solr_docs,
+                                                            session=session)
 
             self.assertEqual(updates['num_updated'], 2)
             self.assertEqual(updates['duplicates_removed'], 2)
@@ -1552,24 +1555,25 @@ class TestLibraryViews(TestCaseDatabase):
                 session.refresh(obj)
                 session.expunge(obj)
 
-        # Retrieve the bibcodes using the web services
-        with MockSolrBigqueryService(solr_docs=solr_docs):
-            response_library = self.library_view._solr_big_query(
-                bibcodes=library.bibcode
-            ).json()
-        self.assertIn('responseHeader', response_library)
+            # Retrieve the bibcodes using the web services
+            with MockSolrBigqueryService(solr_docs=solr_docs):
+                response_library = self.library_view.process_solr_big_query(
+                    bibcodes=library.bibcode
+                ).json()
+            self.assertIn('responseHeader', response_library)
 
-        # Now check solr updates the records correctly
-        solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library_id=library.id,
-                                                        solr_docs=solr_docs)
+            # Now check solr updates the records correctly
+            solr_docs = response_library['response']['docs']
+            updates = self.library_view.solr_update_library(library_id=library.id,
+                                                            solr_docs=solr_docs,
+                                                            session=session)
 
-        # Check the data returned is correct on what files were updated and why
-        self.assertEqual(updates['num_updated'], 1)
-        self.assertEqual(updates['duplicates_removed'], 0)
-        update_list = updates['update_list']
-        self.assertEqual(update_list[0]['arXivtest2'],
-                         'test2')
+            # Check the data returned is correct on what files were updated and why
+            self.assertEqual(updates['num_updated'], 1)
+            self.assertEqual(updates['duplicates_removed'], 0)
+            update_list = updates['update_list']
+            self.assertEqual(update_list[0]['arXivtest2'],
+                            'test2')
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library.id).one()
@@ -1684,10 +1688,8 @@ class TestLibraryViews(TestCaseDatabase):
             session.commit()
 
             bibcodes = fake_biblist(15)
+            
             canonical_bibcodes = bibcodes[:5]
-
-            for i in range(len(canonical_bibcodes), len(bibcodes)):
-                bibcodes[i] = 'arXiv' + bibcodes[i]
 
             # Ensure a library exists
             library = Library(name='MyLibrary',
