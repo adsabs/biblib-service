@@ -188,6 +188,8 @@ class LibraryView(BaseView):
                                             content=note.content, 
                                             bibcode=canonical_bibcode, 
                                             library=library) 
+                        session.add(new_note)
+                        session.commit()
                         if new_note.id not in updated_ids: 
                             updated_ids.add(new_note.id)
                             updated_notes.append(new_note.as_dict())
@@ -524,6 +526,11 @@ class LibraryView(BaseView):
         HTTP GET request that returns all the documents inside a given
         user's library
         :param library: library slug
+        :param start: int (optional) start of pagination
+        :param rows: int (optional) how many rows should be fetched
+        :param sort: enum (optional) type of sort 
+        :param fl: list<str> (optional) set of fields to return
+        :param notes: bool (optional) True if notes should be returned
 
         :return: list of the users libraries with the relevant information
 
@@ -636,7 +643,7 @@ class LibraryView(BaseView):
                                     .format(library))
             return response, 200
         
-        current_app.logger.warning('Library: {0} is private'.format(library))
+        current_app.logger.info('Library: {0} is private'.format(library))
 
         # If user does not exist they don't have access to this private library
         if not self.helper_user_exists(user):

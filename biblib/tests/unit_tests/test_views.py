@@ -1171,6 +1171,8 @@ class TestLibraryViews(TestCaseDatabase):
                                     content='content{0}'.format(bibcode), 
                                     bibcode=bibcode,
                                     library=library)
+                session.add(note)
+                session.commit()
                 notes_ids.append(note.id)
             
             
@@ -1218,6 +1220,8 @@ class TestLibraryViews(TestCaseDatabase):
                                     content='arxiv_note2_content', 
                                     bibcode=original_bibcode2,
                                     library=library)
+            session.add_all([canonical_note, arxiv_note1,arxiv_note2])
+            session.commit()
             updated_list = [{original_bibcode1: canonical_bibcode}, {original_bibcode2: canonical_bibcode}]
 
             updated_notes = LibraryView.update_notes(session, library, updated_list)
@@ -1244,19 +1248,19 @@ class TestLibraryViews(TestCaseDatabase):
             session.commit()
 
             # Create an arxiv note 1
-            Notes.create_unique(session=session, 
+            note1 = Notes.create_unique(session=session, 
                                     content='arxiv_note1_content', 
                                     bibcode=original_bibcode1,
                                     library=library)
             
             # Create an arxiv note 2 
-            Notes.create_unique(session=session, 
+            note2 = Notes.create_unique(session=session, 
                                     content='arxiv_note2_content', 
                                     bibcode=original_bibcode2,
                                     library=library)
             updated_list = [{original_bibcode1: canonical_bibcode}, {original_bibcode2: canonical_bibcode}]
 
-            session.add(library)
+            session.add_all([note1, note2])
             session.commit()
 
             session.refresh(library)
@@ -1315,6 +1319,8 @@ class TestLibraryViews(TestCaseDatabase):
             session.commit()
 
             note = Notes.create_unique(session=session, library=library, content='arxivtest3content', bibcode='arXivtest3')
+            session.add(note)
+            session.commit()
 
             for obj in [library, permission, user]:
                 session.refresh(obj)
@@ -1465,9 +1471,12 @@ class TestLibraryViews(TestCaseDatabase):
             session.add_all([library, permission, user])
             session.commit()
 
-            Notes.create_unique(session=session, library=library, content='test3content', bibcode='test3')
-            Notes.create_unique(session=session, library=library, content='arxivtest3content', bibcode='arXivtest3')
-            Notes.create_unique(session=session, library=library, content='conftest3content', bibcode='conftest3')
+            note1 = Notes.create_unique(session=session, library=library, content='test3content', bibcode='test3')
+            note2 = Notes.create_unique(session=session, library=library, content='arxivtest3content', bibcode='arXivtest3')
+            note3 = Notes.create_unique(session=session, library=library, content='conftest3content', bibcode='conftest3')
+
+            session.add_all([note1, note2, note3])
+            session.commit()
 
             for obj in [library, permission, user]:
                 session.refresh(obj)
@@ -1715,7 +1724,9 @@ class TestLibraryViews(TestCaseDatabase):
             # add notes to the library 
             for i in range(len(bibcodes)): 
                 bibcode = bibcodes[i]
-                Notes.create_unique(library=library, bibcode=bibcode, content="content" + bibcode, session=session)
+                note = Notes.create_unique(library=library, bibcode=bibcode, content="content" + bibcode, session=session)
+                session.add(note)
+                session.commit()
     
             library.bibcode = {bibcode: {} for bibcode in canonical_bibcodes}
             session.add(library)

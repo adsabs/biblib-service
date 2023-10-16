@@ -256,6 +256,7 @@ class TestManagePy(TestCaseDatabase):
                         self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
                 note_1 = Notes.create_unique(session, content="Note 1", bibcode=library[0].get_bibcodes()[0], library=library[0])
                 session.add(note_1)
+                session.commit()
                 note_1.content = "Note 1 version 2"
                 session.commit() 
                 
@@ -272,6 +273,7 @@ class TestManagePy(TestCaseDatabase):
                         self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
                 note_2 = Notes.create_unique(session, content="Note 1", bibcode=library[0].get_bibcodes()[1], library=library[0])
                 session.add(note_2)
+                session.commit()
                 note_2.content = "Note 2 version 2"
                 session.commit() 
 
@@ -423,6 +425,7 @@ class TestManagePy(TestCaseDatabase):
                 #create note 1 for document added and add one revision
                 note_1 = Notes.create_unique(session, content="Note 1", bibcode=library[0].get_bibcodes()[0], library=library[0])
                 session.add(note_1)
+                session.commit()
                 note_1.content = "Note 1 version 2"
                 session.commit()  
  
@@ -441,6 +444,7 @@ class TestManagePy(TestCaseDatabase):
                 #create note 2 for another document and add one revision
                 note_2 = Notes.create_unique(session, content="Note 2", bibcode=library[0].get_bibcodes()[1], library=library[0])
                 session.add(note_2)
+                session.commit()
                 note_2.content = "Note 2 version 2"
                 session.commit() 
 

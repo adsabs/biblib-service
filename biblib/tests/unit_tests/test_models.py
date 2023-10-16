@@ -106,6 +106,8 @@ class TestLibraryModel(TestCaseDatabase):
 
             with self.assertRaises(ValueError) as context:
                 note2 = Notes.create_unique(session, content="Test content 2", bibcode="1", library=lib) 
+                session.add(note2)
+                session.commit()
             
             existing_notes = session.query(Notes).filter_by(bibcode="1", library_id=lib.id).all() 
             self.assertEqual(len(existing_notes), 1) 
@@ -120,7 +122,9 @@ class TestLibraryModel(TestCaseDatabase):
             session.commit()
 
             with self.assertRaises(ValueError) as context:
-                Notes.create_unique(session, content="Test content 1", bibcode="3", library=lib) 
+                note = Notes.create_unique(session, content="Test content 1", bibcode="3", library=lib) 
+                session.add(note)
+                session.commit()
 
             self.assertUnsortedEqual(lib.get_bibcodes(), ['1', '2'])
             self.assertEqual(lib.notes, [])
@@ -134,7 +138,9 @@ class TestLibraryModel(TestCaseDatabase):
             session.commit()
             # Attempt to create a note with a bibcode that is not in the library, which should raise a ValueError
             with pytest.raises(Exception) as exc_info:
-                Notes.create_unique(session, "Note content", "NonExistentBibcode", lib)
+                note = Notes.create_unique(session, "Note content", "NonExistentBibcode", lib)
+                session.add(note)
+                session.commit()
 
             # Check that the exception message matches the expected message
             expected_message = 'Bibcode NonExistentBibcode not in library {0}'.format(lib)
@@ -148,6 +154,8 @@ class TestLibraryModel(TestCaseDatabase):
             session.commit()
             note1 = Notes.create_unique(session, content="Note 1 Content", bibcode="1", library=lib)
             note2 = Notes.create_unique(session, content="Note 2 Content", bibcode="2", library=lib)
+            session.add_all([note1, note2])
+            session.commit()
             
             self.assertEqual(lib.notes, [note1, note2])
 
@@ -165,7 +173,9 @@ class TestLibraryModel(TestCaseDatabase):
             session.commit()
             note1 = Notes.create_unique(session, content="Note 1 Content", bibcode="1", library=lib)
             note2 = Notes.create_unique(session, content="Note 2 Content", bibcode="2", library=lib)
-            
+            session.add_all([note1, note2])
+            session.commit()
+
             self.assertEqual(lib.notes, [note1, note2])
             self.assertEqual(session.query(Notes).count(), 2)
 
@@ -181,7 +191,8 @@ class TestLibraryModel(TestCaseDatabase):
             session.add(lib) 
             session.commit()
             note1 = Notes.create_unique(session, content="Note 1 Content", bibcode="1", library=lib)
-
+            session.add(note1)
+            session.commit()
             self.assertEqual(lib.notes, [note1])
             self.assertEqual(session.query(Notes).count(), 1)
 

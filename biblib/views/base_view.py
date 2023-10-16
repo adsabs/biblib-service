@@ -667,8 +667,7 @@ class BaseView(Resource):
     
     def helper_is_library_public_or_has_special_token(self, library, request):
         """
-        HTTP GET request that returns all the documents inside a given
-        user's library
+        Helper to check if library is public or has special token and returns
         :param library: library
 
         :return: <boolean> True if the library is public or if header contains 

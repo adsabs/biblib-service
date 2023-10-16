@@ -226,8 +226,6 @@ class Notes(Base):
                 raise ValueError('A note for the same bibcode {0}  and library {1} already exists.'.format(bibcode, library))
 
             note = Notes(content=content, bibcode=bibcode, library_id=library.id)
-            session.add(note)
-            session.commit()
             return note
         except Exception as error: 
             session.rollback() 
