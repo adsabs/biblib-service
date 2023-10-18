@@ -346,7 +346,7 @@ class LibraryView(BaseView):
         #timestamp sorting is handled in biblib so we need to change the sort to something SOLR understands.
         if sort in ['time asc', 'time desc']:
             current_app.logger.debug("sort order is set to{}".format(sort))
-            if 'time desc'== sort:
+            if sort == 'time desc':
                 add_sort = True
             else:
                 add_sort = False
@@ -403,7 +403,6 @@ class LibraryView(BaseView):
                 # Now check if we can update the library database based on the
                 # returned canonical bibcodes
                 if solr.get('response'):
-                    current_app.logger.debug("sort order is set to{}".format(add_sort))
                     # Update bibcodes based on solrs response
                     updates = self.solr_update_library(
                         library_id=library.id,
@@ -417,7 +416,6 @@ class LibraryView(BaseView):
                     # Some problem occurred, we will just ignore it, but will
                     # definitely log it.
                     solr = SOLR_RESPONSE_MISMATCH_ERROR['body']
-                    current_app.logger.debug("sort order is set to {}".format(add_sort))
                     current_app.logger.warning('Problem with solr response: {0}'
                                             .format(solr))
                     updates = {}
