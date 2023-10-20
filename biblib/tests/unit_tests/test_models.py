@@ -5,6 +5,7 @@ Tests the underlying models of the database
 import unittest
 from biblib.models import Library, MutableDict, Notes
 from biblib.tests.base import TestCaseDatabase
+from biblib.biblib_exceptions import BibcodeNotFoundError, DuplicateNoteError
 import pytest
 
 
@@ -104,7 +105,7 @@ class TestLibraryModel(TestCaseDatabase):
             session.add(note1) 
             session.commit() 
 
-            with self.assertRaises(ValueError) as context:
+            with self.assertRaises(DuplicateNoteError):
                 note2 = Notes.create_unique(session, content="Test content 2", bibcode="1", library=lib) 
                 session.add(note2)
                 session.commit()
@@ -121,14 +122,14 @@ class TestLibraryModel(TestCaseDatabase):
             session.add(lib) 
             session.commit()
 
-            with self.assertRaises(ValueError) as context:
+            with self.assertRaises(BibcodeNotFoundError) as context:
                 note = Notes.create_unique(session, content="Test content 1", bibcode="3", library=lib) 
                 session.add(note)
                 session.commit()
 
             self.assertUnsortedEqual(lib.get_bibcodes(), ['1', '2'])
             self.assertEqual(lib.notes, [])
-            self.assertIn("Bibcode 3 not in library", context.exception.args[0])  
+            self.assertIn("Bibcode 3 not found", context.exception.args[0])  
 
     def test_create_unique_raises_exception(self):
         
@@ -143,8 +144,7 @@ class TestLibraryModel(TestCaseDatabase):
                 session.commit()
 
             # Check that the exception message matches the expected message
-            expected_message = 'Bibcode NonExistentBibcode not in library {0}'.format(lib)
-            self.assertEqual(str(exc_info.value), expected_message)       
+            self.assertIn('Bibcode NonExistentBibcode not found', str(exc_info.value))       
 
     def test_library_notes_relationship(self): 
         lib = Library(bibcode={'1': {}, '2': {}}, public=True, description="Test description")

@@ -1016,7 +1016,7 @@ class TestLibraryViews(TestCaseDatabase):
         # Retrieve the bibcodes using the web services
         with MockEmailService(self.stub_user, end_type='uid'):
             response_library, meta_data = \
-                self.library_view.get_documents_from_library(
+                self.library_view.get_library_and_metadata(
                     library_id=library.id,
                     service_uid=user.id, 
                     session=session
@@ -1056,7 +1056,7 @@ class TestLibraryViews(TestCaseDatabase):
                 session.expunge(obj)
 
         with MockEmailService(self.stub_user, end_type='uid'):
-            library, metadata = self.library_view.get_documents_from_library(
+            library, metadata = self.library_view.get_library_and_metadata(
                 library_id=library.id,
                 service_uid=user.id, 
                 session=session
@@ -1099,7 +1099,7 @@ class TestLibraryViews(TestCaseDatabase):
                 session.expunge(obj)
 
         with MockEmailService(self.stub_user, end_type='uid'):
-            library, metadata = self.library_view.get_documents_from_library(
+            library, metadata = self.library_view.get_library_and_metadata(
                 library_id=library.id,
                 service_uid=user_random.id,
                 session=session

@@ -25,113 +25,6 @@ class LibraryView(BaseView):
     decorators = [advertise('scopes', 'rate_limit')]
     scopes = []
     rate_limit = [1000, 60*60*24]
-
-    @classmethod
-    def get_documents_from_library(cls, library_id, service_uid, session):
-        """
-        Retrieve all the documents that are within the library specified
-        :param library_id: the unique ID of the library
-        :param service_uid: the user ID within this microservice
-
-        :return: bibcodes
-        """
-
-        # Get the library
-        library = session.query(Library).filter_by(id=library_id).one()
-
-        # Get the owner of the library
-        result = session.query(Permissions, User)\
-            .join(Permissions.user)\
-            .filter(Permissions.library_id == library_id) \
-            .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True))\
-            .one()
-        owner_permissions, owner = result
-        
-        # Format service for later call
-        service = '{api}/{uid}'.format(
-            api=current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'],
-            uid=owner.absolute_uid
-        )
-        current_app.logger.info('Obtaining email of user: {0} [API UID]'
-                                .format(owner.absolute_uid))
-
-        response = client().get(
-            service
-        )
-
-        # Get all the people who have permissions in this library
-        users = session.query(Permissions).filter_by(
-            library_id = library.id
-        ).all()
-
-        if response.status_code != 200:
-            current_app.logger.error('Could not find user in the API'
-                                        'database: {0}.'.format(service))
-            owner = 'Not available'
-        else:
-            owner = response.json()['email'].split('@')[0]
-
-        # User requesting to see the content
-        main_permission = 'none'
-        if service_uid:
-            
-            permission = session.query(Permissions).filter(
-                Permissions.user_id == service_uid
-            ).filter(
-                Permissions.library_id == library_id
-            ).one_or_none()
-
-            if permission and permission.permissions['owner']:
-                main_permission = 'owner'
-            elif permission and permission.permissions['admin']:
-                main_permission = 'admin'
-            elif permission and permission.permissions['write']:
-                main_permission = 'write'
-            elif permission and permission.permissions['read']:
-                main_permission = 'read'
-                
-
-        if main_permission in ['owner', 'admin'] or library.public:
-            num_users = len(users)
-        else:
-            num_users = 0
-
-        metadata = dict(
-            name=library.name,
-            id='{0}'.format(cls.helper_uuid_to_slug(library.id)),
-            description=library.description,
-            num_documents=len(library.bibcode),
-            date_created=library.date_created.isoformat(),
-            date_last_modified=library.date_last_modified.isoformat(),
-            permission=main_permission,
-            public=library.public,
-            num_users=num_users,
-            owner=owner
-        )
-        session.refresh(library)
-        session.expunge(library)
-
-        return library, metadata
-
-    @classmethod
-    def read_access(cls, service_uid, library_id):
-        """
-        Defines which type of user has read permissions to a library.
-
-        :param service_uid: the user ID within this microservice
-        :param library_id: the unique ID of the library
-
-        :return: boolean, access (True), no access (False)
-        """
-
-        read_allowed = ['read', 'write', 'admin', 'owner']
-        for access_type in read_allowed:
-            if cls.helper_access_allowed(service_uid=service_uid,
-                                         library_id=library_id,
-                                         access_type=access_type):
-                return True
-
-        return False
     
     @classmethod
     def get_alternate_bibcodes(cls, solr_docs):
@@ -476,7 +369,7 @@ class LibraryView(BaseView):
         """
         with current_app.session_scope() as session:
             try:
-                library, metadata = self.get_documents_from_library(
+                library, metadata = BaseView.get_library_and_metadata(
                     library_id=data["library_id"],
                     service_uid=data["service_uid"],
                     session=session
