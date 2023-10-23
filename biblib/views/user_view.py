@@ -87,7 +87,9 @@ class UserView(BaseView):
             
             if rows: rows=start+rows
             
-            output_libraries = []
+            total_libraries = len(result) 
+            my_libraries = []
+            shared_with_me = []
             for permission, library in result[start:rows]:
 
                 # For this library get all the people who have permissions
@@ -151,9 +153,12 @@ class UserView(BaseView):
                     owner=owner
                 )
 
-                output_libraries.append(payload)
+                if owner_absolute_uid == absolute_uid:
+                    my_libraries.append(payload)
+                else: 
+                    shared_with_me.append(payload)
 
-            return output_libraries
+            return total_libraries, my_libraries, shared_with_me
 
     # Methods
     def get(self):
@@ -227,9 +232,9 @@ class UserView(BaseView):
         service_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
-        user_libraries = self.get_libraries(service_uid=service_uid,
+        total_libraries, my_libraries, shared_with_me = self.get_libraries(service_uid=service_uid,
                                             absolute_uid=user, start=start, rows=rows, sort_col=sort_col, sort_order=sort_order)
-        return {'libraries': user_libraries}, 200
+        return {'libraries_count': total_libraries, 'libraries': {'my_libraries': my_libraries, 'shared_with_me': shared_with_me}}, 200
 
     def post(self):
         """

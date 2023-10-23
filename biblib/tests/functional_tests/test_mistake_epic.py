@@ -99,7 +99,7 @@ class TestMistakeEpic(TestCaseDatabase):
                 headers=user_mary.headers
             )
         self.assertEqual(name,
-                         response.json['libraries'][0]['name'])
+                         response.json['libraries']['my_libraries'][0]['name'])
 
         # Mary decides to make the description also more relevant
         description = 'something relevant'
@@ -122,7 +122,7 @@ class TestMistakeEpic(TestCaseDatabase):
                 headers=user_mary.headers
             )
         self.assertEqual(description,
-                         response.json['libraries'][0]['description'])
+                         response.json['libraries']['my_libraries'][0]['description'])
 
         # Mary dislikes both her changes and makes both the changes at once
         name = 'Disliked the other one'
@@ -148,9 +148,9 @@ class TestMistakeEpic(TestCaseDatabase):
                 headers=user_mary.headers
             )
         self.assertEqual(name,
-                         response.json['libraries'][0]['name'])
+                         response.json['libraries']['my_libraries'][0]['name'])
         self.assertEqual(description,
-                         response.json['libraries'][0]['description'])
+                         response.json['libraries']['my_libraries'][0]['description'])
 
 
 if __name__ == '__main__':

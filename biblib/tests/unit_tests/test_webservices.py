@@ -123,7 +123,7 @@ class TestWebservices(TestCaseDatabase):
             )
         self.assertEqual(response.status_code, 200)
 
-        for library in response.json['libraries']:
+        for library in response.json['libraries']['my_libraries']:
             self.assertEqual(stub_library.name, library['name'])
             self.assertEqual(stub_library.description,
                              library['description'])
@@ -159,7 +159,7 @@ class TestWebservices(TestCaseDatabase):
             )
         self.assertEqual(response.status_code, 200)
 
-        for library in response.json['libraries']:
+        for library in response.json['libraries']['my_libraries']:
             for expected_type in stub_library.user_view_get_response():
                 self.assertIn(expected_type, library.keys())
 
@@ -1682,7 +1682,7 @@ class TestWebservices(TestCaseDatabase):
                 url,
                 headers=stub_user.headers
             )
-        self.assertTrue(len(response.json['libraries']) == 0,
+        self.assertTrue(response.json['libraries_count'] == 0,
                         response.json)
 
         # Check there is no document content
@@ -2463,7 +2463,7 @@ class TestWebservices(TestCaseDatabase):
             )
 
         self.assertTrue(
-            response.json['libraries'][0]['owner'] == 'Not available'
+            response.json['libraries']['my_libraries'][0]['owner'] == 'Not available'
         )
 
     def test_cannot_update_name_and_description_without_permissions(self):
@@ -2823,12 +2823,12 @@ class TestWebservices(TestCaseDatabase):
                 url,
                 headers=stub_user.headers
             )
-        self.assertTrue(len(response.json['libraries']) > 0,
+        self.assertTrue(response.json['libraries_count'] > 0,
                         msg='No libraries returned: {}'.format(response.json))
-        self.assertEqual(response.json['libraries'][0]['name'], stub_library.name)
-        self.assertEqual(response.json['libraries'][0]['description'],
+        self.assertEqual(response.json['libraries']['my_libraries'][0]['name'], stub_library.name)
+        self.assertEqual(response.json['libraries']['my_libraries'][0]['description'],
                          stub_library.description)
-        library_id = response.json['libraries'][0]['id']
+        library_id = response.json['libraries']['my_libraries'][0]['id']
 
         url = url_for('libraryview', library=library_id)
         with MockEmailService(stub_user, end_type='uid') as ES, \

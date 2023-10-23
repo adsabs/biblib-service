@@ -14,6 +14,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, UnicodeText, UniqueConstraint
 from sqlalchemy.orm import relationship, configure_mappers
 from sqlalchemy_continuum import make_versioned
+from biblib.biblib_exceptions import BibcodeNotFoundError, DuplicateNoteError
+
 make_versioned(user_cls=None)
 
 Base = declarative_base()
@@ -216,20 +218,20 @@ class Notes(Base):
         """
         Creates a new note in the database
         """
-
         try: 
             if bibcode not in library.bibcode.keys(): 
-                raise ValueError('Bibcode {0} not in library {1}'.format(bibcode, library))
+                raise BibcodeNotFoundError('Bibcode {0} not found in the library {1}'.format(bibcode, library.id))
+            
             existing_note = session.query(Notes).filter_by(bibcode=bibcode, library_id=library.id).first()
 
             if existing_note:
-                raise ValueError('A note for the same bibcode {0}  and library {1} already exists.'.format(bibcode, library))
+                raise DuplicateNoteError('Duplicate note for bibcode {0} and library {1}'.format(bibcode, library.id))
 
             note = Notes(content=content, bibcode=bibcode, library_id=library.id)
             return note
-        except Exception as error: 
+        except Exception: 
             session.rollback() 
-            raise error
+            raise
           
 class Library(Base):
     """
