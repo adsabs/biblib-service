@@ -67,7 +67,7 @@ class UserView(BaseView):
         :param absolute_uid: unique UID of the user in the API
         :param start: Index of the first library to return
         :param rows: Number of libraries to return (default all)
-        :param sort_col: Library column to sort on (date_created, date_last_modified)
+        :param sort_col: Library column to sort on (date_created, date_last_modified, name)
         :param sort_dir: Direction sort libraries (asc, desc)
 
         :return: list of libraries in json format
@@ -155,7 +155,7 @@ class UserView(BaseView):
 
                 if owner_absolute_uid == absolute_uid:
                     my_libraries.append(payload)
-                else: 
+                elif main_permission in ['admin', 'read', 'write']: 
                     shared_with_me.append(payload)
 
             return total_libraries, my_libraries, shared_with_me
@@ -215,7 +215,7 @@ class UserView(BaseView):
             rows = get_params.get('rows', type=int)
             
             sort_col = get_params.get('sort', default='date_created', type=str)
-            if sort_col not in ['date_created', 'date_last_modified']: 
+            if sort_col not in ['date_created', 'date_last_modified', 'name']: 
                 raise ValueError
             
             sort_order = get_params.get('order', default='asc', type=str)
