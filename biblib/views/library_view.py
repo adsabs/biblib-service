@@ -6,9 +6,11 @@ from biblib.utils import err, check_boolean
 from biblib.models import User, Library, Permissions
 from biblib.client import client
 from biblib.views.base_view import BaseView
+from datetime import datetime
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy import Boolean
+from sqlalchemy.orm.attributes import flag_modified
 from biblib.views.http_errors import MISSING_USERNAME_ERROR, SOLR_RESPONSE_MISMATCH_ERROR, \
     MISSING_LIBRARY_ERROR, NO_PERMISSION_ERROR, BAD_LIBRARY_ID_ERROR
 
@@ -139,6 +141,34 @@ class LibraryView(BaseView):
         return False
 
     @staticmethod
+    def timestamp_sort(solr, library_id, reverse=False):
+        """
+        Take a solr response and sort it based on the timestamps contained in the library
+        :input: response: response from SOLR bigquery
+        :input: library: The original library
+        :input: reverse: returns library by `time desc` if true, `time asc` otherwise.
+        
+        :return: response: SOLR response sorted by when each item was added.
+        """
+        if "error" not in solr['response'].keys():
+            try:
+                 with current_app.session_scope() as session:
+                    # Find the specified library
+                    library = session.query(Library).filter_by(id=library_id).one()
+                    #First we generate a list of timestamps for the valid bibcodes
+                    timestamp = [library.bibcode[doc['bibcode']]['timestamp'] for doc in solr['response']['docs']]
+                    #Then we sort the SOLR response by the generated timestamp list
+                    solr['response']['docs'] = [\
+                            doc for (doc, timestamp) in sorted(zip(solr['response']['docs'], timestamp), reverse=reverse, key = lambda stamped: stamped[1])\
+                        ]
+            except Exception as e:
+                current_app.logger.warn("Failed to retrieve timestamps for {} with exception: {}. Returning default sorting.".format(library.id, e))
+        else:
+            current_app.logger.warn("SOLR bigquery returned status code {}. Stopping.".format(solr['response'].status_code))
+
+        return solr
+        
+    @staticmethod
     def solr_update_library(library_id, solr_docs):
         """
         Updates the library based on the solr canonical bibcodes response
@@ -173,8 +203,13 @@ class LibraryView(BaseView):
 
         with current_app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library_id).one()
-            for bibcode in library.bibcode:
+            default_timestamp = datetime.timestamp(library.date_created)
 
+            for bibcode in library.bibcode:
+                if "timestamp" not in library.bibcode[bibcode].keys():
+                    update = True
+                    library.bibcode[bibcode]["timestamp"] = default_timestamp
+                
                 # Skip if its already canonical
                 if bibcode in canonical_bibcodes:
                     new_bibcode[bibcode] = library.bibcode[bibcode]
@@ -201,6 +236,7 @@ class LibraryView(BaseView):
                 # Update the database
                 library.bibcode = new_bibcode
                 session.add(library)
+                flag_modified(library, "bibcode")
                 session.commit()
 
             updates = dict(
@@ -276,6 +312,12 @@ class LibraryView(BaseView):
         - sort: 'date desc'
         - fl: 'bibcode'
 
+        Additional Pagination options:
+        ------------
+        - sort:
+            - "time asc" sort by time added to library with documents added least recently added documents being listed first.
+            - "time desc" sort by time added to library with the most recently added documents being listed first.
+
         """
         try:
             user = int(request.headers[USER_ID_KEYWORD])
@@ -301,6 +343,17 @@ class LibraryView(BaseView):
             raw_library = False
 
         sort = request.args.get('sort', 'date desc')
+        #timestamp sorting is handled in biblib so we need to change the sort to something SOLR understands.
+        if sort in ['time asc', 'time desc']:
+            current_app.logger.debug("sort order is set to{}".format(sort))
+            if sort == 'time desc':
+                add_sort = True
+            else:
+                add_sort = False
+            sort = 'date desc'
+
+        else: add_sort = None
+        
         fl = request.args.get('fl', 'bibcode')
         current_app.logger.info('User gave pagination parameters:'
                                 'start: {}, '
@@ -355,6 +408,8 @@ class LibraryView(BaseView):
                         library_id=library.id,
                         solr_docs=solr['response']['docs']
                     )
+                    if add_sort:
+                        solr = self.timestamp_sort(solr, library.id, reverse=add_sort)
 
                     documents = [i['bibcode'] for i in solr['response']['docs']]
                 else:
@@ -364,8 +419,16 @@ class LibraryView(BaseView):
                     current_app.logger.warning('Problem with solr response: {0}'
                                             .format(solr))
                     updates = {}
-                    documents = library.get_bibcodes()
-                    documents.sort()
+                    if add_sort != None:
+                        with current_app.session_scope() as session:
+                            # Find the specified library (we have to do this to have full access to the library)
+                            temp_library = session.query(Library).filter_by(id=library.id).one()
+                            sortable_list = [(bibcode, library.bibcode[bibcode]["timestamp"]) for bibcode in temp_library.get_bibcodes()]
+                            sortable_list.sort(key = lambda stamped: stamped[1], reverse=add_sort)
+                            documents = [doc[0] for doc in sortable_list]         
+                    else:
+                        documents = library.get_bibcodes()
+                        documents.sort()
                     documents = documents[start:start+rows]
             
             else:

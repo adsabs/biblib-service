@@ -54,7 +54,7 @@ class TestLibraryModel(TestCaseDatabase):
             session.add(lib)
             session.commit()
 
-            self.assertEqual(lib.bibcode, {k: {} for k in bibcodes_list})
+            self.assertEqual(lib.bibcode, {k: {"timestamp":lib.bibcode[k]["timestamp"]} for k in bibcodes_list})
             self.assertUnsortedEqual(lib.get_bibcodes(), bibcodes_list)
 
     def test_removing_bibcodes_from_library(self):

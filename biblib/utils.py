@@ -5,6 +5,7 @@ project, and so do not belong to anything specific.
 """
 
 from collections import Counter
+from datetime import datetime
 import json
 
 def get_GET_params(request, types={}):
@@ -78,6 +79,25 @@ def uniquify(input_list):
     seen = set()
     seen_add = seen.add
     return [item for item in input_list if not (item in seen or seen_add(item))]
+
+def convert_timestamp_datetime(timestamp, return_string=False):
+    """
+    Takes a timestamp and converts it back to a datetime object.
+    input:
+    -------
+        timestamp (int): timestamp value
+        return_string (bool): returns the date as a string of the form YYYY-MM-DDTHH:MM:SS.ms if True
+    
+    return:
+    -------
+        datetime_obj (datetime): datetime object
+        date_string (str): string repr of the datetime object YYYY-MM-DDTHH:MM:SS.ms
+    """
+    datetime_obj = datetime.utcfromtimestamp(timestamp)
+    if return_string:
+        return datetime_obj.isoformat()
+    else:
+        return datetime_obj
 
 
 def assert_unsorted_equal(s, t):
