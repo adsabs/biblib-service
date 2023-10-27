@@ -6,12 +6,15 @@ from biblib.views import USER_ID_KEYWORD
 from biblib.utils import err, check_boolean
 from biblib.models import User, Library, Permissions, Notes
 from biblib.client import client
-from biblib.views.base_view import BaseView 
+from biblib.views.base_view import BaseView
+from datetime import datetime
 from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy import Boolean
+from sqlalchemy.orm.attributes import flag_modified
 from biblib.views.http_errors import SOLR_RESPONSE_MISMATCH_ERROR, \
-    MISSING_LIBRARY_ERROR, MISSING_USERNAME_ERROR, BAD_LIBRARY_ID_ERROR, NO_PERMISSION_ERROR \
+    MISSING_LIBRARY_ERROR, MISSING_USERNAME_ERROR, BAD_LIBRARY_ID_ERROR, NO_PERMISSION_ERROR
+
 
 
 class LibraryView(BaseView):
@@ -337,7 +340,6 @@ class LibraryView(BaseView):
         documents:    <list>   Currently, a list containing the bibcodes.
         solr:         <dict>   The response from the solr bigquery end point
         metadata:     <dict>   contains the following:
-
           name:                 <string>  Name of the library
           id:                   <string>  ID of the library
           description:          <string>  Description of the library
@@ -351,6 +353,40 @@ class LibraryView(BaseView):
                                           this library
           owner:                <string>  Identifier of the user who created
                                           the library
+    @staticmethod
+    def timestamp_sort(solr, library_id, reverse=False):
+        """
+        Take a solr response and sort it based on the timestamps contained in the library
+        :input: response: response from SOLR bigquery
+        :input: library: The original library
+        :input: reverse: returns library by `time desc` if true, `time asc` otherwise.
+        
+        :return: response: SOLR response sorted by when each item was added.
+        """
+        if "error" not in solr['response'].keys():
+            try:
+                 with current_app.session_scope() as session:
+                    # Find the specified library
+                    library = session.query(Library).filter_by(id=library_id).one()
+                    #First we generate a list of timestamps for the valid bibcodes
+                    timestamp = [library.bibcode[doc['bibcode']]['timestamp'] for doc in solr['response']['docs']]
+                    #Then we sort the SOLR response by the generated timestamp list
+                    solr['response']['docs'] = [\
+                            doc for (doc, timestamp) in sorted(zip(solr['response']['docs'], timestamp), reverse=reverse, key = lambda stamped: stamped[1])\
+                        ]
+            except Exception as e:
+                current_app.logger.warn("Failed to retrieve timestamps for {} with exception: {}. Returning default sorting.".format(library.id, e))
+        else:
+            current_app.logger.warn("SOLR bigquery returned status code {}. Stopping.".format(solr['response'].status_code))
+
+        return solr
+        
+    @staticmethod
+    def solr_update_library(library_id, solr_docs):
+        """
+        Updates the library based on the solr canonical bibcodes response
+        :param library: library_id of the library to update
+        :param solr_docs: solr docs from the bigquery response
 
         updates:      <dict>   contains the following
 
@@ -486,6 +522,12 @@ class LibraryView(BaseView):
         - sort: 'date desc'
         - fl: 'bibcode'
 
+        Additional Pagination options:
+        ------------
+        - sort:
+            - "time asc" sort by time added to library with documents added least recently added documents being listed first.
+            - "time desc" sort by time added to library with the most recently added documents being listed first.
+
         """
 
         # If set to True, return notes in library
@@ -506,6 +548,7 @@ class LibraryView(BaseView):
             return err(BAD_LIBRARY_ID_ERROR)
         
         if not self.helper_library_exists(library):
+
             return err(MISSING_LIBRARY_ERROR)
         
         # Get user id for service 

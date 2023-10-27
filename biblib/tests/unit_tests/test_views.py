@@ -2007,6 +2007,11 @@ class TestDocumentViews(TestCaseDatabase):
             library = session.query(Library).filter(Library.id == library_id).all()
             for _lib in library:
                 self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
+            #Check that timestamps have been assigned
+            for _lib in library:
+                for bib in _lib.bibcode:
+                    self.assertIn("timestamp", _lib.bibcode[bib].keys())
+                    self.assertEqual(type(_lib.bibcode[bib]["timestamp"]), float)
 
     def test_user_cannot_duplicate_same_document_in_library(self):
         """
@@ -3885,7 +3890,7 @@ class TestClassicViews(TestCaseDatabase):
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.name == self.stub_library.name).one()
-            self.assertEqual(library.bibcode, self.stub_library.bibcode)
+            self.assertEqual(library.bibcode.keys(), self.stub_library.bibcode.keys())
 
     def test_can_upsert_a_library_when_the_names_match(self):
         """
