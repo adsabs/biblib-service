@@ -91,8 +91,6 @@ class TestDeletionAbuseEpic(TestCaseDatabase):
             headers=stub_owner.headers
         )
         self.assertTrue(response.json['libraries_count'] == 0)
-        self.assertTrue(len(response.json['libraries']['my_libraries']) == 0)
-        self.assertTrue(len(response.json['libraries']['shared_with_me']) == 0)
-
+        self.assertTrue(len(response.json['my_libraries']) == 0)   
 if __name__ == '__main__':
     unittest.main(verbosity=2)

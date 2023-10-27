@@ -74,9 +74,9 @@ class TestDeletionEpic(TestCaseDatabase):
                 url,
                 headers=stub_user.headers
             )
-        self.assertTrue(len(response.json['libraries']) == 2)
-        library_id_1 = response.json['libraries']['my_libraries'][0]['id']
-        library_id_2 = response.json['libraries']['my_libraries'][1]['id']
+        self.assertTrue(len(response.json['my_libraries']) == 2)
+        library_id_1 = response.json['my_libraries'][0]['id']
+        library_id_2 = response.json['my_libraries'][1]['id']
 
         # Deletes the second library
         url = url_for('documentview', library=library_id_2)

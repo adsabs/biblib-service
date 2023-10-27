@@ -355,7 +355,7 @@ class TestUserViews(TestCaseDatabase):
                 absolute_uid=user.absolute_uid
             )
         
-        self.assertEqual(libraries[0], number_of_libs)
+        self.assertEqual(libraries['libraries_count'], number_of_libs)
 
     def test_user_can_retrieve_rows_number_of_libraries(self):
         """
@@ -388,7 +388,7 @@ class TestUserViews(TestCaseDatabase):
                 absolute_uid=user.absolute_uid, rows=20
             )
         
-        self.assertEqual(len(libraries[1]), 20)
+        self.assertEqual(len(libraries['my_libraries']), 20)
 
     def test_user_can_retrieve_libraries_from_start(self):
         """
@@ -415,17 +415,18 @@ class TestUserViews(TestCaseDatabase):
                 library_data=stub_library.user_view_post_data
             )
         with MockEmailService(self.stub_user, end_type='uid'):
-            _, libraries_full, _ = self.user_view.get_libraries(
+            libraries_full = self.user_view.get_libraries(
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid, start=0
-            )
+            )['my_libraries']
         
         # Get the library created
         with MockEmailService(self.stub_user, end_type='uid'):
-            libraries, my_libraries, shared_with_me = self.user_view.get_libraries(
+            my_libraries = self.user_view.get_libraries(
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid, start=10
-            )
+            )['my_libraries'] 
+
         self.assertEqual(len(my_libraries), 90)
         self.assertEqual(libraries_full[10:], my_libraries)
 
@@ -459,7 +460,7 @@ class TestUserViews(TestCaseDatabase):
             libraries_full = self.user_view.get_libraries(
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid, start=0
-            )[1]
+            )['my_libraries']
        
         
         # Get the library created
@@ -472,8 +473,8 @@ class TestUserViews(TestCaseDatabase):
                     absolute_uid=user.absolute_uid, start=start*10,
                     rows=10
                 )
-                libraries += curr_libraries[1]
-                total_libraries = curr_libraries[0]
+                libraries += curr_libraries['my_libraries']
+                total_libraries = curr_libraries['libraries_count']
         
         self.assertEqual(total_libraries, 100)
         self.assertEqual(libraries_full, libraries)
@@ -507,7 +508,7 @@ class TestUserViews(TestCaseDatabase):
                 absolute_uid=user.absolute_uid
             )
         
-        self.assertEqual(libraries[1][0]['owner'], 'Not available')
+        self.assertEqual(libraries['my_libraries'][0]['owner'], 'Not available')
 
     def test_user_retrieves_correct_library_content_from_userview(self):
         """
@@ -561,27 +562,27 @@ class TestUserViews(TestCaseDatabase):
                 absolute_uid=user.absolute_uid
             )
         
-        self.assertTrue(libraries[0] == number_of_libs)
+        self.assertTrue(libraries['libraries_count'] == number_of_libs)
         
-        for library in libraries[1]:
+        for library in libraries['my_libraries']:
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
                                                    .format(key))
 
         for j in range(number_of_libs):
-            i = libraries[0] - j - 1
+            i = number_of_libs - j - 1
             for key in ['name', 'description', 'public']:
-                self.assertEqual(libraries[1][i][key],
+                self.assertEqual(libraries['my_libraries'][i][key],
                                 libs[j].user_view_post_data[key])
 
-            self.assertEqual(libraries[1][i]['num_documents'], 0)
+            self.assertEqual(libraries['my_libraries'][i]['num_documents'], 0)
 
-            if libraries[1][i]['id'] == _lib['id']:
-                self.assertEqual(libraries[1][i]['num_users'], 2)
+            if libraries['my_libraries'][i]['id'] == _lib['id']:
+                self.assertEqual(libraries['my_libraries'][i]['num_users'], 2)
             else:
-                self.assertEqual(libraries[1][i]['num_users'], 1)
+                self.assertEqual(libraries['my_libraries'][i]['num_users'], 1)
 
-            self.assertEqual(libraries[1][i]['permission'], 'owner')
+            self.assertEqual(libraries['my_libraries'][i]['permission'], 'owner')
         
         # Get the library created with a different sort order
         with MockEmailService(stub_user_1, end_type='uid'):
@@ -591,8 +592,8 @@ class TestUserViews(TestCaseDatabase):
                 sort_order='asc'
             )
         
-        self.assertTrue(libraries[0] == number_of_libs)
-        for library in libraries[1]:
+        self.assertTrue(libraries['libraries_count'] == number_of_libs)
+        for library in libraries['my_libraries']:
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
                                                    .format(key))
@@ -600,16 +601,16 @@ class TestUserViews(TestCaseDatabase):
         
         for i in range(number_of_libs):
             for key in ['name', 'description', 'public']:
-                self.assertEqual(libraries[1][i][key],
+                self.assertEqual(libraries['my_libraries'][i][key],
                                 libs[i].user_view_post_data[key])
-            self.assertEqual(libraries[1][i]['num_documents'], 0)
+            self.assertEqual(libraries['my_libraries'][i]['num_documents'], 0)
 
-            if libraries[1][i]['id'] == _lib['id']:
-                self.assertEqual(libraries[1][i]['num_users'], 2)
+            if libraries['my_libraries'][i]['id'] == _lib['id']:
+                self.assertEqual(libraries['my_libraries'][i]['num_users'], 2)
             else:
-                self.assertEqual(libraries[1][i]['num_users'], 1)
+                self.assertEqual(libraries['my_libraries'][i]['num_users'], 1)
 
-            self.assertEqual(libraries[1][i]['permission'], 'owner')
+            self.assertEqual(libraries['my_libraries'][i]['permission'], 'owner')
         
         # Get the library created with a different sort order and sort column
         with MockEmailService(stub_user_1, end_type='uid'):
@@ -620,8 +621,8 @@ class TestUserViews(TestCaseDatabase):
                 sort_order='asc'
             )
 
-        self.assertTrue(libraries[0] == number_of_libs)
-        for library in libraries[1]:
+        self.assertTrue(libraries['libraries_count'] == number_of_libs)
+        for library in libraries['my_libraries']:
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
                                                    .format(key))
@@ -629,17 +630,17 @@ class TestUserViews(TestCaseDatabase):
         
         for i in range(number_of_libs):
             for key in ['name', 'description', 'public']:
-                self.assertEqual(libraries[1][i][key],
+                self.assertEqual(libraries['my_libraries'][i][key],
                                 libs[i].user_view_post_data[key])
 
-            self.assertEqual(libraries[1][i]['num_documents'], 0)
+            self.assertEqual(libraries['my_libraries'][i]['num_documents'], 0)
 
-            if libraries[1][i]['id'] == _lib['id']:
-                self.assertEqual(libraries[1][i]['num_users'], 2)
+            if libraries['my_libraries'][i]['id'] == _lib['id']:
+                self.assertEqual(libraries['my_libraries'][i]['num_users'], 2)
             else:
-                self.assertEqual(libraries[1][i]['num_users'], 1)
+                self.assertEqual(libraries['my_libraries'][i]['num_users'], 1)
 
-            self.assertEqual(libraries[1][i]['permission'], 'owner')
+            self.assertEqual(libraries['my_libraries'][i]['permission'], 'owner')
 
         # Get the library created
         with MockEmailService(stub_user_2, end_type='uid'):
@@ -649,7 +650,7 @@ class TestUserViews(TestCaseDatabase):
                     absolute_uid=user_other.absolute_uid
                 )
 
-        self.assertTrue(libraries[0] == 2)
+        self.assertTrue(libraries['libraries_count'] == 2)
 
     def test_dates_of_updates_change_correctly(self):
         """
@@ -730,7 +731,7 @@ class TestUserViews(TestCaseDatabase):
                         absolute_uid=user_other.absolute_uid
                     )
 
-            self.assertEqual(list(permission.keys())[0], libraries[2][0]['permission'])
+            self.assertEqual(list(permission.keys())[0], libraries['my_libraries'][0]['permission'])
 
     def test_can_only_see_number_of_people_with_admin_or_owner(self):
         """
@@ -766,7 +767,7 @@ class TestUserViews(TestCaseDatabase):
                 libraries = self.user_view.get_libraries(
                     service_uid=user_admin.id,
                     absolute_uid=user_admin.absolute_uid
-                )[2]
+                )['my_libraries']
         
         self.assertTrue(libraries[0]['num_users'] > 0)
 
@@ -775,7 +776,7 @@ class TestUserViews(TestCaseDatabase):
             libraries = self.user_view.get_libraries(
                 service_uid=user_owner.id,
                 absolute_uid=user_owner.absolute_uid
-            )[1]
+            )['my_libraries']
         
         self.assertTrue(libraries[0]['num_users'] > 0)
 
@@ -816,7 +817,7 @@ class TestUserViews(TestCaseDatabase):
             libraries = self.user_view.get_libraries(
                 service_uid=user_read.id,
                 absolute_uid=user_read.absolute_uid
-            )[2]
+            )['my_libraries']
         self.assertTrue(libraries[0]['num_users'] == 0)
         # make sure the owner is correct
         self.assertIn(libraries[0]['owner'], self.stub_user_3.email)
@@ -826,7 +827,7 @@ class TestUserViews(TestCaseDatabase):
             libraries = self.user_view.get_libraries(
                 service_uid=user_write.id,
                 absolute_uid=user_write.absolute_uid
-            )[2]
+            )['my_libraries']
         self.assertTrue(libraries[0]['num_users'] == 0)
         self.assertIn(libraries[0]['owner'], self.stub_user_3.email)
 

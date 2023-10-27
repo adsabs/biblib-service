@@ -50,8 +50,8 @@ class TestReturnedDataEpic(TestCaseDatabase):
                 url,
                 headers=user_dave.headers
             )
-        self.assertTrue(len(response.json['libraries']['my_libraries']) == 1)
-        library = response.json['libraries']['my_libraries'][0]
+        self.assertTrue(len(response.json['my_libraries']) == 1)
+        library = response.json['my_libraries'][0]
         self.assertTrue(library['num_documents'] == 0)
         self.assertTrue(library['num_users'] == 1)
         self.assertTrue(library['permission'] == 'owner')
@@ -92,9 +92,9 @@ class TestReturnedDataEpic(TestCaseDatabase):
                 url,
                 headers=user_dave.headers
             )
-        self.assertTrue(len(response.json['libraries']['my_libraries'])==1)
+        self.assertTrue(len(response.json['my_libraries'])==1)
         self.assertEqual(response.status_code, 200)
-        library = response.json['libraries']['my_libraries'][0]
+        library = response.json['my_libraries'][0]
         self.assertTrue(library['num_documents'] == number_of_documents)
 
         # Dave adds mary so that she can see the library and add content
@@ -115,7 +115,7 @@ class TestReturnedDataEpic(TestCaseDatabase):
                     url,
                     headers=user_mary.headers
                 )
-        library = response.json['libraries']['shared_with_me'][0]
+        library = response.json['my_libraries'][0]
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(library['num_users'] == 2)
@@ -151,7 +151,7 @@ class TestReturnedDataEpic(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json['libraries_count'] == 1)
         self.assertTrue(
-            response.json['libraries']['my_libraries'][0]['num_documents']
+            response.json['my_libraries'][0]['num_documents']
             == (number_of_documents+number_of_documents_second)
         )
 
@@ -179,13 +179,13 @@ class TestReturnedDataEpic(TestCaseDatabase):
         
         self.assertTrue(libraries['libraries_count'] == 1)
         self.assertTrue(
-            libraries['libraries']['my_libraries'][0]['num_documents'] == number_of_documents+1
+            libraries['my_libraries'][0]['num_documents'] == number_of_documents+1
         )
-        self.assertTrue(libraries['libraries']['my_libraries'][0]['public'])
-        date_created_2 = datetime.strptime(libraries['libraries']['my_libraries'][0]['date_created'],
+        self.assertTrue(libraries['my_libraries'][0]['public'])
+        date_created_2 = datetime.strptime(libraries['my_libraries'][0]['date_created'],
                                            '%Y-%m-%dT%H:%M:%S.%f')
         date_last_modified_2 = \
-            datetime.strptime(libraries['libraries']['my_libraries'][0]['date_last_modified'],
+            datetime.strptime(libraries['my_libraries'][0]['date_last_modified'],
                               '%Y-%m-%dT%H:%M:%S.%f')
         self.assertEqual(date_created, date_created_2)
         self.assertNotAlmostEqual(date_created_2,

@@ -2,7 +2,7 @@
 User view
 """
 
-from biblib.utils import err, get_post_data
+from biblib.utils import err, get_post_data, check_boolean
 from biblib.models import User, Library, Permissions
 from biblib.client import client
 from biblib.views.base_view import BaseView
@@ -60,7 +60,7 @@ class UserView(BaseView):
         return response
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc"):
+    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", permissions=False):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
@@ -87,7 +87,6 @@ class UserView(BaseView):
             
             if rows: rows=start+rows
             
-            total_libraries = len(result) 
             my_libraries = []
             shared_with_me = []
             for permission, library in result[start:rows]:
@@ -153,12 +152,18 @@ class UserView(BaseView):
                     owner=owner
                 )
 
-                if owner_absolute_uid == absolute_uid:
+                if (permissions and main_permission in ['owner']) or not permissions: 
                     my_libraries.append(payload)
-                elif main_permission in ['admin', 'read', 'write']: 
+                elif permissions and main_permission in ['admin', 'read', 'write']: 
                     shared_with_me.append(payload)
-
-            return total_libraries, my_libraries, shared_with_me
+            
+            response = {'libraries_count': len(result), 
+                        'my_libraries': my_libraries}
+            
+            if shared_with_me: 
+                response['shared_with_me'] = shared_with_me
+            
+        return response
 
     # Methods
     def get(self):
@@ -222,6 +227,7 @@ class UserView(BaseView):
             if sort_order not in ['asc', 'desc']:
                 raise ValueError
 
+            permissions = get_params.get('permissions', default=False, type=check_boolean)
             current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, rows))
 
         except ValueError:
@@ -232,9 +238,14 @@ class UserView(BaseView):
         service_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
-        total_libraries, my_libraries, shared_with_me = self.get_libraries(service_uid=service_uid,
-                                            absolute_uid=user, start=start, rows=rows, sort_col=sort_col, sort_order=sort_order)
-        return {'libraries_count': total_libraries, 'libraries': {'my_libraries': my_libraries, 'shared_with_me': shared_with_me}}, 200
+        response = self.get_libraries(service_uid=service_uid,
+                                      absolute_uid=user, 
+                                      start=start, 
+                                      rows=rows, 
+                                      sort_col=sort_col, 
+                                      sort_order=sort_order, 
+                                      permissions=permissions)
+        return response, 200
 
     def post(self):
         """

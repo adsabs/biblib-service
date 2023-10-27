@@ -81,6 +81,7 @@ class TestBBClassicUserEpic(TestCaseDatabase):
 
         # Gpa checks that the libraries were imported, and didn't affect the
         # friends libraries
+        
         library_id_gpa = response.json[0]['library_id']
 
         url = url_for('libraryview', library=library_id_gpa)
@@ -100,8 +101,9 @@ class TestBBClassicUserEpic(TestCaseDatabase):
                 url,
                 headers=user_mary.headers
             )
-        self.assertTrue(len(response.json['libraries']), 1)
-        self.assertEqual(response.json['libraries']['my_libraries'][0]['name'], stub_library_1.name)
+        
+        self.assertTrue(len(response.json['my_libraries']), 1)
+        self.assertEqual(response.json['my_libraries'][0]['name'], stub_library_1.name)
 
         url = url_for('libraryview', library=library_id_mary)
         with MockSolrBigqueryService(
@@ -138,8 +140,8 @@ class TestBBClassicUserEpic(TestCaseDatabase):
                 url,
                 headers=user_mary.headers
             )
-        self.assertTrue(len(response.json['libraries']), 1)
-        self.assertEqual(response.json['libraries']['my_libraries'][0]['name'], stub_library_1.name)
+        self.assertTrue(len(response.json['my_libraries']), 1)
+        self.assertEqual(response.json['my_libraries'][0]['name'], stub_library_1.name)
 
         url = url_for('libraryview', library=library_id_mary)
         with MockSolrBigqueryService(
