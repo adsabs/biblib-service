@@ -1433,6 +1433,13 @@ class TestLibraryViews(TestCaseDatabase):
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIn('timestamp', library.bibcode['test1'])
+            self.assertIn('timestamp', library.bibcode['test2'])
+            self.assertIn('timestamp', library.bibcode['test3'])
+
+            for element in library.bibcode: 
+                del library.bibcode[element]['timestamp']
+
 
             self.assertUnsortedEqual(library.bibcode, result)
 
