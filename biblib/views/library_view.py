@@ -12,7 +12,9 @@ from flask import request, current_app
 from flask_discoverer import advertise
 from sqlalchemy.orm.attributes import flag_modified
 from biblib.views.http_errors import SOLR_RESPONSE_MISMATCH_ERROR, \
-    MISSING_LIBRARY_ERROR, MISSING_USERNAME_ERROR, BAD_LIBRARY_ID_ERROR, NO_PERMISSION_ERROR \
+    MISSING_LIBRARY_ERROR, MISSING_USERNAME_ERROR, BAD_LIBRARY_ID_ERROR, NO_PERMISSION_ERROR
+from biblib.biblib_exceptions import BibcodeNotFoundError, DuplicateNoteError
+
 
 
 class LibraryView(BaseView):
@@ -87,7 +89,7 @@ class LibraryView(BaseView):
                         if new_note.id not in updated_ids: 
                             updated_ids.add(new_note.id)
                             updated_notes.append(new_note.as_dict())
-                    except Exception as error: 
+                    except (BibcodeNotFoundError, DuplicateNoteError, Exception) as error: 
                         current_app.logger.error('Error while creating new note with canonical bibcode {0}: {1}'
                                                 .format(canonical_bibcode, error))
                 else: 

@@ -7,15 +7,17 @@ from biblib.models import User, Library, Permissions, MutableDict, Notes
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
-    BaseView, TransferView, ClassicView, OperationsView, QueryView
+    BaseView, TransferView, ClassicView, OperationsView, QueryView, NotesView
 from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop, fake_biblist
 from biblib.utils import get_item
-from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
+from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError, BibcodeNotFoundError
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService, MockSolrQueryService
 from biblib.emails import PermissionsChangedEmail
 from flask import current_app
+from unittest.mock import patch
+
 
 class TestBaseViews(TestCaseDatabase):
     """
@@ -1242,49 +1244,6 @@ class TestLibraryViews(TestCaseDatabase):
             self.assertUnsortedEqual([note.bibcode for note in notes], [canonical_bibcode, original_bibcode1, original_bibcode2])
             self.assertEqual(canonical_note.content, 'canonical_note_content arxiv_note1_content arxiv_note2_content')
             self.assertEqual(len(updated_notes), 3)
-
-    def test_update_notes_should_throw_exception(self): 
-        original_bibcode1 = 'arXivtest1'
-        original_bibcode2 = 'arXivtest2'
-        canonical_bibcode = 'canonical1'
-        with self.app.session_scope() as session:
-            # Ensure a library exists
-            library = Library(name='MyLibrary',
-                              description='My library',
-                              public=True,
-                              bibcode={bibcode: {} for bibcode in [original_bibcode1, original_bibcode2, canonical_bibcode]})
-            session.add(library)
-            session.commit()
-
-            # Create an arxiv note 1
-            note1 = Notes.create_unique(session=session, 
-                                    content='arxiv_note1_content', 
-                                    bibcode=original_bibcode1,
-                                    library=library)
-            
-            # Create an arxiv note 2 
-            note2 = Notes.create_unique(session=session, 
-                                    content='arxiv_note2_content', 
-                                    bibcode=original_bibcode2,
-                                    library=library)
-            updated_list = [{original_bibcode1: canonical_bibcode}, {original_bibcode2: canonical_bibcode}]
-
-            session.add_all([note1, note2])
-            session.commit()
-
-            session.refresh(library)
-            session.expunge(library)
-            
-            def mock_create_unique(**kwargs):
-                raise ValueError('Could not create unique note')
-            Notes.create_unique = mock_create_unique
-
-            with self.assertLogs(logger=current_app.logger, level='ERROR') as log:
-                LibraryView.update_notes(session, library, updated_list)
-
-            self.assertIn("Error while creating new note", log.output[0])
-            self.assertIn('Could not create unique note', log.output[0])
-
         
     def test_that_solr_updates_canonical_bibcodes(self):
         """
@@ -4109,6 +4068,423 @@ class TestClassicViews(TestCaseDatabase):
 
             self.assertNotIn('new bibcode', stub_library.get_bibcodes())
 
+class TestNotesViews(TestCaseDatabase):
+    """
+    Base class to test the Library view for GET
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor of the class
+
+        :param args: to pass on to the super class
+        :param kwargs: to pass on to the super class
+
+        :return: no return
+        """
+
+        super(TestNotesViews, self).__init__(*args, **kwargs)
+        self.user_view = UserView
+        self.base_view = BaseView()
+        self.library_view = LibraryView
+        self.notes_view = NotesView()
+
+        self.stub_user = self.stub_user_1 = UserShop()
+        self.stub_user_2 = UserShop()
+
+        self.stub_library = LibraryShop()
+
+    def test_user_can_get_notes_from_library(self):
+        """
+        Test that can retrieve all the notes from a library
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            bibcode = self.stub_library.bibcode
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+
+            expected_response = []
+            for bibcode in library.get_bibcodes():
+                note = Notes.create_unique(bibcode=bibcode, 
+                             content='note {}'.format(bibcode), 
+                             library=library, 
+                             session=session)
+                session.add(note)
+                session.commit()
+                expected_response.append(note.as_dict())
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+
+            # Retrieve the bibcodes using the web services
+            with MockEmailService(self.stub_user, end_type='uid'):
+                _, _ = \
+                    self.notes_view.get_library_and_metadata_wrapper(
+                        library_id=library.id,
+                        service_uid=user.id, 
+                        session=session
+                    )
+                
+                response = self.notes_view.get_note_data(document_id=library.get_bibcodes()[0], library_id=library.id, service_uid=user.id)                
+            
+            self.assertEqual(response[2], expected_response.pop())
+            session.expunge_all()
+            session.close()
+
+    def test_user_cannot_get_notes_if_no_permission(self):
+        """
+        Tests that the user cannot get notes if not reading access
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+            
+            access = self.base_view.helper_check_user_has_read_access(service_uid=user.id,
+                                                      library=library)
+            self.assertFalse(access)
+
+
+    def test_user_can_add_notes_to_library(self):
+        """
+        Test that can add notes to a library
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+        
+            bibcode = self.stub_library.bibcode
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+
+            # Retrieve the bibcodes using the web services
+            with MockEmailService(self.stub_user, end_type='uid'):
+                _, _ = \
+                    self.notes_view.get_library_and_metadata_wrapper(
+                        library_id=library.id,
+                        service_uid=user.id, 
+                        session=session
+                    )
+                
+                response = self.notes_view.add_note_to_document(document_id=library.get_bibcodes()[0], library_id=library.id, service_uid=user.id, note_data={'content': 'note {}'.format(library.get_bibcodes()[0])})
+
+            self.assertEqual(response[0]["content"], 'note {}'.format(library.get_bibcodes()[0]))
+            session.expunge_all()
+            session.close()
+
+    def test_user_cannot_add_a_note_if_no_permission(self):
+        """
+        Tests that the user cannot add a note to library if not writing access
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
+
+            access = self.base_view.write_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertFalse(access)
+
+
+
+    def test_user_can_delete_notes_from_library(self):
+        """
+        Tests that the user can correctly remove note from a library 
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            bibcode = self.stub_library.bibcode
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+
+            
+            for bibcode in library.get_bibcodes():
+                note = Notes.create_unique(bibcode=bibcode, 
+                             content='note {}'.format(bibcode), 
+                             library=library, 
+                             session=session)
+                session.add(note)
+                session.commit()
+            
+            
+            response = self.notes_view.delete_note(document_id=library.get_bibcodes()[0], library_id=library.id)
+
+            self.assertEqual(response, True)
+
+            session.expunge_all()
+            session.close()
+
+    def test_user_cannot_delete_a_note_if_not_owner(self):
+        """
+        Tests that the user cannot delete a library if they are not the owner
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
+
+            access = self.base_view.delete_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertFalse(access)
+
+    def test_user_can_delete_a_note_from_library_if_owner(self):
+        """
+        Tests that the user cannot delete a library if they are not the owner
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
+
+            access = self.base_view.delete_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertTrue(access)
+
+    def test_user_can_update_note_in_library(self):
+        """
+        Test that can update a note in library  if owner or admin
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            bibcode = self.stub_library.bibcode
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+
+            # Retrieve the bibcodes using the web services
+            with MockEmailService(self.stub_user, end_type='uid'):
+                _, _ = \
+                    self.notes_view.get_library_and_metadata_wrapper(
+                        library_id=library.id,
+                        service_uid=user.id, 
+                        session=session
+                    )
+                
+                self.notes_view.add_note_to_document(document_id=library.get_bibcodes()[0], library_id=library.id, service_uid=user.id, note_data={'content': 'note {}'.format(library.get_bibcodes()[0])})
+
+                response = self.notes_view.update_note(library_id=library.id, document_id=library.get_bibcodes()[0], library_data={'content': 'updated content'})
+
+            self.assertEqual(response["content"], 'updated content')
+            session.expunge_all()
+            session.close()
+
+    def test_user_cannot_update_a_note_if_no_permission(self):
+        """
+        Tests that the user cannot update a note if not owner or admin
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
+
+            access = self.base_view.update_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertFalse(access)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

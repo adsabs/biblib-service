@@ -60,10 +60,11 @@ class NotesView(BaseView):
     
     def add_note_to_document(self, document_id, library_id, service_uid, note_data):
         """
-        Gets note data to be returned in the HTTP GET request
+        Adds note to a document
         :param document id: bibcode
         :param library_id: the library id 
         :param service_uid: user id 
+        :param note_data: note content
 
         :return: library: library object 
                  metadata: all the library metadata 
@@ -81,7 +82,8 @@ class NotesView(BaseView):
                                             library=library)
                 session.add(note)
                 session.commit()
-                return dict(note=note, metadata=metadata)
+                note = note.as_dict()
+                return note, metadata
         except (BibcodeNotFoundError, DuplicateNoteError, Exception) as e:
             current_app.logger.error('Failed to add note to document {0} in library {1}. Error {2}'
                 .format(document_id, library_id, e)
@@ -286,10 +288,15 @@ class NotesView(BaseView):
             return err(WRONG_TYPE_ERROR)
         
         try: 
-            response = self.add_note_to_document(document_id, 
+            note, metadata = self.add_note_to_document(document_id, 
                                                  library_id, 
                                                  service_uid, 
                                                  data)
+            
+            response = dict(note=note, 
+                            library_metadata=metadata)
+            
+            return response, 201
         except BibcodeNotFoundError: 
             return err(INVALID_BIBCODE_ERROR)
         except DuplicateNoteError: 
@@ -298,7 +305,7 @@ class NotesView(BaseView):
             return current_app.logger.error('Error: {0}'
                                     .format(error))
         
-        return response, 201
+        
     
     def put(self, library, document_id):
         """
