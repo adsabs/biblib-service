@@ -29,9 +29,11 @@ def upgrade():
     sa.Column('operation_type', sa.SmallInteger(), nullable=False),
     sa.PrimaryKeyConstraint('id', 'transaction_id')
     )
+    
     op.create_index(op.f('ix_notes_version_end_transaction_id'), 'notes_version', ['end_transaction_id'], unique=False)
     op.create_index(op.f('ix_notes_version_operation_type'), 'notes_version', ['operation_type'], unique=False)
     op.create_index(op.f('ix_notes_version_transaction_id'), 'notes_version', ['transaction_id'], unique=False)
+    
     op.create_table('notes',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('content', sa.UnicodeText(), nullable=True),

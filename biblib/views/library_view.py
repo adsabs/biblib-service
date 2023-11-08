@@ -212,7 +212,7 @@ class LibraryView(BaseView):
         sort = request.args.get('sort', 'date desc')
         #timestamp sorting is handled in biblib so we need to change the sort to something SOLR understands.
         if sort in ['time asc', 'time desc']:
-            current_app.logger.debug("sort order is set to{}".format(sort))
+            current_app.logger.debug("sort order is set to {}".format(sort))
             if sort == 'time desc':
                 add_sort = True
             else:

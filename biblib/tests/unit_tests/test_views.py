@@ -11,13 +11,11 @@ from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
 from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
 from biblib.tests.stubdata.stub_data import UserShop, LibraryShop, fake_biblist
 from biblib.utils import get_item
-from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError, BibcodeNotFoundError
+from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService, MockSolrQueryService
 from biblib.emails import PermissionsChangedEmail
 from flask import current_app
-from unittest.mock import patch
-
 
 class TestBaseViews(TestCaseDatabase):
     """
