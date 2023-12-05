@@ -217,6 +217,10 @@ class OperationsView(BaseView):
                 return err(NO_LIBRARY_SPECIFIED_ERROR)
             if len(data['libraries']) > 1:
                 return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
+            # Check the permissions of the user
+            if not self.write_access(service_uid=user_editing_uid,
+                                     library_id=data['libraries'][0]):
+                return err(NO_PERMISSION_ERROR)
 
         lib_names = []
         with current_app.session_scope() as session:
