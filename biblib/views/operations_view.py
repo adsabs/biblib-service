@@ -223,7 +223,7 @@ class OperationsView(BaseView):
                     return err(NO_LIBRARY_SPECIFIED_ERROR)
                 for lib in check_access:
                     lib = session.merge(lib)
-                    if lib.public or not self.read_access(service_uid=user_editing_uid,
+                    if not lib.public or not self.read_access(service_uid=user_editing_uid,
                                             library_id=lib.id):
                         return err(NO_PERMISSION_ERROR)
                 if 'name' not in data:
