@@ -207,6 +207,10 @@ class OperationsView(BaseView):
         if data['action'] in ['union', 'intersection', 'difference']:
             if 'libraries' not in data:
                 return err(NO_LIBRARY_SPECIFIED_ERROR)
+            for lib in data['libraries']:
+                if not self.read_access(service_uid=user_editing_uid,
+                                         library_id=lib):
+                    return err(NO_PERMISSION_ERROR)
             if 'name' not in data:
                 data['name'] = 'Untitled {0}.'.format(get_date().isoformat())
             if 'public' not in data:
