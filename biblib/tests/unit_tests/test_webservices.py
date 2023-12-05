@@ -718,7 +718,7 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.json['error'], NO_LIBRARY_SPECIFIED_ERROR['body'])
 
         post_data['action'] = 'copy'
-        post_data['libraries'] = ['lib1', 'lib2']
+        post_data['libraries'] = [library_id_2, library_id_2]
         response = self.client.post(
             url,
             data=json.dumps(post_data),

@@ -173,7 +173,7 @@ class OperationsView(BaseView):
           - admin
           - write
         """
-
+        
         # Get the user requesting this from the header
         try:
             user_editing = self.helper_get_user_id()
@@ -203,30 +203,8 @@ class OperationsView(BaseView):
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
-
-        if data['action'] in ['union', 'intersection', 'difference']:
-            if 'libraries' not in data:
-                return err(NO_LIBRARY_SPECIFIED_ERROR)
-            for lib in data['libraries']:
-                if not self.read_access(service_uid=user_editing_uid,
-                                         library_id=lib):
-                    return err(NO_PERMISSION_ERROR)
-            if 'name' not in data:
-                data['name'] = 'Untitled {0}.'.format(get_date().isoformat())
-            if 'public' not in data:
-                data['public'] = False
-
-        if data['action'] == 'copy':
-            if 'libraries' not in data:
-                return err(NO_LIBRARY_SPECIFIED_ERROR)
-            if len(data['libraries']) > 1:
-                return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
-            # Check the permissions of the user
-            if not self.write_access(service_uid=user_editing_uid,
-                                     library_id=data['libraries'][0]):
-                return err(NO_PERMISSION_ERROR)
-
         lib_names = []
+        check_access = []
         with current_app.session_scope() as session:
             primary = session.query(Library).filter_by(id=library_uuid).one()
             lib_names.append(primary.name)
@@ -238,6 +216,32 @@ class OperationsView(BaseView):
                         return err(BAD_LIBRARY_ID_ERROR)
                     secondary = session.query(Library).filter_by(id=secondary_uuid).one()
                     lib_names.append(secondary.name)
+                    check_access.append(secondary)
+
+            if data['action'] in ['union', 'intersection', 'difference']:
+                if 'libraries' not in data:
+                    return err(NO_LIBRARY_SPECIFIED_ERROR)
+                for lib in check_access:
+                    lib = session.merge(lib)
+                    if lib.public or not self.read_access(service_uid=user_editing_uid,
+                                            library_id=lib.id):
+                        return err(NO_PERMISSION_ERROR)
+                if 'name' not in data:
+                    data['name'] = 'Untitled {0}.'.format(get_date().isoformat())
+                if 'public' not in data:
+                    data['public'] = False
+
+            if data['action'] == 'copy':
+                if 'libraries' not in data:
+                    return err(NO_LIBRARY_SPECIFIED_ERROR)
+                if len(data['libraries']) > 1:
+                    return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
+                # Check the permissions of the user
+                if not self.write_access(service_uid=user_editing_uid,
+                                        library_id=check_access[0].id):
+                    return err(NO_PERMISSION_ERROR)
+
+        
 
         if data['action'] == 'union':
             bib_union = self.setops_libraries(
