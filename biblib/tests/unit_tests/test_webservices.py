@@ -1487,7 +1487,7 @@ class TestWebservices(TestCaseDatabase):
         lib_ids = []
         libraries = []
         for nl in range(n):
-            stub_library = LibraryShop()
+            stub_library = LibraryShop(public=True)
 
             # Make the libraries
             url = url_for('userview')
