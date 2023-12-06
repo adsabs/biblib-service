@@ -60,7 +60,7 @@ class UserView(BaseView):
         return response
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", permissions=False):
+    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", ownership=False):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
@@ -152,16 +152,18 @@ class UserView(BaseView):
                     owner=owner
                 )
 
-                if (permissions and main_permission in ['owner']) or not permissions: 
+                if (ownership and main_permission in ['owner']) or not ownership: 
                     my_libraries.append(payload)
-                elif permissions and main_permission in ['admin', 'read', 'write']: 
+                elif ownership and main_permission in ['admin', 'read', 'write']: 
                     shared_with_me.append(payload)
             
-            response = {'libraries_count': len(result), 
-                        'my_libraries': my_libraries}
-            
-            if shared_with_me: 
+
+            response = {'libraries_count': len(result)}
+            if ownership: 
+                response['my_libraries'] = my_libraries 
                 response['shared_with_me'] = shared_with_me
+            else: 
+                response['libraries'] = my_libraries
             
         return response
 
@@ -227,7 +229,7 @@ class UserView(BaseView):
             if sort_order not in ['asc', 'desc']:
                 raise ValueError
 
-            permissions = get_params.get('permissions', default=False, type=check_boolean)
+            ownership = get_params.get('ownership', default=False, type=check_boolean)
             current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, rows))
 
         except ValueError:
@@ -244,7 +246,7 @@ class UserView(BaseView):
                                       rows=rows, 
                                       sort_col=sort_col, 
                                       sort_order=sort_order, 
-                                      permissions=permissions)
+                                      ownership=ownership)
         return response, 200
 
     def post(self):

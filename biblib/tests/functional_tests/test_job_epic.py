@@ -57,7 +57,7 @@ class TestJobEpic(TestCaseDatabase):
                 url,
                 headers=user_mary.headers
             )
-        library_id = response.json['my_libraries'][0]['id']
+        library_id = response.json['libraries'][0]['id']
 
         # Then she submits the document (in this case a bibcode) to add to the
         # library

@@ -48,7 +48,7 @@ class NotesView(BaseView):
             library, metadata = self.get_library_and_metadata_wrapper(library_id, 
                                                               service_uid, 
                                                               session)
-           
+            current_app.logger.info('Getting note for library {0} and document id {1}'.format(library, document_id))
             note = session.query(Notes).filter(
                 Notes.bibcode == document_id,
                 Notes.library_id == library_id
@@ -84,7 +84,7 @@ class NotesView(BaseView):
                 session.commit()
                 note = note.as_dict()
                 return note, metadata
-        except (BibcodeNotFoundError, DuplicateNoteError, Exception) as e:
+        except (BibcodeNotFoundError, DuplicateNoteError) as e:
             current_app.logger.error('Failed to add note to document {0} in library {1}. Error {2}'
                 .format(document_id, library_id, e)
             ) 
@@ -161,62 +161,64 @@ class NotesView(BaseView):
           - read
         """
 
-        try: 
-            # Get user 
+        current_app.logger.info('###### GET METHOD #####')
+        try:
             user = self.helper_get_user_id()
-            current_app.logger.info('User: {0} requested library: {1}'
-                                    .format(user, library))
-            # Get library id
-            library_id = self.helper_slug_to_uuid(library)
-
-            if not self.helper_library_exists(library_id):
-                return err(MISSING_LIBRARY_ERROR)
-            
-            # Get user id for service 
-            service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
-            
-            # Get library, library metadata and note to be returned
-            library, metadata, note = self.get_note_data(document_id, library_id, service_uid)
-
-            if not note: 
-                return err(MISSING_NOTE_ERROR)
-            
-            current_app.logger.info('Note found: {0}'
-                                    .format(note))
-            
-            response = dict(document=document_id, 
-                            note=note, 
-                            library_metadata=metadata)
-            
-            current_app.logger.info('Checking if library {0} is public'
-                                .format(library))
-            # If library is public or has special token anyone can access it 
-            if self.helper_is_library_public_or_has_special_token(library, request):
-                return response, 200 
-                
-            # If user does not exist they don't have access to this private library
-            if not self.helper_user_exists(user):
-                current_app.logger.error(
-                    'User: {0} does not exist in the database. '
-                    'Therefore will not have extra privileges to view the library: {1}'
-                    .format(user, library_id)
-                )
-                return err(NO_PERMISSION_ERROR)
-            
-            # Check if the user has read access to this private library
-            if not self.helper_check_user_has_read_access(service_uid, library): 
-                return err(NO_PERMISSION_ERROR)
-            
-            current_app.logger.info('Getting note for document {0} in library {1}.'.format(document_id, library_id))
-                
-            return response, 200 
-        except ValueError: 
-            return err(BAD_LIBRARY_ID_ERROR)
         except KeyError:
             return err(MISSING_USERNAME_ERROR)
+        
+        # Get library id
+        try:
+            library_id = self.helper_slug_to_uuid(library)
         except TypeError:
             return err(BAD_LIBRARY_ID_ERROR)
+
+        if not self.helper_user_exists(user):
+            return err(NO_PERMISSION_ERROR)
+
+        if not self.helper_library_exists(library_id):
+            return err(MISSING_LIBRARY_ERROR)
+            
+        # Get user id for service 
+        service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
+            
+        # Get library, library metadata and note to be returned
+        library, metadata, note = self.get_note_data(document_id, library_id, service_uid)
+
+        if not note: 
+            return err(MISSING_NOTE_ERROR)
+            
+        current_app.logger.info('Note found: {0}'
+                                .format(note))
         
+        response = dict(document=document_id, 
+                        note=note, 
+                        library_metadata=metadata)
+            
+        current_app.logger.info('Checking if library {0} is public'
+                            .format(library))
+        # If library is public or has special token anyone can access it 
+        if self.helper_is_library_public_or_has_special_token(library, request):
+            return response, 200 
+                
+        # If user does not exist they don't have access to this private library
+        if not self.helper_user_exists(user):
+            current_app.logger.error(
+                'User: {0} does not exist in the database. '
+                'Therefore will not have extra privileges to view the library: {1}'
+                .format(user, library_id)
+            )
+            return err(NO_PERMISSION_ERROR)
+            
+        # Check if the user has read access to this private library
+        if not self.helper_check_user_has_read_access(service_uid, library): 
+            return err(NO_PERMISSION_ERROR)
+        
+        current_app.logger.info('Getting note for document {0} in library {1}.'.format(document_id, library_id))
+            
+        return response, 200 
+
+    
 
     def post(self, library, document_id):
         """
@@ -334,6 +336,7 @@ class NotesView(BaseView):
 
           - owner
           - admin
+          - write 
         """
         try:
             user = self.helper_get_user_id()
@@ -358,7 +361,7 @@ class NotesView(BaseView):
         service_uid = self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
         # Check the user's permissions
-        if not self.update_access(service_uid=service_uid,
+        if not self.write_access(service_uid=service_uid,
                                 library_id=library_id):
             return err(NO_PERMISSION_ERROR)
         
@@ -409,6 +412,8 @@ class NotesView(BaseView):
         -----------
         The following type of user can delete the note:
           - owner
+          - admin 
+          - write 
         """
         try:
             user = self.helper_get_user_id()
@@ -437,7 +442,7 @@ class NotesView(BaseView):
                                 'requesting to delete note for document {1} and library {2}.'
                                 .format(service_uid, document_id, library))
 
-        if not self.delete_access(service_uid=service_uid,
+        if not self.write_access(service_uid=service_uid,
                                 library_id=library_id):
             return err(NO_PERMISSION_ERROR)
         

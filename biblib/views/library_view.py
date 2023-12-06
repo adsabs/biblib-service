@@ -89,7 +89,7 @@ class LibraryView(BaseView):
                         if new_note.id not in updated_ids: 
                             updated_ids.add(new_note.id)
                             updated_notes.append(new_note.as_dict())
-                    except (BibcodeNotFoundError, DuplicateNoteError, Exception) as error: 
+                    except (BibcodeNotFoundError, DuplicateNoteError) as error: 
                         current_app.logger.error('Error while creating new note with canonical bibcode {0}: {1}'
                                                 .format(canonical_bibcode, error))
                 else: 
@@ -398,19 +398,18 @@ class LibraryView(BaseView):
                                         notes (those not associated with a bibcode in the library)
         """
         with current_app.session_scope() as session:
-            try:
-                library, metadata = BaseView.get_library_and_metadata(
+            library, metadata = BaseView.get_library_and_metadata(
                     library_id=data["library_id"],
                     service_uid=data["service_uid"],
                     session=session
                 )
-        
-                if data["raw_library"]:
-                    solr, updates, documents = self.process_raw_library(data["user"], 
-                                                                        library, 
-                                                                        data["start"], 
-                                                                        data["rows"])
-                else:
+            if data["raw_library"]:
+                solr, updates, documents = self.process_raw_library(data["user"], 
+                                                                    library, 
+                                                                    data["start"], 
+                                                                    data["rows"])
+            else:
+                try:
                     solr, updates, documents = self.process_solr(library, 
                                                                 data["start"], 
                                                                 data["rows"], 
@@ -418,31 +417,32 @@ class LibraryView(BaseView):
                                                                 data["fl"], 
                                                                 session, 
                                                                 data["add_sort"])
+                except Exception as error:
+                    current_app.logger.warning(
+                        'Library missing or solr endpoint failed: {0}'
+                        .format(error)
+                    )
+                    return data["library_id"], None, err(MISSING_LIBRARY_ERROR)
 
-                library_notes = {}
-                if data["notes"] is True: 
-                    library_notes = self.get_notes_from_library(library, session)
-                
-                # Make the response dictionary
-                response = dict(
-                    documents=documents,
-                    solr=solr,
-                    metadata=metadata,
-                    updates=updates,
-                )
+            library_notes = {}
+            if data["notes"]: 
+                library_notes = self.get_notes_from_library(library, session)
+            
+            # Make the response dictionary
+            response = dict(
+                documents=documents,
+                solr=solr,
+                metadata=metadata,
+                updates=updates,
+            )
 
-                if library_notes and (library_notes.get('notes', {}) or library_notes.get('orphan_notes', {})):
-                    response['library_notes'] = library_notes
+            if library_notes and (library_notes.get('notes', {}) or library_notes.get('orphan_notes', {})):
+                response['library_notes'] = library_notes
 
 
-                return library, response, None
+            return library, response, None
 
-            except Exception as error:
-                current_app.logger.warning(
-                    'Library missing or solr endpoint failed: {0}'
-                    .format(error)
-                )
-                return data["library_id"], None, err(MISSING_LIBRARY_ERROR)
+            
             
     @staticmethod
     def timestamp_sort(solr, library_id, reverse=False):

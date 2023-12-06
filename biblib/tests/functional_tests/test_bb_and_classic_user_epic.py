@@ -102,8 +102,8 @@ class TestBBClassicUserEpic(TestCaseDatabase):
                 headers=user_mary.headers
             )
         
-        self.assertTrue(len(response.json['my_libraries']), 1)
-        self.assertEqual(response.json['my_libraries'][0]['name'], stub_library_1.name)
+        self.assertTrue(len(response.json['libraries']), 1)
+        self.assertEqual(response.json['libraries'][0]['name'], stub_library_1.name)
 
         url = url_for('libraryview', library=library_id_mary)
         with MockSolrBigqueryService(
@@ -140,8 +140,8 @@ class TestBBClassicUserEpic(TestCaseDatabase):
                 url,
                 headers=user_mary.headers
             )
-        self.assertTrue(len(response.json['my_libraries']), 1)
-        self.assertEqual(response.json['my_libraries'][0]['name'], stub_library_1.name)
+        self.assertTrue(len(response.json['libraries']), 1)
+        self.assertEqual(response.json['libraries'][0]['name'], stub_library_1.name)
 
         url = url_for('libraryview', library=library_id_mary)
         with MockSolrBigqueryService(
