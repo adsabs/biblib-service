@@ -204,10 +204,14 @@ class OperationsView(BaseView):
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
         lib_names = []
-        check_access = []
+        has_write_access = True
+        has_read_access = True 
         with current_app.session_scope() as session:
             primary = session.query(Library).filter_by(id=library_uuid).one()
             lib_names.append(primary.name)
+            if not self.write_access(service_uid=user_editing_uid,
+                                        library_id=primary.id):
+                has_write_access = False
             if 'libraries' in data:
                 for lib in data['libraries']:
                     try:
@@ -216,16 +220,15 @@ class OperationsView(BaseView):
                         return err(BAD_LIBRARY_ID_ERROR)
                     secondary = session.query(Library).filter_by(id=secondary_uuid).one()
                     lib_names.append(secondary.name)
-                    check_access.append(secondary)
+                    if not secondary.public or not self.read_access(service_uid=user_editing_uid,
+                                            library_id=secondary_uuid):
+                        has_read_access = False 
 
             if data['action'] in ['union', 'intersection', 'difference']:
                 if 'libraries' not in data:
                     return err(NO_LIBRARY_SPECIFIED_ERROR)
-                for lib in check_access:
-                    lib = session.merge(lib)
-                    if not lib.public or not self.read_access(service_uid=user_editing_uid,
-                                            library_id=lib.id):
-                        return err(NO_PERMISSION_ERROR)
+                if not has_read_access: 
+                    return err(NO_PERMISSION_ERROR)
                 if 'name' not in data:
                     data['name'] = 'Untitled {0}.'.format(get_date().isoformat())
                 if 'public' not in data:
@@ -237,8 +240,7 @@ class OperationsView(BaseView):
                 if len(data['libraries']) > 1:
                     return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
                 # Check the permissions of the user
-                if not self.write_access(service_uid=user_editing_uid,
-                                        library_id=check_access[0].id):
+                if not has_write_access: 
                     return err(NO_PERMISSION_ERROR)
 
         
