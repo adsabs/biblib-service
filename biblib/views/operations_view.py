@@ -188,12 +188,6 @@ class OperationsView(BaseView):
 
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
-
-        # Check the permissions of the user
-        if not self.write_access(service_uid=user_editing_uid,
-                                 library_id=library_uuid):
-            return err(NO_PERMISSION_ERROR)
-
         try:
             data = get_post_data(
                 request,
@@ -203,31 +197,48 @@ class OperationsView(BaseView):
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
+        
+        if data['action'] != 'copy' and not self.write_access(service_uid=user_editing_uid,
+                                 library_id=library_uuid):
+            return err(NO_PERMISSION_ERROR)
+    
+       
+        has_read_access_primary = False
+        has_read_access_secondary = False 
+        has_write_access_secondary = False
+        primary_is_public = False 
+        secondary_is_public = False 
+        
         lib_names = []
-        has_write_access = True
-        has_read_access = True 
+
         with current_app.session_scope() as session:
             primary = session.query(Library).filter_by(id=library_uuid).one()
             lib_names.append(primary.name)
-            if not self.write_access(service_uid=user_editing_uid,
-                                        library_id=primary.id):
-                has_write_access = False
-            if 'libraries' in data:
-                for lib in data['libraries']:
-                    try:
-                        secondary_uuid = self.helper_slug_to_uuid(lib)
-                    except TypeError:
-                        return err(BAD_LIBRARY_ID_ERROR)
-                    secondary = session.query(Library).filter_by(id=secondary_uuid).one()
-                    lib_names.append(secondary.name)
-                    if not secondary.public or not self.read_access(service_uid=user_editing_uid,
-                                            library_id=secondary_uuid):
-                        has_read_access = False 
-
+            if primary.public: primary_is_public = True
+            if self.read_access(service_uid=user_editing_uid,
+                                        library_id=library_uuid):
+                has_read_access_primary = True 
+        
+            for lib in data.get('libraries', []):
+                try:
+                    secondary_uuid = self.helper_slug_to_uuid(lib)
+                except TypeError:
+                    return err(BAD_LIBRARY_ID_ERROR)
+                secondary = session.query(Library).filter_by(id=secondary_uuid).one()
+                if secondary.public: secondary_is_public = True
+                lib_names.append(secondary.name)
+                if self.read_access(service_uid=user_editing_uid,
+                                    library_id=secondary_uuid):
+                    has_read_access_secondary = True  
+                if self.write_access(service_uid=user_editing_uid,
+                            library_id=secondary_uuid): 
+                    has_write_access_secondary = True 
+                    
+                    
             if data['action'] in ['union', 'intersection', 'difference']:
                 if 'libraries' not in data:
                     return err(NO_LIBRARY_SPECIFIED_ERROR)
-                if not has_read_access: 
+                if not (secondary_is_public or has_read_access_secondary) or not has_read_access_primary: 
                     return err(NO_PERMISSION_ERROR)
                 if 'name' not in data:
                     data['name'] = 'Untitled {0}.'.format(get_date().isoformat())
@@ -235,13 +246,14 @@ class OperationsView(BaseView):
                     data['public'] = False
 
             if data['action'] == 'copy':
+                
                 if 'libraries' not in data:
                     return err(NO_LIBRARY_SPECIFIED_ERROR)
                 if len(data['libraries']) > 1:
                     return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
                 # Check the permissions of the user
-                if not has_write_access: 
-                    return err(NO_PERMISSION_ERROR)
+                if not (primary_is_public or has_read_access_primary) or not has_write_access_secondary:
+                    return err(NO_PERMISSION_ERROR)           
 
         
 
