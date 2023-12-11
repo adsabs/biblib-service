@@ -727,6 +727,277 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.status_code, TOO_MANY_LIBRARIES_SPECIFIED_ERROR['number'])
         self.assertEqual(response.json['error'], TOO_MANY_LIBRARIES_SPECIFIED_ERROR['body'])
 
+    def test_permissions_on_operations_view_post_types(self): 
+       
+        # Create admin user to give out permissions 
+        admin_user = UserShop()
+
+        # Create stub user to use libraries 
+        stub_user = UserShop()
+
+        stub_library_1 = LibraryShop()
+        stub_library_2 = LibraryShop()
+        stub_library_3 = LibraryShop(public=True)
+
+        # Make libraries 
+        # Make the libraries with admin as admin
+        url = url_for('userview')
+        response_1 = self.client.post(
+            url,
+            data=stub_library_1.user_view_post_data_json,
+            headers=admin_user.headers
+        )
+        library_id_1 = response_1.json['id']
+
+        response_2 = self.client.post(
+            url,
+            data=stub_library_2.user_view_post_data_json,
+            headers=admin_user.headers
+        )
+        library_id_2 = response_2.json['id']
+
+        response_3 = self.client.post(
+            url,
+            data=stub_library_3.user_view_post_data_json,
+            headers=admin_user.headers
+        )
+        library_id_3 = response_3.json['id']
+
+        # Copy success: User has read access primary and write access secondary
+        url = url_for('permissionview', library=library_id_1)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        url = url_for('permissionview', library=library_id_2)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': False, 'write': True, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(action='copy', libraries=[library_id_2])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # Copy success: User is admin
+        url = url_for('permissionview', library=library_id_1)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': False, 'write': False, 'admin': True, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        url = url_for('permissionview', library=library_id_2)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': False, 'write': True, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(action='copy', libraries=[library_id_2])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # Copy fail: User does not have right permissions
+        url = url_for('permissionview', library=library_id_1)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': False, 'write': True, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        url = url_for('permissionview', library=library_id_2)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(action='copy', libraries=[library_id_2])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+        # Copy success: User does not have right permissions for primary but library is public
+        url = url_for('permissionview', library=library_id_3)
+        
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        url = url_for('permissionview', library=library_id_2)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': False, 'write': True, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        
+        url = url_for('operationsview', library=library_id_3)
+        post_data = stub_library_3.operations_view_post_data(action='copy', libraries=[library_id_2])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # Union success: User has read read access primary and read access secondary
+        url = url_for('permissionview', library=library_id_1)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        url = url_for('permissionview', library=library_id_2)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(action='union', libraries=[library_id_2])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # Union success: User does not have the right permissions secondary but it's public
+        url = url_for('permissionview', library=library_id_1)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        url = url_for('permissionview', library=library_id_3)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(action='union', libraries=[library_id_3])
+        post_data['name'] = 'New Library 1'
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Union fail: User does not have right permissions
+        url = url_for('permissionview', library=library_id_1)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        url = url_for('permissionview', library=library_id_2)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(action='union', libraries=[library_id_2])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+        # Union fail: User does not have right permissions
+        url = url_for('permissionview', library=library_id_1)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': True, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+
+        url = url_for('permissionview', library=library_id_2)
+        with MockEmailService(stub_user):
+            response = self.client.post(
+                url,
+                data=stub_user.permission_view_post_data_json({'read': False, 'write': False, 'admin': False, 'owner': False}),
+                headers=admin_user.headers
+            )
+        self.assertEqual(response.status_code, 200)
+        
+        url = url_for('operationsview', library=library_id_1)
+        post_data = stub_library_1.operations_view_post_data(action='union', libraries=[library_id_2])
+        response = self.client.post(
+            url,
+            data=json.dumps(post_data),
+            headers=stub_user.headers
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+
+
     def test_document_view_put_types(self):
         """
         Tests that the content passed to the UserView POST end point

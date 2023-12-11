@@ -173,7 +173,7 @@ class OperationsView(BaseView):
           - admin
           - write
         """
-        
+
         # Get the user requesting this from the header
         try:
             user_editing = self.helper_get_user_id()
@@ -197,11 +197,6 @@ class OperationsView(BaseView):
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
-        
-        if data['action'] != 'copy' and not self.write_access(service_uid=user_editing_uid,
-                                 library_id=library_uuid):
-            return err(NO_PERMISSION_ERROR)
-    
        
         has_read_access_primary = False
         has_read_access_secondary = False 
