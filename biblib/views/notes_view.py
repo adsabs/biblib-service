@@ -160,8 +160,6 @@ class NotesView(BaseView):
           - admin
           - read
         """
-
-        current_app.logger.info('###### GET METHOD #####')
         try:
             user = self.helper_get_user_id()
         except KeyError:
