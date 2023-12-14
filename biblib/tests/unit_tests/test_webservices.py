@@ -718,7 +718,7 @@ class TestWebservices(TestCaseDatabase):
         self.assertEqual(response.json['error'], NO_LIBRARY_SPECIFIED_ERROR['body'])
 
         post_data['action'] = 'copy'
-        post_data['libraries'] = [library_id_2, library_id_2]
+        post_data['libraries'] = [library_id_1, library_id_2]
         response = self.client.post(
             url,
             data=json.dumps(post_data),
@@ -880,7 +880,7 @@ class TestWebservices(TestCaseDatabase):
 
         self.assertEqual(response.status_code, 200)
 
-        # Union success: User has read read access primary and read access secondary
+        # Union success: User has read access primary and read access secondary
         url = url_for('permissionview', library=library_id_1)
         with MockEmailService(stub_user):
             response = self.client.post(
@@ -909,7 +909,7 @@ class TestWebservices(TestCaseDatabase):
 
         self.assertEqual(response.status_code, 200)
 
-        # Union success: User does not have the right permissions secondary but it's public
+        # Union success: User does not have the right permissions for secondary but it's public
         url = url_for('permissionview', library=library_id_1)
         with MockEmailService(stub_user):
             response = self.client.post(
@@ -995,7 +995,6 @@ class TestWebservices(TestCaseDatabase):
         )
 
         self.assertEqual(response.status_code, 403)
-
 
 
     def test_document_view_put_types(self):

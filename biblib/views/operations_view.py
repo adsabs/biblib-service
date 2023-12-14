@@ -197,60 +197,64 @@ class OperationsView(BaseView):
             current_app.logger.error('Wrong type passed for POST: {0} [{1}]'
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
-       
-        has_read_access_primary = False
-        has_read_access_secondary = False 
-        has_write_access_secondary = False
-        primary_is_public = False 
-        secondary_is_public = False 
-        
+
+        action = data["action"]
+
+        if action in ["union", "intersection", "difference"]:
+            if "libraries" not in data:
+                return err(NO_LIBRARY_SPECIFIED_ERROR)
+            if "name" not in data:
+                data["name"] = "Untitled {0}.".format(get_date().isoformat())
+            if "public" not in data:
+                data["public"] = False
+        elif action == "copy":
+            if "libraries" not in data:
+                return err(NO_LIBRARY_SPECIFIED_ERROR)
+            if len(data["libraries"]) > 1:
+                return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
+
         lib_names = []
 
         with current_app.session_scope() as session:
             primary = session.query(Library).filter_by(id=library_uuid).one()
             lib_names.append(primary.name)
-            if primary.public: primary_is_public = True
-            if self.read_access(service_uid=user_editing_uid,
-                                        library_id=library_uuid):
-                has_read_access_primary = True 
-        
-            for lib in data.get('libraries', []):
+            primary_is_public = primary.public
+            has_read_access_primary = self.read_access(
+                service_uid=user_editing_uid, library_id=library_uuid
+            )
+
+            secondary_libraries = data.get("libraries", [])
+            for lib in secondary_libraries:
                 try:
                     secondary_uuid = self.helper_slug_to_uuid(lib)
                 except TypeError:
                     return err(BAD_LIBRARY_ID_ERROR)
+
                 secondary = session.query(Library).filter_by(id=secondary_uuid).one()
-                if secondary.public: secondary_is_public = True
                 lib_names.append(secondary.name)
-                if self.read_access(service_uid=user_editing_uid,
-                                    library_id=secondary_uuid):
-                    has_read_access_secondary = True  
-                if self.write_access(service_uid=user_editing_uid,
-                            library_id=secondary_uuid): 
-                    has_write_access_secondary = True 
-                    
-                    
-            if data['action'] in ['union', 'intersection', 'difference']:
-                if 'libraries' not in data:
-                    return err(NO_LIBRARY_SPECIFIED_ERROR)
-                if not (secondary_is_public or has_read_access_secondary) or not has_read_access_primary: 
-                    return err(NO_PERMISSION_ERROR)
-                if 'name' not in data:
-                    data['name'] = 'Untitled {0}.'.format(get_date().isoformat())
-                if 'public' not in data:
-                    data['public'] = False
 
-            if data['action'] == 'copy':
-                
-                if 'libraries' not in data:
-                    return err(NO_LIBRARY_SPECIFIED_ERROR)
-                if len(data['libraries']) > 1:
-                    return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
-                # Check the permissions of the user
-                if not (primary_is_public or has_read_access_primary) or not has_write_access_secondary:
-                    return err(NO_PERMISSION_ERROR)           
+                secondary_is_public = secondary.public
 
-        
+                has_read_access_secondary = self.read_access(
+                    service_uid=user_editing_uid, library_id=secondary_uuid
+                )
+
+                has_write_access_secondary = self.write_access(
+                    service_uid=user_editing_uid, library_id=secondary_uuid
+                )
+
+                if action in ["union", "intersection", "difference"]:
+                    if not has_read_access_primary or not (
+                        secondary_is_public or has_read_access_secondary
+                    ):
+                        return err(NO_PERMISSION_ERROR)
+
+                elif action == "copy":
+                    if (
+                        not (primary_is_public or has_read_access_primary)
+                        or not has_write_access_secondary
+                    ):
+                        return err(NO_PERMISSION_ERROR)
 
         if data['action'] == 'union':
             bib_union = self.setops_libraries(
