@@ -2,7 +2,7 @@
 User view
 """
 
-from biblib.utils import err, get_post_data
+from biblib.utils import err, get_post_data, check_boolean
 from biblib.models import User, Library, Permissions
 from biblib.client import client
 from biblib.views.base_view import BaseView
@@ -60,14 +60,14 @@ class UserView(BaseView):
         return response
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc"):
+    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", ownership=False):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
         :param absolute_uid: unique UID of the user in the API
         :param start: Index of the first library to return
         :param rows: Number of libraries to return (default all)
-        :param sort_col: Library column to sort on (date_created, date_last_modified)
+        :param sort_col: Library column to sort on (date_created, date_last_modified, name)
         :param sort_dir: Direction sort libraries (asc, desc)
 
         :return: list of libraries in json format
@@ -87,7 +87,8 @@ class UserView(BaseView):
             
             if rows: rows=start+rows
             
-            output_libraries = []
+            my_libraries = []
+            shared_with_me = []
             for permission, library in result[start:rows]:
 
                 # For this library get all the people who have permissions
@@ -151,9 +152,20 @@ class UserView(BaseView):
                     owner=owner
                 )
 
-                output_libraries.append(payload)
+                if (ownership and main_permission in ['owner']) or not ownership: 
+                    my_libraries.append(payload)
+                elif ownership and main_permission in ['admin', 'read', 'write']: 
+                    shared_with_me.append(payload)
+            
 
-            return output_libraries
+            response = {'libraries_count': len(result)}
+            if ownership: 
+                response['my_libraries'] = my_libraries 
+                response['shared_with_me'] = shared_with_me
+            else: 
+                response['libraries'] = my_libraries
+            
+        return response
 
     # Methods
     def get(self):
@@ -210,13 +222,14 @@ class UserView(BaseView):
             rows = get_params.get('rows', type=int)
             
             sort_col = get_params.get('sort', default='date_created', type=str)
-            if sort_col not in ['date_created', 'date_last_modified']: 
+            if sort_col not in ['date_created', 'date_last_modified', 'name']: 
                 raise ValueError
             
             sort_order = get_params.get('order', default='asc', type=str)
             if sort_order not in ['asc', 'desc']:
                 raise ValueError
 
+            ownership = get_params.get('ownership', default=False, type=check_boolean)
             current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, rows))
 
         except ValueError:
@@ -227,9 +240,14 @@ class UserView(BaseView):
         service_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user)
 
-        user_libraries = self.get_libraries(service_uid=service_uid,
-                                            absolute_uid=user, start=start, rows=rows, sort_col=sort_col, sort_order=sort_order)
-        return {'libraries': user_libraries}, 200
+        response = self.get_libraries(service_uid=service_uid,
+                                      absolute_uid=user, 
+                                      start=start, 
+                                      rows=rows, 
+                                      sort_col=sort_col, 
+                                      sort_order=sort_order, 
+                                      ownership=ownership)
+        return response, 200
 
     def post(self):
         """

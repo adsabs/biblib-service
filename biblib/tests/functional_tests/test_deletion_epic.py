@@ -93,7 +93,7 @@ class TestDeletionEpic(TestCaseDatabase):
                 url,
                 headers=stub_user.headers
             )
-        self.assertTrue(len(response.json['libraries']) == 1)
+        self.assertTrue(response.json['libraries_count'] == 1)
 
         # Deletes the first library
         url = url_for('documentview', library=library_id_1)
@@ -103,14 +103,14 @@ class TestDeletionEpic(TestCaseDatabase):
         )
         self.assertEqual(response.status_code, 200)
 
-        # Looks to check there are is only one libraries
+        # Looks to check there are no libraries
         url = url_for('userview')
         with MockEmailService(stub_user, end_type='uid'):
             response = self.client.get(
                 url,
                 headers=stub_user.headers
             )
-        self.assertTrue(len(response.json['libraries']) == 0)
+        self.assertTrue(response.json['libraries_count'] == 0)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

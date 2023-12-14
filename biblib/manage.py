@@ -11,7 +11,7 @@ sys.path.append(PROJECT_HOME)
 from flask import current_app
 from flask_script import Manager, Command, Option
 from flask_migrate import Migrate, MigrateCommand
-from biblib.models import Base, User, Permissions, Library
+from biblib.models import Base, User, Permissions, Library, Notes
 from biblib.app import create_app
 from sqlalchemy import create_engine, desc
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -67,7 +67,7 @@ class DeleteStaleUsers(Command):
 
 class DeleteObsoleteVersionsTime(Command):
     """
-    Clears obsolete library versions older than chosen time.
+    Clears obsolete library and notes versions older than chosen time.
     """
     @staticmethod
     def run(app=app, n_years=None):
@@ -81,14 +81,21 @@ class DeleteObsoleteVersionsTime(Command):
             with current_app.session_scope() as session:
                 # Obtain a list of all versions older than 1 year.
                 LibraryVersion = sqlalchemy_continuum.version_class(Library)
+                NotesVersion = sqlalchemy_continuum.version_class(Notes)
                 current_date = datetime.now()
                 current_offset = current_date - relativedelta(years=n_years)
                 try:
-                    results = session.query(LibraryVersion).filter(LibraryVersion.date_last_modified<current_offset).all()
-                    d = [session.delete(revision) for revision in results]
-                    d_len = len(d)
+                    library_results = session.query(LibraryVersion).filter(LibraryVersion.date_last_modified<current_offset).all()
+                    notes_results = session.query(NotesVersion).filter(NotesVersion.date_last_modified<current_offset).all() 
+
+                    d_library = [session.delete(revision) for revision in library_results]
+                    d_notes = [session.delete(revision) for revision in notes_results] 
+
+                    d_library_len = len(d_library)
+                    d_notes_len = len(d_notes)
                     session.commit()
-                    current_app.logger.info('Removed {} obsolete revisions'.format(d_len))
+                    current_app.logger.info('Removed {} obsolete library revisions'.format(d_library_len))
+                    current_app.logger.info('Removed {} obsolete notes revisions'.format(d_notes_len))
                 except Exception as error:
                         current_app.logger.info('Problem with database, could not remove revisions: {}'
                                                 .format(error))
@@ -96,35 +103,39 @@ class DeleteObsoleteVersionsTime(Command):
 
 class DeleteObsoleteVersionsNumber(Command):
     """
-    Limits number of revisions saved per library to n_revisions.
+    Limits number of revisions saved per entity to n_revisions.
     """
     @staticmethod
+    def limit_revisions(session, entity_class, n_revisions):
+        VersionClass = sqlalchemy_continuum.version_class(entity_class)
+        entities = session.query(entity_class).all()
+
+        for entity in entities:
+            try:
+                revisions = session.query(VersionClass).filter_by(id=entity.id).order_by(VersionClass.date_last_modified.asc()).all()
+                current_app.logger.debug('Found {} revisions for entity: {}'.format(len(revisions), entity.id))
+                obsolete_revisions = revisions[:-n_revisions]
+                deleted_revisions = [session.delete(revision) for revision in obsolete_revisions]
+                deleted_revisions_len = len(deleted_revisions)
+                session.commit()
+                current_app.logger.info('Removed {} obsolete revisions for entity: {}'.format(deleted_revisions_len, entity.id))
+
+            except Exception as error:
+                current_app.logger.info('Problem with the database, could not remove revisions for entity {}: {}'
+                                        .format(entity, error))
+                session.rollback()
+
+    @staticmethod
     def run(app=app, n_revisions=None):
-        """
-        Carries out the deletion of older versions
-        """
-        if not n_revisions: n_revisions = current_app.config.get('NUMBER_REVISIONS', 7)
+        if not n_revisions:
+            n_revisions = current_app.config.get('NUMBER_REVISIONS', 7)
 
         with app.app_context():
             with current_app.session_scope() as session:
-                LibraryVersion = sqlalchemy_continuum.version_class(Library)
-                for library in session.query(Library).all():
-                    try:
-                        #for library in libraries:
-                        revisions = session.query(LibraryVersion).filter_by(id=library.id).order_by(LibraryVersion.date_last_modified.asc()).all()
-                        # Obtain the revisions for a given library
-                        current_app.logger.debug('Found {} revisions for library: {}'.format(len(revisions), library.id))
-                        obsolete_revisions = revisions[:-n_revisions]
-                        d = [session.delete(revision) for revision in obsolete_revisions]
-                        #deletes all but the n_revisions most recent revisions.
-                        d_len = len(d)
-                        session.commit()
-                        current_app.logger.info('Removed {} obsolete revisions for library: {}'.format(d_len, library.id))
+                DeleteObsoleteVersionsNumber.limit_revisions(session, Library, n_revisions)
+                DeleteObsoleteVersionsNumber.limit_revisions(session, Notes, n_revisions)
 
-                    except Exception as error:
-                        current_app.logger.info('Problem with database, could not remove revisions for library {}: {}'
-                                                .format(library, error))
-                        session.rollback()
+
 
 # Setup the command line arguments using Flask-Script
 manager = Manager(app)

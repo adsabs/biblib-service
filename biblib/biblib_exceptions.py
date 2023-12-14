@@ -31,3 +31,29 @@ class PermissionDeniedError(Exception):
         """
         super(PermissionDeniedError, self).__init__(message)
         self.errors = 'You do not have permission to do this'
+
+class BibcodeNotFoundError(Exception):
+    """
+    Custom exception. Is raised when the bibcode is not found in library.
+    """
+    def __init__(self, message):
+        """
+        Constructor
+        :param message: error message
+        :return: no return
+        """
+        super(BibcodeNotFoundError, self).__init__(message)
+        self.errors = 'The bibcode given was not found in library.'
+
+class DuplicateNoteError(Exception):
+    """
+    Custom exception. Is raised when bibcode in library already has a note.
+    """
+    def __init__(self, message):
+        """
+        Constructor
+        :param message: error message
+        :return: no return
+        """
+        super(DuplicateNoteError, self).__init__(message)
+        self.errors = 'Note must be unique for given bibcode and library.'

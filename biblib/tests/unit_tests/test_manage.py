@@ -4,7 +4,7 @@ Tests the methods within the flask-script file manage.py
 
 import unittest
 from biblib.manage import DeleteObsoleteVersionsNumber, DeleteStaleUsers, DeleteObsoleteVersionsTime
-from biblib.models import User, Library, Permissions
+from biblib.models import User, Library, Permissions, Notes
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.tests.base import TestCaseDatabase
 import sqlalchemy_continuum
@@ -254,8 +254,14 @@ class TestManagePy(TestCaseDatabase):
                     library = session.query(Library).filter(Library.id == library_1_id).all()
                     for _lib in library:
                         self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
-
-                    # Add a different document to the library
+                note_1 = Notes.create_unique(session, content="Note 1", bibcode=library[0].get_bibcodes()[0], library=library[0])
+                session.add(note_1)
+                session.commit()
+                note_1.content = "Note 1 version 2"
+                session.commit() 
+                
+                
+                # Add a different document to the library
                 with MockSolrQueryService(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode')):
                     output = self.document_view.add_document_to_library(
                         library_id=library_1_id,
@@ -265,6 +271,11 @@ class TestManagePy(TestCaseDatabase):
                     library = session.query(Library).filter(Library.id == library_1_id).all()
                     for _lib in library:
                         self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
+                note_2 = Notes.create_unique(session, content="Note 1", bibcode=library[0].get_bibcodes()[1], library=library[0])
+                session.add(note_2)
+                session.commit()
+                note_2.content = "Note 2 version 2"
+                session.commit() 
 
                 with MockSolrQueryService(canonical_bibcode = self.stub_library_3.document_view_post_data('add').get('bibcode')):
                     output = self.document_view.add_document_to_library(
@@ -286,6 +297,14 @@ class TestManagePy(TestCaseDatabase):
                         revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
                         revision_lengths.append(len(revisions))
                 
+                # # Check state of database for notes 
+                NotesVersion = sqlalchemy_continuum.version_class(Notes)
+                notes = session.query(Notes).all()
+                notes_revision_lengths = []
+                for notes in notes: 
+                    revisions = session.query(NotesVersion).filter_by(id=notes.id).all() 
+                    notes_revision_lengths.append(len(revisions))
+                self.assertEqual(notes_revision_lengths, [2, 2])
                 # Now run the obsolete deletion
                 DeleteObsoleteVersionsNumber().run(app=self.app, n_revisions=self.n_revisions)
                 service_user = user_1_id
@@ -293,6 +312,7 @@ class TestManagePy(TestCaseDatabase):
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
                 LibraryVersion = sqlalchemy_continuum.version_class(Library)
                 updated_revision_lengths = []
+                
                 
                 #confirm most recent remaining revision matches current state of library
                 for library in libraries:
@@ -303,7 +323,19 @@ class TestManagePy(TestCaseDatabase):
                 #Confirm number of revisions matches expected length
                 for i in range(0,len(updated_revision_lengths)):
                     self.assertEqual(revision_lengths[i]-updated_revision_lengths[i], revision_lengths[i]-self.n_revisions)
-    
+
+                # Check state of database for notes after the deletion of obsolete versions
+                NotesVersion = sqlalchemy_continuum.version_class(Notes)
+                notes = session.query(Notes).all()
+                updated_notes_revision_lengths = []
+                for note in notes: 
+                    revisions = session.query(NotesVersion).filter_by(id=note.id).all() 
+                    updated_notes_revision_lengths.append(len(revisions))
+                self.assertEqual(updated_notes_revision_lengths, [1, 1])
+                
+                for note in notes:
+                    updated_revisions = session.query(NotesVersion).filter_by(id=note.id).all()
+                    self.assertIn(updated_revisions[0].content, ["Note 1 version 2", "Note 2 version 2"])
 
             except Exception:
                 raise
@@ -376,10 +408,7 @@ class TestManagePy(TestCaseDatabase):
 
                 # Retain some IDs for when they are deleted
                 user_1_id = user_1.id
-                user_2_id = user_2.id
-                user_1_absolute_uid = user_1.absolute_uid
                 library_1_id = library_1.id
-                library_2_id = library_2.id
 
                 #create multiple versions by adding to library
                 with MockSolrQueryService(canonical_bibcode = self.stub_library.document_view_post_data('add').get('bibcode')):
@@ -393,6 +422,14 @@ class TestManagePy(TestCaseDatabase):
                     for _lib in library:
                         self.assertIn(list(self.stub_library.bibcode.keys())[0], _lib.bibcode)
 
+                #create note 1 for document added and add one revision
+                note_1 = Notes.create_unique(session, content="Note 1", bibcode=library[0].get_bibcodes()[0], library=library[0])
+                session.add(note_1)
+                session.commit()
+                note_1.content = "Note 1 version 2"
+                session.commit()  
+ 
+
                 #Add a different document to the library
                 with MockSolrQueryService(canonical_bibcode = self.stub_library_2.document_view_post_data('add').get('bibcode')):
                     output = self.document_view.add_document_to_library(
@@ -404,6 +441,14 @@ class TestManagePy(TestCaseDatabase):
                     for _lib in library:
                         self.assertIn(list(self.stub_library_2.bibcode.keys())[0], _lib.bibcode)
 
+                #create note 2 for another document and add one revision
+                note_2 = Notes.create_unique(session, content="Note 2", bibcode=library[0].get_bibcodes()[1], library=library[0])
+                session.add(note_2)
+                session.commit()
+                note_2.content = "Note 2 version 2"
+                session.commit() 
+
+                #Add yet another document to the library
                 with MockSolrQueryService(canonical_bibcode = self.stub_library_3.document_view_post_data('add').get('bibcode')):
                     output = self.document_view.add_document_to_library(
                         library_id=library_1_id,
@@ -415,16 +460,27 @@ class TestManagePy(TestCaseDatabase):
                     for _lib in library:
                         self.assertIn(list(self.stub_library_3.bibcode.keys())[0], _lib.bibcode)
 
-                    service_user = user_1_id
-                    permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
-                    libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
-                    LibraryVersion = sqlalchemy_continuum.version_class(Library)
-                    revision_lengths = []
-                    for library in libraries:
-                        revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
-                        revision_lengths.append(len(revisions))
+                service_user = user_1_id
+                permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
+                libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
+                LibraryVersion = sqlalchemy_continuum.version_class(Library)
+                revision_lengths = []
+                for library in libraries:
+                    revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
+                    revision_lengths.append(len(revisions))
+
+                # Check state of database for notes before the deletion of obsolete versions
+                NotesVersion = sqlalchemy_continuum.version_class(Notes)
+                notes = session.query(Notes).all()
+                notes_revision_lengths = []
+                for note in notes: 
+                    revisions = session.query(NotesVersion).filter_by(id=note.id).all() 
+                    notes_revision_lengths.append(len(revisions))
+                # Confirm there are two revisions for each note
+                self.assertEqual(notes_revision_lengths, [2, 2])
                 
-                #Now run the obsolete deletion acting as if we are 1 year in the future.
+                # Now run the obsolete deletion acting as if we are 1 year in the future.
+                # Libraries and notes should persist because n_years is 2 
                 current_offset = datetime.now() + relativedelta(years=1)
                 with freezegun.freeze_time(current_offset):
                     DeleteObsoleteVersionsTime().run(app=self.app, n_years=self.n_years)
@@ -439,9 +495,19 @@ class TestManagePy(TestCaseDatabase):
                     updated_revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
                     updated_revision_lengths.append(len(updated_revisions))
                     self.assertUnsortedEqual(library.bibcode, updated_revisions[-1].bibcode) 
+                
+                NotesVersion = sqlalchemy_continuum.version_class(Notes)
+                notes = session.query(Notes).all()
+                updated_notes_revision_lengths = []
+                for note in notes: 
+                    revisions = session.query(NotesVersion).filter_by(id=note.id).all() 
+                    updated_notes_revision_lengths.append(len(revisions))
+                # Confirm there are two revisions for each note
+                self.assertEqual(updated_notes_revision_lengths, [2, 2])
 
-                #Run obsolete deletion assuming we are 2 years in the future.
-                current_offset = datetime.now() + relativedelta(years=2)
+                # Run obsolete deletion assuming we are 2 years in the future.
+                # Libraries and notes should be deleted
+                current_offset = datetime.now() + relativedelta(years=2, days=1)
                 with freezegun.freeze_time(current_offset):
                     DeleteObsoleteVersionsTime().run(app=self.app, n_years=self.n_years)
                 service_user = user_1_id
@@ -454,6 +520,16 @@ class TestManagePy(TestCaseDatabase):
                 for library in libraries:
                     updated_revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
                     self.assertEqual(len(updated_revisions), 0) 
+
+                # Check state of database for notes after the deletion of obsolete versions
+                NotesVersion = sqlalchemy_continuum.version_class(Notes)
+                notes = session.query(Notes).all()
+                updated_notes_revision_lengths = []
+                for note in notes: 
+                    revisions = session.query(NotesVersion).filter_by(id=note.id).all() 
+                    updated_notes_revision_lengths.append(len(revisions))
+                # Confirm there are zero revisions for each note
+                self.assertEqual(updated_notes_revision_lengths, [0, 0])
 
             except Exception:
                 # Destroy the tables

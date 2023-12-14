@@ -7,7 +7,7 @@ import logging.config
 
 from werkzeug.serving import run_simple
 from biblib.views import UserView, LibraryView, DocumentView, QueryView, PermissionView, \
-    TransferView, ClassicView, TwoPointOhView, OperationsView
+    TransferView, ClassicView, TwoPointOhView, OperationsView, NotesView
 from flask_restful import Api
 from flask_discoverer import Discoverer
 from flask_mail import Mail
@@ -43,6 +43,10 @@ def create_app(**config):
     api.add_resource(DocumentView,
                      '/documents/<string:library>',
                      methods=['POST', 'DELETE', 'PUT'])
+    
+    api.add_resource(NotesView,
+               '/notes/<string:library>/<string:document_id>',
+               methods=['GET', 'POST', 'DELETE', 'PUT'])
     
     api.add_resource(QueryView,
                      '/query/<string:library>',

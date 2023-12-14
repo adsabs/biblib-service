@@ -1762,7 +1762,7 @@ class TestWebservices(TestCaseDatabase):
                 url,
                 headers=stub_user.headers
             )
-        self.assertTrue(len(response.json['libraries']) == 0,
+        self.assertTrue(response.json['libraries_count'] == 0,
                         response.json)
 
         # Check there is no document content
@@ -2903,7 +2903,7 @@ class TestWebservices(TestCaseDatabase):
                 url,
                 headers=stub_user.headers
             )
-        self.assertTrue(len(response.json['libraries']) > 0,
+        self.assertTrue(response.json['libraries_count'] > 0,
                         msg='No libraries returned: {}'.format(response.json))
         self.assertEqual(response.json['libraries'][0]['name'], stub_library.name)
         self.assertEqual(response.json['libraries'][0]['description'],

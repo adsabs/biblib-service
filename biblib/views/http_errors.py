@@ -23,6 +23,24 @@ MISSING_USERNAME_ERROR = dict(
          'See the API documentation: {0}'.format(API_HELP),
     number=400
 )
+MISSING_NOTE_ERROR = dict(
+    body='Note does not exist for specified document.'
+         'See the API documentation: {0}'.format(API_HELP),
+    number=400
+)
+DUPLICATE_NOTE_ERROR = dict(
+    body='Note for this document already exists.',
+    number=409
+)
+INVALID_BIBCODE_ERROR = dict(
+    body='Bibcode does not exist in this library.',
+    number=400
+)
+INVALID_CONTENT_ERROR = dict(
+    body='Content is invalid. '
+    'See the API documentation: {0}'.format(API_HELP),
+    number=400
+)
 NO_PERMISSION_ERROR = dict(
     body='You do not have the correct permissions or the library does not '
          'exist.',
@@ -77,7 +95,6 @@ def INVALID_BIBCODE_SPECIFIED_ERROR(output_dict):
         output_dict.get("invalid_bibcodes")),
         number=400
     )
-
 INVALID_QUERY_PARAMETERS_SPECIFIED = dict(
     body = "Invalid /search parameters specified.",
     number = 400

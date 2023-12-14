@@ -115,7 +115,6 @@ class TestReturnedDataEpic(TestCaseDatabase):
                     url,
                     headers=user_mary.headers
                 )
-
         library = response.json['libraries'][0]
 
         self.assertEqual(response.status_code, 200)
@@ -150,7 +149,7 @@ class TestReturnedDataEpic(TestCaseDatabase):
                 headers=user_dave.headers
             )
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(len(response.json['libraries']) == 1)
+        self.assertTrue(response.json['libraries_count'] == 1)
         self.assertTrue(
             response.json['libraries'][0]['num_documents']
             == (number_of_documents+number_of_documents_second)
@@ -176,16 +175,17 @@ class TestReturnedDataEpic(TestCaseDatabase):
                 headers=user_dave.headers
             )
         self.assertEqual(response.status_code, 200)
-        libraries = response.json['libraries']
-        self.assertTrue(len(libraries) == 1)
+        libraries = response.json
+        
+        self.assertTrue(libraries['libraries_count'] == 1)
         self.assertTrue(
-            libraries[0]['num_documents'] == number_of_documents+1
+            libraries['libraries'][0]['num_documents'] == number_of_documents+1
         )
-        self.assertTrue(libraries[0]['public'])
-        date_created_2 = datetime.strptime(libraries[0]['date_created'],
+        self.assertTrue(libraries['libraries'][0]['public'])
+        date_created_2 = datetime.strptime(libraries['libraries'][0]['date_created'],
                                            '%Y-%m-%dT%H:%M:%S.%f')
         date_last_modified_2 = \
-            datetime.strptime(libraries[0]['date_last_modified'],
+            datetime.strptime(libraries['libraries'][0]['date_last_modified'],
                               '%Y-%m-%dT%H:%M:%S.%f')
         self.assertEqual(date_created, date_created_2)
         self.assertNotAlmostEqual(date_created_2,

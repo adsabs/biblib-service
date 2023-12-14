@@ -1,21 +1,21 @@
 """
 Tests Views of the application
 """
-
 import unittest
 import uuid
-from biblib.models import User, Library, Permissions, MutableDict
+from biblib.models import User, Library, Permissions, MutableDict, Notes
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.views import UserView, LibraryView, DocumentView, PermissionView, \
-    BaseView, TransferView, ClassicView, OperationsView, QueryView
+    BaseView, TransferView, ClassicView, OperationsView, QueryView, NotesView
 from biblib.views import DEFAULT_LIBRARY_DESCRIPTION
-from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
+from biblib.tests.stubdata.stub_data import UserShop, LibraryShop, fake_biblist
 from biblib.utils import get_item
 from biblib.biblib_exceptions import BackendIntegrityError, PermissionDeniedError
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService, MockSolrQueryService
 from biblib.emails import PermissionsChangedEmail
+from flask import current_app
 
 class TestBaseViews(TestCaseDatabase):
     """
@@ -354,7 +354,8 @@ class TestUserViews(TestCaseDatabase):
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid
             )
-        self.assertEqual(len(libraries), number_of_libs)
+        
+        self.assertEqual(libraries['libraries_count'], number_of_libs)
 
     def test_user_can_retrieve_rows_number_of_libraries(self):
         """
@@ -386,7 +387,8 @@ class TestUserViews(TestCaseDatabase):
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid, rows=20
             )
-        self.assertEqual(len(libraries), 20)
+        
+        self.assertEqual(len(libraries['libraries']), 20)
 
     def test_user_can_retrieve_libraries_from_start(self):
         """
@@ -416,16 +418,17 @@ class TestUserViews(TestCaseDatabase):
             libraries_full = self.user_view.get_libraries(
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid, start=0
-            )
+            )['libraries']
         
         # Get the library created
         with MockEmailService(self.stub_user, end_type='uid'):
-            libraries = self.user_view.get_libraries(
+            my_libraries = self.user_view.get_libraries(
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid, start=10
-            )
-        self.assertEqual(len(libraries), 90)
-        self.assertEqual(libraries_full[10:], libraries)
+            )['libraries'] 
+
+        self.assertEqual(len(my_libraries), 90)
+        self.assertEqual(libraries_full[10:], my_libraries)
 
     def test_user_can_retrieve_all_libraries_by_paging(self):
         """
@@ -457,19 +460,23 @@ class TestUserViews(TestCaseDatabase):
             libraries_full = self.user_view.get_libraries(
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid, start=0
-            )
+            )['libraries']
+       
         
         # Get the library created
         libraries = []
+        total_libraries = 0
         with MockEmailService(self.stub_user, end_type='uid'):
             for start in range(number_of_libs):
-                libraries = libraries + self.user_view.get_libraries(
+                curr_libraries = self.user_view.get_libraries(
                     service_uid=user.id,
                     absolute_uid=user.absolute_uid, start=start*10,
                     rows=10
                 )
-
-        self.assertEqual(len(libraries), 100)
+                libraries += curr_libraries['libraries']
+                total_libraries = curr_libraries['libraries_count']
+        
+        self.assertEqual(total_libraries, 100)
         self.assertEqual(libraries_full, libraries)
 
     def test_user_can_retrieve_library_when_uid_does_not_exist(self):
@@ -500,9 +507,10 @@ class TestUserViews(TestCaseDatabase):
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid
             )
-        self.assertEqual(libraries[0]['owner'], 'Not available')
+        
+        self.assertEqual(libraries['libraries'][0]['owner'], 'Not available')
 
-    def test_user_retrieves_correct_library_content(self):
+    def test_user_retrieves_correct_library_content_from_userview(self):
         """
         Test that the contents returned from the user_view contains all the
         information that we want
@@ -553,29 +561,29 @@ class TestUserViews(TestCaseDatabase):
                 service_uid=user.id,
                 absolute_uid=user.absolute_uid
             )
-
-        self.assertTrue(len(libraries) == number_of_libs)
-        for library in libraries:
+        
+        self.assertTrue(libraries['libraries_count'] == number_of_libs)
+        
+        for library in libraries['libraries']:
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
                                                    .format(key))
 
-        
         for j in range(number_of_libs):
-            i = len(libraries) - j - 1
+            i = number_of_libs - j - 1
             for key in ['name', 'description', 'public']:
-                self.assertEqual(libraries[i][key],
+                self.assertEqual(libraries['libraries'][i][key],
                                 libs[j].user_view_post_data[key])
 
-            self.assertEqual(libraries[i]['num_documents'], 0)
+            self.assertEqual(libraries['libraries'][i]['num_documents'], 0)
 
-            if libraries[i]['id'] == _lib['id']:
-                self.assertEqual(libraries[i]['num_users'], 2)
+            if libraries['libraries'][i]['id'] == _lib['id']:
+                self.assertEqual(libraries['libraries'][i]['num_users'], 2)
             else:
-                self.assertEqual(libraries[i]['num_users'], 1)
+                self.assertEqual(libraries['libraries'][i]['num_users'], 1)
 
-            self.assertEqual(libraries[i]['permission'], 'owner')
-
+            self.assertEqual(libraries['libraries'][i]['permission'], 'owner')
+        
         # Get the library created with a different sort order
         with MockEmailService(stub_user_1, end_type='uid'):
             libraries = self.user_view.get_libraries(
@@ -583,9 +591,9 @@ class TestUserViews(TestCaseDatabase):
                 absolute_uid=user.absolute_uid,
                 sort_order='asc'
             )
-
-        self.assertTrue(len(libraries) == number_of_libs)
-        for library in libraries:
+        
+        self.assertTrue(libraries['libraries_count'] == number_of_libs)
+        for library in libraries['libraries']:
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
                                                    .format(key))
@@ -593,17 +601,16 @@ class TestUserViews(TestCaseDatabase):
         
         for i in range(number_of_libs):
             for key in ['name', 'description', 'public']:
-                self.assertEqual(libraries[i][key],
+                self.assertEqual(libraries['libraries'][i][key],
                                 libs[i].user_view_post_data[key])
+            self.assertEqual(libraries['libraries'][i]['num_documents'], 0)
 
-            self.assertEqual(libraries[i]['num_documents'], 0)
-
-            if libraries[i]['id'] == _lib['id']:
-                self.assertEqual(libraries[i]['num_users'], 2)
+            if libraries['libraries'][i]['id'] == _lib['id']:
+                self.assertEqual(libraries['libraries'][i]['num_users'], 2)
             else:
-                self.assertEqual(libraries[i]['num_users'], 1)
+                self.assertEqual(libraries['libraries'][i]['num_users'], 1)
 
-            self.assertEqual(libraries[i]['permission'], 'owner')
+            self.assertEqual(libraries['libraries'][i]['permission'], 'owner')
         
         # Get the library created with a different sort order and sort column
         with MockEmailService(stub_user_1, end_type='uid'):
@@ -614,8 +621,8 @@ class TestUserViews(TestCaseDatabase):
                 sort_order='asc'
             )
 
-        self.assertTrue(len(libraries) == number_of_libs)
-        for library in libraries:
+        self.assertTrue(libraries['libraries_count'] == number_of_libs)
+        for library in libraries['libraries']:
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
                                                    .format(key))
@@ -623,17 +630,17 @@ class TestUserViews(TestCaseDatabase):
         
         for i in range(number_of_libs):
             for key in ['name', 'description', 'public']:
-                self.assertEqual(libraries[i][key],
+                self.assertEqual(libraries['libraries'][i][key],
                                 libs[i].user_view_post_data[key])
 
-            self.assertEqual(libraries[i]['num_documents'], 0)
+            self.assertEqual(libraries['libraries'][i]['num_documents'], 0)
 
-            if libraries[i]['id'] == _lib['id']:
-                self.assertEqual(libraries[i]['num_users'], 2)
+            if libraries['libraries'][i]['id'] == _lib['id']:
+                self.assertEqual(libraries['libraries'][i]['num_users'], 2)
             else:
-                self.assertEqual(libraries[i]['num_users'], 1)
+                self.assertEqual(libraries['libraries'][i]['num_users'], 1)
 
-            self.assertEqual(libraries[i]['permission'], 'owner')
+            self.assertEqual(libraries['libraries'][i]['permission'], 'owner')
 
         # Get the library created
         with MockEmailService(stub_user_2, end_type='uid'):
@@ -643,7 +650,7 @@ class TestUserViews(TestCaseDatabase):
                     absolute_uid=user_other.absolute_uid
                 )
 
-        self.assertTrue(len(libraries) == 2)
+        self.assertTrue(libraries['libraries_count'] == 2)
 
     def test_dates_of_updates_change_correctly(self):
         """
@@ -724,7 +731,7 @@ class TestUserViews(TestCaseDatabase):
                         absolute_uid=user_other.absolute_uid
                     )
 
-            self.assertEqual(list(permission.keys())[0], libraries[0]['permission'])
+            self.assertEqual(list(permission.keys())[0], libraries['libraries'][0]['permission'])
 
     def test_can_only_see_number_of_people_with_admin_or_owner(self):
         """
@@ -760,16 +767,18 @@ class TestUserViews(TestCaseDatabase):
                 libraries = self.user_view.get_libraries(
                     service_uid=user_admin.id,
                     absolute_uid=user_admin.absolute_uid
-                )[0]
-        self.assertTrue(libraries['num_users'] > 0)
+                )['libraries']
+        
+        self.assertTrue(libraries[0]['num_users'] > 0)
 
         # For user owner
         with MockEmailService(self.stub_user_1, end_type='uid'):
             libraries = self.user_view.get_libraries(
                 service_uid=user_owner.id,
                 absolute_uid=user_owner.absolute_uid
-            )[0]
-        self.assertTrue(libraries['num_users'] > 0)
+            )['libraries']
+        
+        self.assertTrue(libraries[0]['num_users'] > 0)
 
     def test_cannot_see_number_of_people_with_lower_than_admin(self):
         """
@@ -808,19 +817,19 @@ class TestUserViews(TestCaseDatabase):
             libraries = self.user_view.get_libraries(
                 service_uid=user_read.id,
                 absolute_uid=user_read.absolute_uid
-            )[0]
-        self.assertTrue(libraries['num_users'] == 0)
+            )['libraries']
+        self.assertTrue(libraries[0]['num_users'] == 0)
         # make sure the owner is correct
-        self.assertIn(libraries['owner'], self.stub_user_3.email)
+        self.assertIn(libraries[0]['owner'], self.stub_user_3.email)
 
         # For user write
         with MockEmailService(self.stub_user_3, end_type='uid'):
             libraries = self.user_view.get_libraries(
                 service_uid=user_write.id,
                 absolute_uid=user_write.absolute_uid
-            )[0]
-        self.assertTrue(libraries['num_users'] == 0)
-        self.assertIn(libraries['owner'], self.stub_user_3.email)
+            )['libraries']
+        self.assertTrue(libraries[0]['num_users'] == 0)
+        self.assertIn(libraries[0]['owner'], self.stub_user_3.email)
 
     def test_user_cannot_add_two_libraries_with_the_same_name(self):
         """
@@ -1016,9 +1025,10 @@ class TestLibraryViews(TestCaseDatabase):
         # Retrieve the bibcodes using the web services
         with MockEmailService(self.stub_user, end_type='uid'):
             response_library, meta_data = \
-                self.library_view.get_documents_from_library(
+                self.library_view.get_library_and_metadata(
                     library_id=library.id,
-                    service_uid=user.id
+                    service_uid=user.id, 
+                    session=session
                 )
         self.assertEqual(library.bibcode, response_library.bibcode)
 
@@ -1055,9 +1065,10 @@ class TestLibraryViews(TestCaseDatabase):
                 session.expunge(obj)
 
         with MockEmailService(self.stub_user, end_type='uid'):
-            library, metadata = self.library_view.get_documents_from_library(
+            library, metadata = self.library_view.get_library_and_metadata(
                 library_id=library.id,
-                service_uid=user.id
+                service_uid=user.id, 
+                session=session
             )
 
         for key in self.stub_library.library_view_get_response():
@@ -1097,9 +1108,10 @@ class TestLibraryViews(TestCaseDatabase):
                 session.expunge(obj)
 
         with MockEmailService(self.stub_user, end_type='uid'):
-            library, metadata = self.library_view.get_documents_from_library(
+            library, metadata = self.library_view.get_library_and_metadata(
                 library_id=library.id,
-                service_uid=user_random.id
+                service_uid=user_random.id,
+                session=session
             )
 
         for key in self.stub_library.library_view_get_response():
@@ -1142,11 +1154,95 @@ class TestLibraryViews(TestCaseDatabase):
 
         # Retrieve the bibcodes using the web services
         with MockSolrBigqueryService():
-            response_library = self.library_view.solr_big_query(
+            response_library = self.library_view.process_solr_big_query(
                 bibcodes=library.bibcode
             )
         self.assertIn('responseHeader', response_library.json())
 
+
+    def test_update_notes_should_create_new_note_if_canonical_note_does_not_exist(self): 
+        original_bibcodes = ['arXivtest1', 'arXivtest2', 'arXivtest3', 'arXivtest4']
+        canonical_bibcodes = ['canonical1', 'canonical2', 'canonical3', 'canonical4']
+        with self.app.session_scope() as session: 
+            # Simulating solr response where original bibcodes have a corresponding canonical bibcodes
+            updated_list = [{original_bibcodes[i]: canonical_bibcodes[i]} for i in range(len(original_bibcodes))]
+            
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={bibcode: {} for bibcode in canonical_bibcodes+original_bibcodes})
+            session.add(library)
+            session.commit()
+            notes_ids = []
+            for bibcode in original_bibcodes: 
+                note = Notes.create_unique(session=session, 
+                                    content='content{0}'.format(bibcode), 
+                                    bibcode=bibcode,
+                                    library=library)
+                session.add(note)
+                session.commit()
+                notes_ids.append(note.id)
+            
+            
+            LibraryView.update_notes(session, library, updated_list)
+            session.refresh(library)
+            session.expunge(library)
+
+        # Assert the new notes with canonical bibcodes were created and old notes were preserved
+        notes = session.query(Notes).filter(Notes.library_id == library.id).all()
+        self.assertEqual(len(notes), len(original_bibcodes+canonical_bibcodes))
+        self.assertEqual(original_bibcodes + canonical_bibcodes, [note.bibcode for note in notes])
+        self.assertUnsortedNotEqual(notes_ids, [note.id for note in notes])
+        self.assertIn('contentarXivtest1', [note.content for note in notes])
+        self.assertIn('contentarXivtest2', [note.content for note in notes])
+        self.assertIn('contentarXivtest3', [note.content for note in notes])
+        self.assertIn('contentarXivtest4', [note.content for note in notes]) 
+        self.assertNotIn('contentcanonical1', [note.content for note in notes]) 
+
+    def test_update_notes_should_merge_content_if_canonical_already_exists(self): 
+        original_bibcode1 = 'arXivtest1'
+        original_bibcode2 = 'arXivtest2'
+        canonical_bibcode = 'canonical1'
+        with self.app.session_scope() as session:
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={bibcode: {} for bibcode in [original_bibcode1, original_bibcode2, canonical_bibcode]})
+            session.add(library)
+            session.commit()
+            # Create a canonical note 
+            canonical_note = Notes.create_unique(session=session, 
+                                    content='canonical_note_content', 
+                                    bibcode=canonical_bibcode,
+                                    library=library)
+            
+            # Create an arxiv note 1
+            arxiv_note1 = Notes.create_unique(session=session, 
+                                    content='arxiv_note1_content', 
+                                    bibcode=original_bibcode1,
+                                    library=library)
+            
+            # Create an arxiv note 2 
+            arxiv_note2 = Notes.create_unique(session=session, 
+                                    content='arxiv_note2_content', 
+                                    bibcode=original_bibcode2,
+                                    library=library)
+            session.add_all([canonical_note, arxiv_note1,arxiv_note2])
+            session.commit()
+            updated_list = [{original_bibcode1: canonical_bibcode}, {original_bibcode2: canonical_bibcode}]
+
+            updated_notes = LibraryView.update_notes(session, library, updated_list)
+            session.refresh(library)
+            session.expunge(library)
+            notes = session.query(Notes).filter(Notes.library_id == library.id).all()
+            canonical_note = session.query(Notes).filter(Notes.library_id == library.id, Notes.bibcode == canonical_bibcode).one()
+            self.assertEqual(len(notes), 3)
+            self.assertUnsortedEqual([note.bibcode for note in notes], [canonical_bibcode, original_bibcode1, original_bibcode2])
+            self.assertEqual(canonical_note.content, 'canonical_note_content arxiv_note1_content arxiv_note2_content')
+            self.assertEqual(len(updated_notes), 3)
+        
     def test_that_solr_updates_canonical_bibcodes(self):
         """
         Tests that a comparison between the solr data and the stored data is
@@ -1174,7 +1270,9 @@ class TestLibraryViews(TestCaseDatabase):
             library = Library(name='MyLibrary',
                               description='My library',
                               public=True,
-                              bibcode={k: {} for k in original_bibcodes})
+                              bibcode={bibcode: {} for bibcode in original_bibcodes})
+            
+            
 
             # Give the user and library permissions
             permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
@@ -1185,38 +1283,50 @@ class TestLibraryViews(TestCaseDatabase):
 
             session.add_all([library, permission, user])
             session.commit()
+
+            note = Notes.create_unique(session=session, library=library, content='arxivtest3content', bibcode='arXivtest3')
+            session.add(note)
+            session.commit()
+
             for obj in [library, permission, user]:
                 session.refresh(obj)
                 session.expunge(obj)
+            
 
-        # Retrieve the bibcodes using the web services
-        with MockSolrBigqueryService(solr_docs=solr_docs):
-            response_library = self.library_view.solr_big_query(
-                bibcodes=library.bibcode
-            ).json()
-        self.assertIn('responseHeader', response_library)
+            # Retrieve the bibcodes using the web services
+            with MockSolrBigqueryService(solr_docs=solr_docs):
+                response_library = self.library_view.process_solr_big_query(
+                    bibcodes=library.bibcode
+                ).json()
+            self.assertIn('responseHeader', response_library)
+            # Now check solr updates the records correctly
+            solr_docs = response_library['response']['docs']
+            updates = self.library_view.solr_update_library(library_id=library.id,
+                                                            solr_docs=solr_docs, 
+                                                            session=session)
 
-        # Now check solr updates the records correctly
-        solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library_id=library.id,
-                                                        solr_docs=solr_docs)
-
-        # Check the data returned is correct on what files were updated and why
-        self.assertEqual(updates['num_updated'], 1)
-        self.assertEqual(updates['duplicates_removed'], 0)
-        update_list = updates['update_list']
-        self.assertEqual(update_list[0]['arXivtest3'],
-                         'test3')
+            # Check the data returned is correct on what files were updated and why
+            self.assertEqual(updates['num_updated'], 1)
+            self.assertEqual(updates['duplicates_removed'], 0)
+            # New note was created and old note was also added to updated_notes list
+            self.assertEqual(len(updates['updated_notes']), 2)
+            update_list = updates['update_list']
+            self.assertEqual(update_list[0]['arXivtest3'],
+                            'test3')
+            
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library.id).one()
+            notes = session.query(Notes).filter(Notes.library_id == library.id).all()
+
+            self.assertEqual(len(notes), 2)
+            self.assertUnsortedEqual([note.bibcode for note in notes], ['test3', 'arXivtest3'])
 
             self.assertUnsortedNotEqual(library.get_bibcodes(),
                                         original_bibcodes)
             self.assertUnsortedEqual(library.get_bibcodes(),
-                                     canonical_bibcodes)
-
-    def test_that_solr_updates_canonical_bibcodes_with_multi_alternates(self):
+                                        canonical_bibcodes)
+    def test_that_solr_maintains_bibcode_info(self):
         """
         Tests that a comparison between the solr data and the stored data is
         carried out. Mismatching documents are then updated appropriately.
@@ -1232,7 +1342,84 @@ class TestLibraryViews(TestCaseDatabase):
             session.add(user)
             session.commit()
 
-            original_bibcodes = ['test1', 'test2', 'arXivtest3', 'conftest3']
+            original_bibcodes = ['test1', 'test2', 'arXivtest3']
+            result = {'test1': {'0': 0}, 'test2': {'1': 1}, 'test3': {'2': 2}}
+            solr_docs = [
+                {'bibcode': 'test1'},
+                {'bibcode': 'test2'},
+                {'bibcode': 'test3', 'alternate_bibcode': ['arXivtest3']}
+            ]
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={k: {} for k in original_bibcodes})
+            
+            for i, element in enumerate(library.bibcode):
+                library.bibcode[element] = {i: i}
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+
+            # Retrieve the bibcodes using the web services
+            with MockSolrBigqueryService(solr_docs=solr_docs):
+                response_library = self.library_view.process_solr_big_query(
+                    bibcodes=library.bibcode
+                ).json()
+            self.assertIn('responseHeader', response_library)
+
+            # Now check solr updates the records correctly
+            solr_docs = response_library['response']['docs']
+            updates = self.library_view.solr_update_library(library_id=library.id,
+                                                            solr_docs=solr_docs, 
+                                                            session=session)
+            
+            self.assertEqual(len(updates['update_list']), 1)
+
+        with self.app.session_scope() as session:
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIn('timestamp', library.bibcode['test1'])
+            self.assertIn('timestamp', library.bibcode['test2'])
+            self.assertIn('timestamp', library.bibcode['test3'])
+
+            for element in library.bibcode: 
+                del library.bibcode[element]['timestamp']
+
+
+            self.assertUnsortedEqual(library.bibcode, result)
+
+    def test_that_solr_updates_canonical_bibcodes_with_multi_alternates(self): 
+        """
+        Tests that a comparison between the solr data and the stored data is
+        carried out. Mismatching documents are then updated appropriately.
+        This specifically considers the case when fewer documents are returned
+        as there exists two alternates.
+
+        It also tests that the notes are updated accordingly. 
+        Meaning that their content will be merged if the bibcodes are updated.
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            original_bibcodes = ['test1', 'test2', 'test3', 'arXivtest3', 'conftest3']
             canonical_bibcodes = ['test1', 'test2', 'test3']
             solr_docs = [
                 {'bibcode': 'test1'},
@@ -1256,37 +1443,52 @@ class TestLibraryViews(TestCaseDatabase):
 
             session.add_all([library, permission, user])
             session.commit()
+
+            note1 = Notes.create_unique(session=session, library=library, content='test3content', bibcode='test3')
+            note2 = Notes.create_unique(session=session, library=library, content='arxivtest3content', bibcode='arXivtest3')
+            note3 = Notes.create_unique(session=session, library=library, content='conftest3content', bibcode='conftest3')
+
+            session.add_all([note1, note2, note3])
+            session.commit()
+
             for obj in [library, permission, user]:
                 session.refresh(obj)
                 session.expunge(obj)
+             
+            # Retrieve the bibcodes using the web services
+            with MockSolrBigqueryService(solr_docs=solr_docs):
+                response_library = self.library_view.process_solr_big_query(
+                    bibcodes=library.bibcode
+                ).json()
+            self.assertIn('responseHeader', response_library)
 
-        # Retrieve the bibcodes using the web services
-        with MockSolrBigqueryService(solr_docs=solr_docs):
-            response_library = self.library_view.solr_big_query(
-                bibcodes=library.bibcode
-            ).json()
-        self.assertIn('responseHeader', response_library)
+            # Now check solr updates the records correctly
+            solr_docs = response_library['response']['docs']
+            updates = self.library_view.solr_update_library(library_id=library.id,
+                                                            solr_docs=solr_docs,
+                                                            session=session)
 
-        # Now check solr updates the records correctly
-        solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library_id=library.id,
-                                                        solr_docs=solr_docs)
+            self.assertEqual(updates['num_updated'], 2)
+            self.assertEqual(updates['duplicates_removed'], 2)
+            update_list = updates['update_list']
 
-        self.assertEqual(updates['num_updated'], 2)
-        self.assertEqual(updates['duplicates_removed'], 1)
-        update_list = updates['update_list']
-
-        self.assertEqual(
-            get_item(update_list, 'arXivtest3'),
-            'test3'
-        )
-        self.assertEqual(
-            get_item(update_list, 'conftest3'),
-            'test3'
-        )
+            self.assertEqual(
+                get_item(update_list, 'arXivtest3'),
+                'test3'
+            )
+            self.assertEqual(
+                get_item(update_list, 'conftest3'),
+                'test3'
+            )
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library.id).one()
+
+            notes = session.query(Notes).filter(Notes.library_id ==library.id).all()
+
+            self.assertEqual(len(notes), 3)
+            self.assertUnsortedEqual([note.bibcode for note in notes], ['test3', 'arXivtest3', 'conftest3'])
+            self.assertUnsortedEqual([note.content for note in notes], ['arxivtest3content', 'conftest3content', 'test3content arxivtest3content conftest3content'])
 
             self.assertUnsortedNotEqual(library.get_bibcodes(),
                                         original_bibcodes)
@@ -1335,24 +1537,25 @@ class TestLibraryViews(TestCaseDatabase):
                 session.refresh(obj)
                 session.expunge(obj)
 
-        # Retrieve the bibcodes using the web services
-        with MockSolrBigqueryService(solr_docs=solr_docs):
-            response_library = self.library_view.solr_big_query(
-                bibcodes=library.bibcode
-            ).json()
-        self.assertIn('responseHeader', response_library)
+            # Retrieve the bibcodes using the web services
+            with MockSolrBigqueryService(solr_docs=solr_docs):
+                response_library = self.library_view.process_solr_big_query(
+                    bibcodes=library.bibcode
+                ).json()
+            self.assertIn('responseHeader', response_library)
 
-        # Now check solr updates the records correctly
-        solr_docs = response_library['response']['docs']
-        updates = self.library_view.solr_update_library(library_id=library.id,
-                                                        solr_docs=solr_docs)
+            # Now check solr updates the records correctly
+            solr_docs = response_library['response']['docs']
+            updates = self.library_view.solr_update_library(library_id=library.id,
+                                                            solr_docs=solr_docs,
+                                                            session=session)
 
-        # Check the data returned is correct on what files were updated and why
-        self.assertEqual(updates['num_updated'], 1)
-        self.assertEqual(updates['duplicates_removed'], 0)
-        update_list = updates['update_list']
-        self.assertEqual(update_list[0]['arXivtest2'],
-                         'test2')
+            # Check the data returned is correct on what files were updated and why
+            self.assertEqual(updates['num_updated'], 1)
+            self.assertEqual(updates['duplicates_removed'], 0)
+            update_list = updates['update_list']
+            self.assertEqual(update_list[0]['arXivtest2'],
+                            'test2')
 
         with self.app.session_scope() as session:
             library = session.query(Library).filter(Library.id == library.id).one()
@@ -1454,6 +1657,61 @@ class TestLibraryViews(TestCaseDatabase):
         name = self.library_view.helper_library_name(library_id=library.id)
         self.assertEqual(name, library.name)
 
+
+    def test_get_notes_from_library_retrieves_notes_and_orphan_notes(self):
+        """
+        Tests if get_notes_from_library retrieves notes and orphan notes
+
+        :return: no return
+        """
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            bibcodes = fake_biblist(15)
+            
+            canonical_bibcodes = bibcodes[:5]
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode={bibcode: {} for bibcode in bibcodes})
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+            
+            self.assertEqual(library.get_bibcodes(), bibcodes) 
+
+            # add notes to the library 
+            for i in range(len(bibcodes)): 
+                bibcode = bibcodes[i]
+                note = Notes.create_unique(library=library, bibcode=bibcode, content="content" + bibcode, session=session)
+                session.add(note)
+                session.commit()
+    
+            library.bibcode = {bibcode: {} for bibcode in canonical_bibcodes}
+            session.add(library)
+            session.commit()
+            
+            
+            response = self.library_view.get_notes_from_library(library, session)
+            self.assertEqual(len(response['notes']), 5)
+            self.assertEqual(len(response['orphan_notes']), 10)
+            self.assertUnsortedEqual(response['notes'].keys(), canonical_bibcodes)
+            self.assertUnsortedEqual(response['orphan_notes'].keys(), bibcodes[5:])
+                
 
 class TestDocumentViews(TestCaseDatabase):
     """
@@ -3808,6 +4066,423 @@ class TestClassicViews(TestCaseDatabase):
 
             self.assertNotIn('new bibcode', stub_library.get_bibcodes())
 
+class TestNotesViews(TestCaseDatabase):
+    """
+    Base class to test the Library view for GET
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Constructor of the class
+
+        :param args: to pass on to the super class
+        :param kwargs: to pass on to the super class
+
+        :return: no return
+        """
+
+        super(TestNotesViews, self).__init__(*args, **kwargs)
+        self.user_view = UserView
+        self.base_view = BaseView()
+        self.library_view = LibraryView
+        self.notes_view = NotesView()
+
+        self.stub_user = self.stub_user_1 = UserShop()
+        self.stub_user_2 = UserShop()
+
+        self.stub_library = LibraryShop()
+
+    def test_user_can_get_notes_from_library(self):
+        """
+        Test that can retrieve all the notes from a library
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            bibcode = self.stub_library.bibcode
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+
+            expected_response = []
+            for bibcode in library.get_bibcodes():
+                note = Notes.create_unique(bibcode=bibcode, 
+                             content='note {}'.format(bibcode), 
+                             library=library, 
+                             session=session)
+                session.add(note)
+                session.commit()
+                expected_response.append(note.as_dict())
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+
+            # Retrieve the bibcodes using the web services
+            with MockEmailService(self.stub_user, end_type='uid'):
+                _, _ = \
+                    self.notes_view.get_library_and_metadata_wrapper(
+                        library_id=library.id,
+                        service_uid=user.id, 
+                        session=session
+                    )
+                
+                response = self.notes_view.get_note_data(document_id=library.get_bibcodes()[0], library_id=library.id, service_uid=user.id)                
+            
+            self.assertEqual(response[2], expected_response.pop())
+            session.expunge_all()
+            session.close()
+
+    def test_user_cannot_get_notes_if_no_permission(self):
+        """
+        Tests that the user cannot get notes if not reading access
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+            
+            access = self.base_view.helper_check_user_has_read_access(service_uid=user.id,
+                                                      library=library)
+            self.assertFalse(access)
+
+
+    def test_user_can_add_notes_to_library(self):
+        """
+        Test that can add notes to a library
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+        
+            bibcode = self.stub_library.bibcode
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+
+            # Retrieve the bibcodes using the web services
+            with MockEmailService(self.stub_user, end_type='uid'):
+                _, _ = \
+                    self.notes_view.get_library_and_metadata_wrapper(
+                        library_id=library.id,
+                        service_uid=user.id, 
+                        session=session
+                    )
+                
+                response = self.notes_view.add_note_to_document(document_id=library.get_bibcodes()[0], library_id=library.id, service_uid=user.id, note_data={'content': 'note {}'.format(library.get_bibcodes()[0])})
+
+            self.assertEqual(response[0]["content"], 'note {}'.format(library.get_bibcodes()[0]))
+            session.expunge_all()
+            session.close()
+
+    def test_user_cannot_add_a_note_if_no_permission(self):
+        """
+        Tests that the user cannot add a note to library if not writing access
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
+
+            access = self.base_view.write_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertFalse(access)
+
+
+
+    def test_user_can_delete_notes_from_library(self):
+        """
+        Tests that the user can correctly remove note from a library 
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            bibcode = self.stub_library.bibcode
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+
+            
+            for bibcode in library.get_bibcodes():
+                note = Notes.create_unique(bibcode=bibcode, 
+                             content='note {}'.format(bibcode), 
+                             library=library, 
+                             session=session)
+                session.add(note)
+                session.commit()
+            
+            
+            response = self.notes_view.delete_note(document_id=library.get_bibcodes()[0], library_id=library.id)
+
+            self.assertEqual(response, True)
+
+            session.expunge_all()
+            session.close()
+
+    def test_user_cannot_delete_a_note_if_not_owner(self):
+        """
+        Tests that the user cannot delete a library if they are not the owner
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
+
+            access = self.base_view.delete_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertFalse(access)
+
+    def test_user_can_delete_a_note_from_library_if_owner(self):
+        """
+        Tests that the user cannot delete a library if they are not the owner
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': False, 'write': False, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
+
+            access = self.base_view.delete_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertTrue(access)
+
+    def test_user_can_update_note_in_library(self):
+        """
+        Test that can update a note in library  if owner or admin
+
+        :return: no return
+        """
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            bibcode = self.stub_library.bibcode
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': True, 'admin': False, 'owner': True})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+
+            session.add_all([library, permission, user])
+            session.commit()
+
+            for obj in [library, permission, user]:
+                session.refresh(obj)
+                session.expunge(obj)
+
+            # Retrieve the bibcodes using the web services
+            with MockEmailService(self.stub_user, end_type='uid'):
+                _, _ = \
+                    self.notes_view.get_library_and_metadata_wrapper(
+                        library_id=library.id,
+                        service_uid=user.id, 
+                        session=session
+                    )
+                
+                self.notes_view.add_note_to_document(document_id=library.get_bibcodes()[0], library_id=library.id, service_uid=user.id, note_data={'content': 'note {}'.format(library.get_bibcodes()[0])})
+
+                response = self.notes_view.update_note(library_id=library.id, document_id=library.get_bibcodes()[0], library_data={'content': 'updated content'})
+
+            self.assertEqual(response["content"], 'updated content')
+            session.expunge_all()
+            session.close()
+
+    def test_user_cannot_update_a_note_if_no_permission(self):
+        """
+        Tests that the user cannot update a note if not owner or admin
+
+        :return: no return
+        """
+
+        # Step 1. Make the user, library, and permissions
+
+        # Ensure a user exists
+        user = User(absolute_uid=self.stub_user.absolute_uid)
+        with self.app.session_scope() as session:
+            session.add(user)
+            session.commit()
+
+            # Ensure a library exists
+            library = Library(name='MyLibrary',
+                              description='My library',
+                              public=True,
+                              bibcode=self.stub_library.bibcode)
+
+            # Give the user and library permissions
+            permission = Permissions(permissions={'read': True, 'write': False, 'admin': False, 'owner': False})
+
+            # Commit the stub data
+            user.permissions.append(permission)
+            library.permissions.append(permission)
+            session.add_all([library, permission, user])
+            session.commit()
+            library = session.query(Library).filter(Library.id == library.id).one()
+            self.assertIsInstance(library, Library)
+
+            access = self.base_view.update_access(service_uid=user.id,
+                                                      library_id=library.id)
+            self.assertFalse(access)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
