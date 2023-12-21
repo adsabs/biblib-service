@@ -218,11 +218,22 @@ class OperationsView(BaseView):
         with current_app.session_scope() as session:
             primary = session.query(Library).filter_by(id=library_uuid).one()
             lib_names.append(primary.name)
-            primary_is_public = primary.public
-            has_read_access_primary = self.read_access(
-                service_uid=user_editing_uid, library_id=library_uuid
-            )
 
+            if action == "empty":
+                permission_check_primary = self.update_access(
+                    service_uid=user_editing_uid,
+                    library_id=library_uuid
+                )
+            else:
+                permission_check_primary = primary.public or self.read_access(
+                    service_uid=user_editing_uid,
+                    library_id=library_uuid
+                )
+
+            if not permission_check_primary:
+                return err(NO_PERMISSION_ERROR)
+
+            
             secondary_libraries = data.get("libraries", [])
             for lib in secondary_libraries:
                 try:
@@ -233,30 +244,19 @@ class OperationsView(BaseView):
                 secondary = session.query(Library).filter_by(id=secondary_uuid).one()
                 lib_names.append(secondary.name)
 
-                secondary_is_public = secondary.public
-
-                has_read_access_secondary = self.read_access(
+                if action in ["union", "intersection", "difference"]: 
+                    permission_check_secondary = secondary.public or self.read_access(
                     service_uid=user_editing_uid, library_id=secondary_uuid
                 )
-
-                has_write_access_secondary = self.write_access(
+                elif action == "copy": 
+                    permission_check_secondary = self.write_access(
                     service_uid=user_editing_uid, library_id=secondary_uuid
                 )
+        
+                if not permission_check_secondary: 
+                    return err(NO_PERMISSION_ERROR)
 
-                if action in ["union", "intersection", "difference"]:
-                    if not has_read_access_primary or not (
-                        secondary_is_public or has_read_access_secondary
-                    ):
-                        return err(NO_PERMISSION_ERROR)
-
-                elif action == "copy":
-                    if (
-                        not (primary_is_public or has_read_access_primary)
-                        or not has_write_access_secondary
-                    ):
-                        return err(NO_PERMISSION_ERROR)
-
-        if data['action'] == 'union':
+        if action == 'union':
             bib_union = self.setops_libraries(
                 library_id=library_uuid,
                 document_data=data,
@@ -288,7 +288,7 @@ class OperationsView(BaseView):
 
             return library_dict, 200
 
-        elif data['action'] == 'intersection':
+        elif action == 'intersection':
             bib_intersect = self.setops_libraries(
                 library_id=library_uuid,
                 document_data=data,
@@ -317,7 +317,7 @@ class OperationsView(BaseView):
                 return err(WRONG_TYPE_ERROR)
             return library_dict, 200
 
-        elif data['action'] == 'difference':
+        elif action == 'difference':
             bib_diff = self.setops_libraries(
                 library_id=library_uuid,
                 document_data=data,
@@ -341,7 +341,7 @@ class OperationsView(BaseView):
                 return err(WRONG_TYPE_ERROR)
             return library_dict, 200
 
-        elif data['action'] == 'copy':
+        elif action == 'copy':
             library_dict = self.copy_library(
                 library_id=library_uuid,
                 document_data=data
@@ -358,7 +358,7 @@ class OperationsView(BaseView):
 
             return library_dict, 200
 
-        elif data['action'] == 'empty':
+        elif action == 'empty':
             library_dict = self.empty_library(
                 library_id=library_uuid
             )
