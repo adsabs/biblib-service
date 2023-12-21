@@ -29,6 +29,9 @@ class BaseView(Resource):
     #default permissions for write_access()
     write_allowed = ['write', 'admin', 'owner']
 
+    # default permissions for read_access()
+    read_allowed = ['read', 'write', 'admin', 'owner']
+
     @staticmethod
     def helper_uuid_to_slug(library_uuid):
         """
@@ -223,8 +226,27 @@ class BaseView(Resource):
         delete_allowed = cls.helper_access_allowed(service_uid=service_uid,
                                                    library_id=library_id,
                                                    access_type='owner')
-        return delete_allowed 
-    
+        return delete_allowed
+
+    @classmethod
+    def read_access(cls, service_uid, library_id):
+        """
+        Defines which type of user has read permissions to a library.
+
+        :param service_uid: the user ID within this microservice
+        :param library_id: the unique ID of the library
+
+        :return: boolean, access (True), no access (False)
+        """
+
+        for access_type in cls.read_allowed:
+            if cls.helper_access_allowed(service_uid=service_uid,
+                                         library_id=library_id,
+                                         access_type=access_type):
+                return True
+
+        return False
+
     @classmethod
     def write_access(cls, service_uid, library_id):
         """

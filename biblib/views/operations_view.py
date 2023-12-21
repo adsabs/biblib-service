@@ -188,12 +188,6 @@ class OperationsView(BaseView):
 
         user_editing_uid = \
             self.helper_absolute_uid_to_service_uid(absolute_uid=user_editing)
-
-        # Check the permissions of the user
-        if not self.write_access(service_uid=user_editing_uid,
-                                 library_id=library_uuid):
-            return err(NO_PERMISSION_ERROR)
-
         try:
             data = get_post_data(
                 request,
@@ -204,34 +198,65 @@ class OperationsView(BaseView):
                                      .format(request.data, error))
             return err(WRONG_TYPE_ERROR)
 
-        if data['action'] in ['union', 'intersection', 'difference']:
-            if 'libraries' not in data:
-                return err(NO_LIBRARY_SPECIFIED_ERROR)
-            if 'name' not in data:
-                data['name'] = 'Untitled {0}.'.format(get_date().isoformat())
-            if 'public' not in data:
-                data['public'] = False
+        action = data["action"]
 
-        if data['action'] == 'copy':
-            if 'libraries' not in data:
+        if action in ["union", "intersection", "difference"]:
+            if "libraries" not in data:
                 return err(NO_LIBRARY_SPECIFIED_ERROR)
-            if len(data['libraries']) > 1:
+            if "name" not in data:
+                data["name"] = "Untitled {0}.".format(get_date().isoformat())
+            if "public" not in data:
+                data["public"] = False
+        elif action == "copy":
+            if "libraries" not in data:
+                return err(NO_LIBRARY_SPECIFIED_ERROR)
+            if len(data["libraries"]) > 1:
                 return err(TOO_MANY_LIBRARIES_SPECIFIED_ERROR)
 
         lib_names = []
+
         with current_app.session_scope() as session:
             primary = session.query(Library).filter_by(id=library_uuid).one()
             lib_names.append(primary.name)
-            if 'libraries' in data:
-                for lib in data['libraries']:
-                    try:
-                        secondary_uuid = self.helper_slug_to_uuid(lib)
-                    except TypeError:
-                        return err(BAD_LIBRARY_ID_ERROR)
-                    secondary = session.query(Library).filter_by(id=secondary_uuid).one()
-                    lib_names.append(secondary.name)
 
-        if data['action'] == 'union':
+            if action == "empty":
+                permission_check_primary = self.update_access(
+                    service_uid=user_editing_uid,
+                    library_id=library_uuid
+                )
+            else:
+                permission_check_primary = primary.public or self.read_access(
+                    service_uid=user_editing_uid,
+                    library_id=library_uuid
+                )
+
+            if not permission_check_primary:
+                return err(NO_PERMISSION_ERROR)
+
+            
+            secondary_libraries = data.get("libraries", [])
+            for lib in secondary_libraries:
+                try:
+                    secondary_uuid = self.helper_slug_to_uuid(lib)
+                except TypeError:
+                    return err(BAD_LIBRARY_ID_ERROR)
+
+                secondary = session.query(Library).filter_by(id=secondary_uuid).one()
+                lib_names.append(secondary.name)
+
+                if action in ["union", "intersection", "difference"]: 
+                    permission_check_secondary = secondary.public or self.read_access(
+                    service_uid=user_editing_uid, library_id=secondary_uuid
+                )
+                elif action == "copy": 
+                    permission_check_secondary = self.write_access(
+                    service_uid=user_editing_uid, library_id=secondary_uuid
+                )
+        
+                if not permission_check_secondary: 
+                    return err(NO_PERMISSION_ERROR)
+
+        if action == 'union':
             bib_union = self.setops_libraries(
                 library_id=library_uuid,
                 document_data=data,
@@ -263,7 +288,7 @@ class OperationsView(BaseView):
 
             return library_dict, 200
 
-        elif data['action'] == 'intersection':
+        elif action == 'intersection':
             bib_intersect = self.setops_libraries(
                 library_id=library_uuid,
                 document_data=data,
@@ -292,7 +317,7 @@ class OperationsView(BaseView):
                 return err(WRONG_TYPE_ERROR)
             return library_dict, 200
 
-        elif data['action'] == 'difference':
+        elif action == 'difference':
             bib_diff = self.setops_libraries(
                 library_id=library_uuid,
                 document_data=data,
@@ -316,7 +341,7 @@ class OperationsView(BaseView):
                 return err(WRONG_TYPE_ERROR)
             return library_dict, 200
 
-        elif data['action'] == 'copy':
+        elif action == 'copy':
             library_dict = self.copy_library(
                 library_id=library_uuid,
                 document_data=data
@@ -333,7 +358,7 @@ class OperationsView(BaseView):
 
             return library_dict, 200
 
-        elif data['action'] == 'empty':
+        elif action == 'empty':
             library_dict = self.empty_library(
                 library_id=library_uuid
             )
