@@ -84,6 +84,7 @@ class UserView(BaseView):
                 .filter(Permissions.user_id == service_uid)\
                 .order_by(getattr(getattr(Library, sort_col), sort_order)())\
                 .all()
+            libraries_response = {'libraries_count': len(result)}
             
             if rows: rows=start+rows
             
@@ -157,15 +158,13 @@ class UserView(BaseView):
                 elif ownership and main_permission in ['admin', 'read', 'write']: 
                     shared_with_me.append(payload)
             
-
-            response = {'libraries_count': len(result)}
             if ownership: 
-                response['my_libraries'] = my_libraries 
-                response['shared_with_me'] = shared_with_me
+                libraries_response['my_libraries'] = my_libraries 
+                libraries_response['shared_with_me'] = shared_with_me
             else: 
-                response['libraries'] = my_libraries
+                libraries_response['libraries'] = my_libraries
             
-        return response
+        return libraries_response
 
     # Methods
     def get(self):
