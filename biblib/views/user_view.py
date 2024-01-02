@@ -121,12 +121,11 @@ class UserView(BaseView):
 
                 if main_permission != 'owner':
                     # get the owner
-                    result = session.query(Permissions, User) \
+                    owner_permissions, owner = session.query(Permissions, User) \
                         .join(Permissions.user) \
                         .filter(Permissions.library_id == library.id) \
                         .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True)) \
                         .one()
-                    owner_permissions, owner = result
                     owner_absolute_uid = owner.absolute_uid
                 else:
                     owner_absolute_uid = absolute_uid
@@ -174,7 +173,7 @@ class UserView(BaseView):
 
         :param start: The index of the library list to start on (int).  default: 0
         :param rows: The number of rows to return from the start point (int).  default: None (returns all libraries)
-        :param sort: Library column to sort on. default: date_created (date_created, date_last_modified)
+        :param sort: Library column to sort on. default: date_created (date_created, date_last_modified, name)
         :param order: Direction sort libraries. default: desc (asc, desc)
         :return: list of the users libraries with the relevant information
 
