@@ -79,18 +79,19 @@ class UserView(BaseView):
         # The nested getattr calls allow us to request a column from the library model,
         # and then request the proper sort order from that column.
         with current_app.session_scope() as session:
-            result = session.query(Permissions, Library)\
+            user_libraries = session.query(Permissions, Library)\
                 .join(Permissions.library)\
                 .filter(Permissions.user_id == service_uid)\
                 .order_by(getattr(getattr(Library, sort_col), sort_order)())\
                 .all()
-            libraries_response = {'libraries_count': len(result)}
+            
+            libraries_response = {'libraries_count': len(user_libraries)}
             
             if rows: rows=start+rows
             
             my_libraries = []
             shared_with_me = []
-            for permission, library in result[start:rows]:
+            for permission, library in user_libraries[start:rows]:
 
                 # For this library get all the people who have permissions
                 users = session.query(Permissions).filter_by(
