@@ -79,17 +79,19 @@ class UserView(BaseView):
         # The nested getattr calls allow us to request a column from the library model,
         # and then request the proper sort order from that column.
         with current_app.session_scope() as session:
-            result = session.query(Permissions, Library)\
+            user_libraries = session.query(Permissions, Library)\
                 .join(Permissions.library)\
                 .filter(Permissions.user_id == service_uid)\
                 .order_by(getattr(getattr(Library, sort_col), sort_order)())\
                 .all()
             
+            libraries_response = {'libraries_count': len(user_libraries)}
+            
             if rows: rows=start+rows
             
             my_libraries = []
             shared_with_me = []
-            for permission, library in result[start:rows]:
+            for permission, library in user_libraries[start:rows]:
 
                 # For this library get all the people who have permissions
                 users = session.query(Permissions).filter_by(
@@ -120,12 +122,11 @@ class UserView(BaseView):
 
                 if main_permission != 'owner':
                     # get the owner
-                    result = session.query(Permissions, User) \
+                    owner_permissions, owner = session.query(Permissions, User) \
                         .join(Permissions.user) \
                         .filter(Permissions.library_id == library.id) \
                         .filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True)) \
                         .one()
-                    owner_permissions, owner = result
                     owner_absolute_uid = owner.absolute_uid
                 else:
                     owner_absolute_uid = absolute_uid
@@ -157,15 +158,13 @@ class UserView(BaseView):
                 elif ownership and main_permission in ['admin', 'read', 'write']: 
                     shared_with_me.append(payload)
             
-
-            response = {'libraries_count': len(result)}
             if ownership: 
-                response['my_libraries'] = my_libraries 
-                response['shared_with_me'] = shared_with_me
+                libraries_response['my_libraries'] = my_libraries 
+                libraries_response['shared_with_me'] = shared_with_me
             else: 
-                response['libraries'] = my_libraries
+                libraries_response['libraries'] = my_libraries
             
-        return response
+        return libraries_response
 
     # Methods
     def get(self):
@@ -175,7 +174,7 @@ class UserView(BaseView):
 
         :param start: The index of the library list to start on (int).  default: 0
         :param rows: The number of rows to return from the start point (int).  default: None (returns all libraries)
-        :param sort: Library column to sort on. default: date_created (date_created, date_last_modified)
+        :param sort: Library column to sort on. default: date_created (date_created, date_last_modified, name)
         :param order: Direction sort libraries. default: desc (asc, desc)
         :return: list of the users libraries with the relevant information
 
