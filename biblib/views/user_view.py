@@ -58,6 +58,21 @@ class UserView(BaseView):
                     service
                 )
         return response
+    
+    @classmethod
+    def get_user_libraries(cls, session, service_uid, sort_col, sort_order, type):
+
+        query = session.query(Permissions, Library)\
+        .join(Permissions.library)\
+        .filter(Permissions.user_id == service_uid) 
+
+        if type == 'owner':
+            query = query.filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True))
+        elif type != 'all': 
+            query = query.filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(False))
+
+        return query.order_by(getattr(getattr(Library, sort_col), sort_order)()).all()
+            
 
     @classmethod
     def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", type="all"):
@@ -79,12 +94,9 @@ class UserView(BaseView):
         # The nested getattr calls allow us to request a column from the library model,
         # and then request the proper sort order from that column.
         with current_app.session_scope() as session:
-            user_libraries = session.query(Permissions, Library)\
-                .join(Permissions.library)\
-                .filter(Permissions.user_id == service_uid)\
-                .order_by(getattr(getattr(Library, sort_col), sort_order)())\
-                .all()
-            
+
+            user_libraries = cls.get_user_libraries(session, service_uid, sort_col, sort_order, type) 
+
             libraries = []
             for permission, library in user_libraries:
 
@@ -150,7 +162,7 @@ class UserView(BaseView):
 
                 if type == 'all' or (type == 'owner' and main_permission in ['owner']) or (type == 'collaborator' and main_permission in ['admin', 'read', 'write']): 
                     libraries.append(payload)
-                    
+
             count = len(libraries)
             if rows: libraries = libraries[start: start+rows]
             elif start > 0: libraries = libraries[start:]
