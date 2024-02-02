@@ -147,13 +147,14 @@ class UserView(BaseView):
                     num_users=num_users,
                     owner=owner
                 )
-                current_app.logger.debug('Type: {0}.'.format(type))
+
                 if type == 'all' or (type == 'owner' and main_permission in ['owner']) or (type == 'collaborator' and main_permission in ['admin', 'read', 'write']): 
                     libraries.append(payload)
-
+                    
+            count = len(libraries)
             if rows: libraries = libraries[start: start+rows]
             elif start > 0: libraries = libraries[start:]
-            libraries_response = {'count': len(libraries), 'libraries': libraries}
+            libraries_response = {'count': count, 'libraries': libraries}
             
         return libraries_response
 

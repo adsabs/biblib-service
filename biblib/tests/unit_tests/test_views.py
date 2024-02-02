@@ -474,7 +474,7 @@ class TestUserViews(TestCaseDatabase):
                     rows=10
                 )
                 libraries += curr_libraries['libraries']
-                total_libraries += curr_libraries['count']
+                total_libraries = curr_libraries['count']
         self.assertEqual(total_libraries, 100)
         self.assertEqual(libraries_full, libraries)
 
