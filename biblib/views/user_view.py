@@ -60,7 +60,7 @@ class UserView(BaseView):
         return response
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", ownership=False):
+    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", type="all"):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
@@ -85,13 +85,8 @@ class UserView(BaseView):
                 .order_by(getattr(getattr(Library, sort_col), sort_order)())\
                 .all()
             
-            libraries_response = {'libraries_count': len(user_libraries)}
-            
-            if rows: rows=start+rows
-            
-            my_libraries = []
-            shared_with_me = []
-            for permission, library in user_libraries[start:rows]:
+            libraries = []
+            for permission, library in user_libraries:
 
                 # For this library get all the people who have permissions
                 users = session.query(Permissions).filter_by(
@@ -152,17 +147,13 @@ class UserView(BaseView):
                     num_users=num_users,
                     owner=owner
                 )
+                current_app.logger.debug('Type: {0}.'.format(type))
+                if type == 'all' or (type == 'owner' and main_permission in ['owner']) or (type == 'collaborator' and main_permission in ['admin', 'read', 'write']): 
+                    libraries.append(payload)
 
-                if (ownership and main_permission in ['owner']) or not ownership: 
-                    my_libraries.append(payload)
-                elif ownership and main_permission in ['admin', 'read', 'write']: 
-                    shared_with_me.append(payload)
-            
-            if ownership: 
-                libraries_response['my_libraries'] = my_libraries 
-                libraries_response['shared_with_me'] = shared_with_me
-            else: 
-                libraries_response['libraries'] = my_libraries
+            if rows: libraries = libraries[start: start+rows]
+            elif start > 0: libraries = libraries[start:]
+            libraries_response = {'count': len(libraries), 'libraries': libraries}
             
         return libraries_response
 
@@ -176,6 +167,8 @@ class UserView(BaseView):
         :param rows: The number of rows to return from the start point (int).  default: None (returns all libraries)
         :param sort: Library column to sort on. default: date_created (date_created, date_last_modified, name)
         :param order: Direction sort libraries. default: desc (asc, desc)
+        :param type: Level of library ownership. default: all (all, owner, collaborator)
+
         :return: list of the users libraries with the relevant information
 
         Header:
@@ -228,8 +221,9 @@ class UserView(BaseView):
             if sort_order not in ['asc', 'desc']:
                 raise ValueError
 
-            ownership = get_params.get('ownership', default=False, type=check_boolean)
-            current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, rows))
+            type = get_params.get('type', default='all', type=str) 
+            if type not in ['all', 'owner', 'collaborator']: 
+                raise ValueError
 
         except ValueError:
             msg = "Failed to parse input parameters: {}. Please confirm the request is properly formatted.".format(request)
@@ -245,7 +239,7 @@ class UserView(BaseView):
                                       rows=rows, 
                                       sort_col=sort_col, 
                                       sort_order=sort_order, 
-                                      ownership=ownership)
+                                      type=type)
         return response, 200
 
     def post(self):

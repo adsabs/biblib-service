@@ -149,7 +149,7 @@ class TestReturnedDataEpic(TestCaseDatabase):
                 headers=user_dave.headers
             )
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json['libraries_count'] == 1)
+        self.assertTrue(response.json['count'] == 1)
         self.assertTrue(
             response.json['libraries'][0]['num_documents']
             == (number_of_documents+number_of_documents_second)
@@ -177,7 +177,7 @@ class TestReturnedDataEpic(TestCaseDatabase):
         self.assertEqual(response.status_code, 200)
         libraries = response.json
         
-        self.assertTrue(libraries['libraries_count'] == 1)
+        self.assertTrue(libraries['count'] == 1)
         self.assertTrue(
             libraries['libraries'][0]['num_documents'] == number_of_documents+1
         )
