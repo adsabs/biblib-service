@@ -355,7 +355,7 @@ class TestUserViews(TestCaseDatabase):
                 absolute_uid=user.absolute_uid
             )
         
-        self.assertEqual(libraries['libraries_count'], number_of_libs)
+        self.assertEqual(libraries['count'], number_of_libs)
 
     def test_user_can_retrieve_rows_number_of_libraries(self):
         """
@@ -474,8 +474,7 @@ class TestUserViews(TestCaseDatabase):
                     rows=10
                 )
                 libraries += curr_libraries['libraries']
-                total_libraries = curr_libraries['libraries_count']
-        
+                total_libraries = curr_libraries['count']
         self.assertEqual(total_libraries, 100)
         self.assertEqual(libraries_full, libraries)
 
@@ -562,7 +561,7 @@ class TestUserViews(TestCaseDatabase):
                 absolute_uid=user.absolute_uid
             )
         
-        self.assertTrue(libraries['libraries_count'] == number_of_libs)
+        self.assertTrue(libraries['count'] == number_of_libs)
         
         for library in libraries['libraries']:
             for key in self.stub_library.user_view_get_response():
@@ -592,7 +591,7 @@ class TestUserViews(TestCaseDatabase):
                 sort_order='asc'
             )
         
-        self.assertTrue(libraries['libraries_count'] == number_of_libs)
+        self.assertTrue(libraries['count'] == number_of_libs)
         for library in libraries['libraries']:
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
@@ -621,7 +620,7 @@ class TestUserViews(TestCaseDatabase):
                 sort_order='asc'
             )
 
-        self.assertTrue(libraries['libraries_count'] == number_of_libs)
+        self.assertTrue(libraries['count'] == number_of_libs)
         for library in libraries['libraries']:
             for key in self.stub_library.user_view_get_response():
                 self.assertIn(key, library.keys(), 'Missing key: {0}'
@@ -650,7 +649,7 @@ class TestUserViews(TestCaseDatabase):
                     absolute_uid=user_other.absolute_uid
                 )
 
-        self.assertTrue(libraries['libraries_count'] == 2)
+        self.assertTrue(libraries['count'] == 2)
 
     def test_dates_of_updates_change_correctly(self):
         """

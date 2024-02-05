@@ -93,7 +93,7 @@ class TestDeletionEpic(TestCaseDatabase):
                 url,
                 headers=stub_user.headers
             )
-        self.assertTrue(response.json['libraries_count'] == 1)
+        self.assertTrue(response.json['count'] == 1)
 
         # Deletes the first library
         url = url_for('documentview', library=library_id_1)
@@ -110,7 +110,7 @@ class TestDeletionEpic(TestCaseDatabase):
                 url,
                 headers=stub_user.headers
             )
-        self.assertTrue(response.json['libraries_count'] == 0)
+        self.assertTrue(response.json['count'] == 0)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

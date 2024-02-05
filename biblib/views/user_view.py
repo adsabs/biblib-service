@@ -58,9 +58,35 @@ class UserView(BaseView):
                     service
                 )
         return response
+    
+    @classmethod
+    def get_user_libraries(cls, session, service_uid, sort_col, sort_order, access_type, start=0, rows=None):
+
+        query = session.query(Permissions, Library)\
+        .join(Permissions.library)\
+        .filter(Permissions.user_id == service_uid) 
+
+        if access_type == 'owner':
+            query = query.filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True))
+        elif access_type == 'collaborator': 
+            query = query.filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(False))
+        
+        # Sorting
+        query = query.order_by(getattr(getattr(Library, sort_col), sort_order)())
+
+        count = query.count()
+        
+        # Pagination
+        if start > 0: 
+            query = query.offset(start)
+        if rows: 
+            query = query.limit(rows)
+
+        return query.all(), count
+            
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", ownership=False):
+    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", access_type="all"):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
@@ -79,19 +105,11 @@ class UserView(BaseView):
         # The nested getattr calls allow us to request a column from the library model,
         # and then request the proper sort order from that column.
         with current_app.session_scope() as session:
-            user_libraries = session.query(Permissions, Library)\
-                .join(Permissions.library)\
-                .filter(Permissions.user_id == service_uid)\
-                .order_by(getattr(getattr(Library, sort_col), sort_order)())\
-                .all()
-            
-            libraries_response = {'libraries_count': len(user_libraries)}
-            
-            if rows: rows=start+rows
-            
-            my_libraries = []
-            shared_with_me = []
-            for permission, library in user_libraries[start:rows]:
+
+            user_libraries, count = cls.get_user_libraries(session, service_uid, sort_col, sort_order, access_type, start, rows) 
+
+            libraries = []
+            for permission, library in user_libraries:
 
                 # For this library get all the people who have permissions
                 users = session.query(Permissions).filter_by(
@@ -153,16 +171,9 @@ class UserView(BaseView):
                     owner=owner
                 )
 
-                if (ownership and main_permission in ['owner']) or not ownership: 
-                    my_libraries.append(payload)
-                elif ownership and main_permission in ['admin', 'read', 'write']: 
-                    shared_with_me.append(payload)
-            
-            if ownership: 
-                libraries_response['my_libraries'] = my_libraries 
-                libraries_response['shared_with_me'] = shared_with_me
-            else: 
-                libraries_response['libraries'] = my_libraries
+                libraries.append(payload)
+
+            libraries_response = {'count': count, 'libraries': libraries}
             
         return libraries_response
 
@@ -176,6 +187,8 @@ class UserView(BaseView):
         :param rows: The number of rows to return from the start point (int).  default: None (returns all libraries)
         :param sort: Library column to sort on. default: date_created (date_created, date_last_modified, name)
         :param order: Direction sort libraries. default: desc (asc, desc)
+        :param access_type: Level of library ownership. default: all (all, owner, collaborator)
+
         :return: list of the users libraries with the relevant information
 
         Header:
@@ -228,8 +241,9 @@ class UserView(BaseView):
             if sort_order not in ['asc', 'desc']:
                 raise ValueError
 
-            ownership = get_params.get('ownership', default=False, type=check_boolean)
-            current_app.logger.debug("GET params: {}, start: {}, end: {}".format(get_params, start, rows))
+            access_type = get_params.get('access_type', default='all', type=str) 
+            if access_type not in ['all', 'owner', 'collaborator']: 
+                raise ValueError
 
         except ValueError:
             msg = "Failed to parse input parameters: {}. Please confirm the request is properly formatted.".format(request)
@@ -245,7 +259,7 @@ class UserView(BaseView):
                                       rows=rows, 
                                       sort_col=sort_col, 
                                       sort_order=sort_order, 
-                                      ownership=ownership)
+                                      access_type=access_type)
         return response, 200
 
     def post(self):
