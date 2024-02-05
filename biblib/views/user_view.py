@@ -60,22 +60,33 @@ class UserView(BaseView):
         return response
     
     @classmethod
-    def get_user_libraries(cls, session, service_uid, sort_col, sort_order, type):
+    def get_user_libraries(cls, session, service_uid, sort_col, sort_order, access_type, start=0, rows=None):
 
         query = session.query(Permissions, Library)\
         .join(Permissions.library)\
         .filter(Permissions.user_id == service_uid) 
 
-        if type == 'owner':
+        if access_type == 'owner':
             query = query.filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(True))
-        elif type != 'all': 
+        elif access_type == 'collaborator': 
             query = query.filter(Permissions.permissions['owner'].astext.cast(Boolean).is_(False))
+        
+        # Sorting
+        query = query.order_by(getattr(getattr(Library, sort_col), sort_order)())
 
-        return query.order_by(getattr(getattr(Library, sort_col), sort_order)()).all()
+        count = query.count()
+        
+        # Pagination
+        if start > 0: 
+            query = query.offset(start)
+        if rows: 
+            query = query.limit(rows)
+
+        return query.all(), count
             
 
     @classmethod
-    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", type="all"):
+    def get_libraries(cls, service_uid, absolute_uid, start=0, rows=None, sort_col="date_created", sort_order="desc", access_type="all"):
         """
         Get all the libraries a user has
         :param service_uid: microservice UID of the user
@@ -95,7 +106,7 @@ class UserView(BaseView):
         # and then request the proper sort order from that column.
         with current_app.session_scope() as session:
 
-            user_libraries = cls.get_user_libraries(session, service_uid, sort_col, sort_order, type) 
+            user_libraries, count = cls.get_user_libraries(session, service_uid, sort_col, sort_order, access_type, start, rows) 
 
             libraries = []
             for permission, library in user_libraries:
@@ -160,12 +171,8 @@ class UserView(BaseView):
                     owner=owner
                 )
 
-                if type == 'all' or (type == 'owner' and main_permission in ['owner']) or (type == 'collaborator' and main_permission in ['admin', 'read', 'write']): 
-                    libraries.append(payload)
+                libraries.append(payload)
 
-            count = len(libraries)
-            if rows: libraries = libraries[start: start+rows]
-            elif start > 0: libraries = libraries[start:]
             libraries_response = {'count': count, 'libraries': libraries}
             
         return libraries_response
@@ -180,7 +187,7 @@ class UserView(BaseView):
         :param rows: The number of rows to return from the start point (int).  default: None (returns all libraries)
         :param sort: Library column to sort on. default: date_created (date_created, date_last_modified, name)
         :param order: Direction sort libraries. default: desc (asc, desc)
-        :param type: Level of library ownership. default: all (all, owner, collaborator)
+        :param access_type: Level of library ownership. default: all (all, owner, collaborator)
 
         :return: list of the users libraries with the relevant information
 
@@ -234,8 +241,8 @@ class UserView(BaseView):
             if sort_order not in ['asc', 'desc']:
                 raise ValueError
 
-            type = get_params.get('type', default='all', type=str) 
-            if type not in ['all', 'owner', 'collaborator']: 
+            access_type = get_params.get('access_type', default='all', type=str) 
+            if access_type not in ['all', 'owner', 'collaborator']: 
                 raise ValueError
 
         except ValueError:
@@ -252,7 +259,7 @@ class UserView(BaseView):
                                       rows=rows, 
                                       sort_col=sort_col, 
                                       sort_order=sort_order, 
-                                      type=type)
+                                      access_type=access_type)
         return response, 200
 
     def post(self):
