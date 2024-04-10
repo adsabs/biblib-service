@@ -210,13 +210,13 @@ class LibraryView(BaseView):
             raw_library = False
 
         sort = request.args.get('sort', 'date desc')
-        #timestamp sorting is handled in biblib so we need to change the sort to something SOLR understands.
+        # timestamp sorting is handled in biblib so we need to change the sort to something SOLR understands.
         if sort in ['time asc', 'time desc']:
             current_app.logger.debug("sort order is set to {}".format(sort))
             if sort == 'time desc':
-                add_sort = True
+                add_sort = 'desc'
             else:
-                add_sort = False
+                add_sort = 'asc'
             sort = 'date desc'
 
         else: add_sort = None
@@ -275,6 +275,7 @@ class LibraryView(BaseView):
                                     .format(error))
             solr = {'error': 'Could not parse solr data'}
         
+        reverse = True if add_sort == 'desc' else False 
         # Now check if we can update the library database based on the
         # returned canonical bibcodes
         if solr.get('response'):
@@ -285,7 +286,8 @@ class LibraryView(BaseView):
                 session=session
             )
             if add_sort:
-                solr = self.timestamp_sort(solr, library.id, reverse=add_sort)
+    
+                solr = self.timestamp_sort(solr, library.id, reverse=reverse)
 
             documents = [doc['bibcode'] for doc in solr['response']['docs']]
         else:
@@ -299,7 +301,7 @@ class LibraryView(BaseView):
                 # Find the specified library (we have to do this to have full access to the library)
                 temp_library = session.query(Library).filter_by(id=library.id).one()
                 sortable_list = [(bibcode, library.bibcode[bibcode]["timestamp"]) for bibcode in temp_library.get_bibcodes()]
-                sortable_list.sort(key = lambda stamped: stamped[1], reverse=add_sort)
+                sortable_list.sort(key = lambda stamped: stamped[1], reverse=reverse)
                 documents = [doc[0] for doc in sortable_list]         
             else:
                 documents = library.get_bibcodes()

@@ -1425,6 +1425,9 @@ class TestWebservices(TestCaseDatabase):
                 query_string={'sort': 'time asc'}
             )
 
+       
+        response_asc = response.json['documents']
+
         self.assertEqual(response.status_code, 200, response)
         self.assertEqual(full_bibcodes,
                          response.json['documents'])
@@ -1437,11 +1440,14 @@ class TestWebservices(TestCaseDatabase):
                 headers=stub_user.headers,
                 query_string={"sort": 'time desc'}
             )
+        
+        response_desc = response.json['documents'] 
 
         self.assertEqual(response.status_code, 200, response)
         self.assertEqual(list(reversed(full_bibcodes)),
                          response.json['documents'])
-
+        self.assertEqual(response_asc, response_desc[::-1])
+        
     def test_add_query_to_library(self):
         """
         Test the /query/<> end point with POST to add a document
