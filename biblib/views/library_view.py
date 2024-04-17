@@ -286,8 +286,7 @@ class LibraryView(BaseView):
                 session=session
             )
             if add_sort:
-    
-                solr = self.timestamp_sort(solr, library.id, reverse=reverse)
+                solr = self.timestamp_sort(solr, library, reverse=reverse)
 
             documents = [doc['bibcode'] for doc in solr['response']['docs']]
         else:
@@ -447,7 +446,7 @@ class LibraryView(BaseView):
             
             
     @staticmethod
-    def timestamp_sort(solr, library_id, reverse=False):
+    def timestamp_sort(solr, library, reverse=False):
         """
         Take a solr response and sort it based on the timestamps contained in the library
         :input: response: response from SOLR bigquery
@@ -458,15 +457,12 @@ class LibraryView(BaseView):
         """
         if "error" not in solr['response'].keys():
             try:
-                 with current_app.session_scope() as session:
-                    # Find the specified library
-                    library = session.query(Library).filter_by(id=library_id).one()
-                    #First we generate a list of timestamps for the valid bibcodes
-                    timestamp = [library.bibcode[doc['bibcode']]['timestamp'] for doc in solr['response']['docs']]
-                    #Then we sort the SOLR response by the generated timestamp list
-                    solr['response']['docs'] = [\
-                            doc for (doc, timestamp) in sorted(zip(solr['response']['docs'], timestamp), reverse=reverse, key = lambda stamped: stamped[1])\
-                        ]
+                #First we generate a list of timestamps for the valid bibcodes
+                timestamp = [library.bibcode[doc['bibcode']]['timestamp'] for doc in solr['response']['docs']]
+                #Then we sort the SOLR response by the generated timestamp list
+                solr['response']['docs'] = [\
+                        doc for (doc, timestamp) in sorted(zip(solr['response']['docs'], timestamp), reverse=reverse, key = lambda stamped: stamped[1])\
+                    ]
             except Exception as e:
                 current_app.logger.warn("Failed to retrieve timestamps for {} with exception: {}. Returning default sorting.".format(library.id, e))
         else:
