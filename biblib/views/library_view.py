@@ -160,8 +160,7 @@ class LibraryView(BaseView):
         for bibcode in library.bibcode:
 
             if "timestamp" not in library.bibcode[bibcode].keys():
-                    update = True
-                    library.bibcode[bibcode]["timestamp"] = default_timestamp
+                library.bibcode[bibcode]["timestamp"] = default_timestamp
 
             # Update if its an alternate
             if bibcode in alternate_bibcodes:
@@ -176,6 +175,8 @@ class LibraryView(BaseView):
                     updates['duplicates_removed'] += 1
             else:
                 new_library_bibcodes[bibcode] = library.bibcode[bibcode]
+        session.add(library)
+        session.commit()
         if updates['update_list']:                
             cls.update_database(session, library, new_library_bibcodes, updates)
 
