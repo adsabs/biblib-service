@@ -156,10 +156,12 @@ class LibraryView(BaseView):
 
         library = session.query(Library).filter(Library.id == library_id).one()
         default_timestamp = datetime.timestamp(library.date_created) 
+        updated_timestamp = False 
         for bibcode in library.bibcode:
 
             if "timestamp" not in library.bibcode[bibcode].keys():
                 library.bibcode[bibcode]["timestamp"] = default_timestamp
+                updated_timestamp = True
 
             # Update if its an alternate
             if bibcode in alternate_bibcodes:
@@ -175,9 +177,12 @@ class LibraryView(BaseView):
             else:
                 new_library_bibcodes[bibcode] = library.bibcode[bibcode]
         
-        library.bibcode = new_library_bibcodes
-        cls.update_library(session, library)
-        updates['updated_notes'] = cls.update_notes(session, library, updates['update_list'])
+        if updated_timestamp: 
+            cls.update_library(session, library)
+        if updates['update_list']: 
+            library.bibcode = new_library_bibcodes
+            cls.update_library(session, library)
+            updates['updated_notes'] = cls.update_notes(session, library, updates['update_list'])
         
         return updates
         
