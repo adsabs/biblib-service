@@ -177,12 +177,12 @@ class LibraryView(BaseView):
             else:
                 new_library_bibcodes[bibcode] = library.bibcode[bibcode]
         
-        if updated_timestamp: 
-            cls.update_library(session, library)
         if updates['update_list']: 
             library.bibcode = new_library_bibcodes
             cls.update_library(session, library)
             updates['updated_notes'] = cls.update_notes(session, library, updates['update_list'])
+        elif updated_timestamp: 
+            cls.update_library(session, library)
         
         return updates
         
