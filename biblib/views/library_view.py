@@ -66,6 +66,7 @@ class LibraryView(BaseView):
         for updated_bibcode in updated_list: 
             for key, value in updated_bibcode.items(): 
                 updated_dict[key] = value
+        
         for note in notes: 
             
             if note.bibcode in updated_dict:  
@@ -102,7 +103,7 @@ class LibraryView(BaseView):
         return updated_notes
 
     @classmethod
-    def update_database(cls, session, library, new_library_bibcodes, updates):
+    def update_library(cls, session, library):
         """
         Carries the actual database update for the library and notes tables. 
         :param session: Necessary for the updates 
@@ -117,14 +118,13 @@ class LibraryView(BaseView):
                  updated_notes: list of notes that were updates
         """
         try: 
-            library.bibcode = new_library_bibcodes
+            
             session.add(library)
             flag_modified(library, "bibcode")
             session.commit()
             
-            updates['updated_notes'] = cls.update_notes(session, library, updates['update_list'])
         except Exception as error:
-            current_app.logger.warning('Could not update database: {0}'
+            current_app.logger.warning('Could not update library: {0}'
                                     .format(error))
             
     @classmethod
@@ -152,15 +152,16 @@ class LibraryView(BaseView):
             )
         # Extract the canonical bibcodes and create a hashmap 
         # in which the alternate bibcode is the key and the canonical bibcode is the value
-        alternate_bibcodes = cls.get_alternate_bibcodes(solr_docs)
+        alternate_bibcodes = cls.get_alternate_bibcodes(solr_docs) # alternate_bibcode: canonical_bibcode
 
         library = session.query(Library).filter(Library.id == library_id).one()
         default_timestamp = datetime.timestamp(library.date_created) 
-
+        updated_timestamp = False 
         for bibcode in library.bibcode:
 
             if "timestamp" not in library.bibcode[bibcode].keys():
                 library.bibcode[bibcode]["timestamp"] = default_timestamp
+                updated_timestamp = True
 
             # Update if its an alternate
             if bibcode in alternate_bibcodes:
@@ -175,11 +176,14 @@ class LibraryView(BaseView):
                     updates['duplicates_removed'] += 1
             else:
                 new_library_bibcodes[bibcode] = library.bibcode[bibcode]
-        session.add(library)
-        session.commit()
-        if updates['update_list']:                
-            cls.update_database(session, library, new_library_bibcodes, updates)
-
+        
+        if updates['update_list']: 
+            library.bibcode = new_library_bibcodes
+            cls.update_library(session, library)
+            updates['updated_notes'] = cls.update_notes(session, library, updates['update_list'])
+        elif updated_timestamp: 
+            cls.update_library(session, library)
+        
         return updates
         
     def load_parameters(self, request): 
