@@ -5,7 +5,7 @@ get annoying to scroll when reading the source code.
 # Constant definitions
 DEFAULT_LIBRARY_NAME_PREFIX = 'Untitled Library'
 DEFAULT_LIBRARY_DESCRIPTION = 'My ADS library'
-USER_ID_KEYWORD = 'X-Adsws-Uid'
+USER_ID_KEYWORD = 'X-api-uid'
 
 from .base_view import BaseView
 from .user_view import UserView
