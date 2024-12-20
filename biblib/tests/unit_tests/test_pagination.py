@@ -131,7 +131,7 @@ class TestLibraryViews(TestCaseDatabase):
             })
 
 
-            r = self.client.get(url, headers={'X-Adsws-Uid': self.stub_user.absolute_uid})
+            r = self.client.get(url, headers={'X-api-uid': self.stub_user.absolute_uid})
 
 
 if __name__ == '__main__':
