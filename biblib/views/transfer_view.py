@@ -207,7 +207,7 @@ class TransferView(BaseView):
         current_app.logger.info('Sending email to {0} with payload: {1}'.format(transfer_data['email'], payload_plain))
 
         try:
-            if not request.header.get(current_app.config.get('MIRROR_HEADER'),'HOST').endswith(current_app.config.get('MIRROR_SUFFIX'),'-shadow'):
+            if not request.header.get(current_app.config.get('MIRROR_HEADER'),'Host').endswith(current_app.config.get('MIRROR_SUFFIX'),'-shadow'):
                 template = env.get_template('transfer_email.html')
                 payload_html = template.render(email_address=transfer_data['email'],
                                             lib_name=name,
