@@ -549,10 +549,11 @@ class PermissionView(BaseView):
         if payload_plain:
             current_app.logger.info('Sending email to {0} with payload: {1}'.format(permission_data['email'], payload_plain))
             try:
-                msg = self.send_email(email_addr=permission_data['email'],
-                                      payload_plain=payload_plain,
-                                      payload_html=payload_html,
-                                      email_template=PermissionsChangedEmail)
+                if not request.header.get('Host').endswith('shadow'):
+                    msg = self.send_email(email_addr=permission_data['email'],
+                                        payload_plain=payload_plain,
+                                        payload_html=payload_html,
+                                        email_template=PermissionsChangedEmail)
             except:
                 current_app.logger.warning('Sending email to {0} failed'.format(permission_data['email']))
 
