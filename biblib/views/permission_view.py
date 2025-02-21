@@ -548,7 +548,7 @@ class PermissionView(BaseView):
 
         if payload_plain:
             try:
-                if not request.header.get(current_app.config.get('MIRROR_HEADER'),'Host').endswith(current_app.config.get('MIRROR_SUFFIX','-shadow')):
+                if not request.headers.get(current_app.config.get('MIRROR_HEADER'),'Host').endswith(current_app.config.get('MIRROR_SUFFIX','shadow')):
                     current_app.logger.info('Sending email to {0} with payload: {1}'.format(permission_data['email'], payload_plain))
                     msg = self.send_email(email_addr=permission_data['email'],
                                         payload_plain=payload_plain,
