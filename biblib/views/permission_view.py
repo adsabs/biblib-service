@@ -547,13 +547,16 @@ class PermissionView(BaseView):
             payload_plain = None
 
         if payload_plain:
-            current_app.logger.info('Sending email to {0} with payload: {1}'.format(permission_data['email'], payload_plain))
             try:
-                if not request.header.get(current_app.config.get('MIRROR_HEADER'),'HOST').endswith(current_app.config.get('MIRROR_SUFFIX','-shadow')):
+                if not request.header.get(current_app.config.get('MIRROR_HEADER'),'Host').endswith(current_app.config.get('MIRROR_SUFFIX','-shadow')):
+                    current_app.logger.info('Sending email to {0} with payload: {1}'.format(permission_data['email'], payload_plain))
                     msg = self.send_email(email_addr=permission_data['email'],
                                         payload_plain=payload_plain,
                                         payload_html=payload_html,
                                         email_template=PermissionsChangedEmail)
+                else:
+                    current_app.logger.info('Skipping sending email to {0} with payload: {1} due to shadowed request.'.format(permission_data['email'], payload_plain))
+
             except:
                 current_app.logger.warning('Sending email to {0} failed'.format(permission_data['email']))
 
