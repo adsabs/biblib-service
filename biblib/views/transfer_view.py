@@ -204,17 +204,21 @@ class TransferView(BaseView):
                         u'\n If this is a mistake, please contact ADS Help (adshelp@cfa.harvard.edu). ' \
                         u'\n - the ADS team'.format(name, library)
 
-        current_app.logger.info('Sending email to {0} with payload: {1}'.format(transfer_data['email'], payload_plain))
 
         try:
-            template = env.get_template('transfer_email.html')
-            payload_html = template.render(email_address=transfer_data['email'],
-                                           lib_name=name,
-                                           lib_id=library)
-            msg = self.send_email(email_addr=transfer_data['email'],
-                                  payload_plain=payload_plain,
-                                  payload_html=payload_html,
-                                  email_template=PermissionsChangedEmail)
+            if not request.headers.get('Host').endswith('shadow'):
+                current_app.logger.info('Sending email to {0} with payload: {1}'.format(transfer_data['email'], payload_plain))
+                template = env.get_template('transfer_email.html')
+                payload_html = template.render(email_address=transfer_data['email'],
+                                            lib_name=name,
+                                            lib_id=library)
+                msg = self.send_email(email_addr=transfer_data['email'],
+                                    payload_plain=payload_plain,
+                                    payload_html=payload_html,
+                                    email_template=PermissionsChangedEmail)
+            else:
+                current_app.logger.info('Skipping sending email to {0} with payload: {1} due to shadowed request.'.format(transfer_data['email'], payload_plain))
+
         except:
             current_app.logger.warning('Sending email to {0} failed'.format(transfer_data['email']))
 
