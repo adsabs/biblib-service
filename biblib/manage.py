@@ -1,16 +1,16 @@
 """
-Alembic migration management file
+Legacy manage.py interface - maintains backward compatibility
+This file provides the same command interface without Flask-Script dependency
 """
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import os
 import sys
+import argparse
 PROJECT_HOME = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(PROJECT_HOME)
 from flask import current_app
-from flask_script import Manager, Command, Option
-from flask_migrate import Migrate, MigrateCommand
 from biblib.models import Base, User, Permissions, Library, Notes
 from biblib.app import create_app
 from sqlalchemy import create_engine, desc
@@ -20,7 +20,7 @@ import sqlalchemy_continuum
 # Load the app with the factory
 app = create_app()
 
-class DeleteStaleUsers(Command):
+class DeleteStaleUsers:
     """
     Compares the users that exist within the API to those within the
     microservice and deletes any stale users that no longer exist. The logic
@@ -65,7 +65,7 @@ class DeleteStaleUsers(Command):
                             session.rollback()
                 current_app.logger.info('Deleted {} stale users: {}'.format(len(removal_list), removal_list))
 
-class DeleteObsoleteVersionsTime(Command):
+class DeleteObsoleteVersionsTime:
     """
     Clears obsolete library and notes versions older than chosen time.
     """
@@ -101,7 +101,7 @@ class DeleteObsoleteVersionsTime(Command):
                                                 .format(error))
                         session.rollback()
 
-class DeleteObsoleteVersionsNumber(Command):
+class DeleteObsoleteVersionsNumber:
     """
     Limits number of revisions saved per entity to n_revisions.
     """
@@ -136,12 +136,24 @@ class DeleteObsoleteVersionsNumber(Command):
                 DeleteObsoleteVersionsNumber.limit_revisions(session, Notes, n_revisions)
 
 
-
-# Setup the command line arguments using Flask-Script
-manager = Manager(app)
-manager.add_command('syncdb', DeleteStaleUsers())
-manager.add_command('clean_versions_time', DeleteObsoleteVersionsTime())
-manager.add_command('clean_versions_number', DeleteObsoleteVersionsNumber())
+def main():
+    """
+    Command line interface that mimics Flask-Script behavior
+    """
+    parser = argparse.ArgumentParser(description='Biblib Management Commands')
+    parser.add_argument('command', choices=['syncdb', 'clean_versions_time', 'clean_versions_number'],
+                       help='Command to run')
+    parser.add_argument('--n_years', type=int, help='Number of years for time-based cleanup')
+    parser.add_argument('--n_revisions', type=int, help='Number of revisions to keep')
+    
+    args = parser.parse_args()
+    
+    if args.command == 'syncdb':
+        DeleteStaleUsers().run(app=app)
+    elif args.command == 'clean_versions_time':
+        DeleteObsoleteVersionsTime().run(app=app, n_years=args.n_years)
+    elif args.command == 'clean_versions_number':
+        DeleteObsoleteVersionsNumber().run(app=app, n_revisions=args.n_revisions)
 
 if __name__ == '__main__':
-    manager.run()
+    main()

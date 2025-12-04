@@ -12,6 +12,7 @@ from flask_restful import Api
 from flask_discoverer import Discoverer
 from flask_mail import Mail
 from adsmutils import ADSFlask
+from biblib.cli import register_commands
 
 def create_app(**config):
     """
@@ -69,6 +70,9 @@ def create_app(**config):
                      '/twopointoh',
                      methods=['GET']
                      )
+
+    # Register CLI commands
+    register_commands(app)
 
     return app
 
