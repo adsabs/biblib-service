@@ -5,6 +5,7 @@ description = "ADS Library Service"
 authors = [{ name = "ADS Team", email = "adshelp@cfa.harvard.edu" }]
 license = { text = "MIT" }
 readme = "README.md"
+packages = ["biblib"]
 dependencies = [
     "adsmutils @ git+https://github.com/adsabs/ADSMicroserviceUtils.git@v1.3.0",
     "alembic==1.12.0",
@@ -43,7 +44,8 @@ requires = [
     "setuptools",
     "wheel",
     "flit_core >=3.2,<4",
-    "ppsetuptools==2.0.2"
+    "ppsetuptools==2.0.2",
+    "toml"
 ]
 build-backend = "flit_core.buildapi"
 
