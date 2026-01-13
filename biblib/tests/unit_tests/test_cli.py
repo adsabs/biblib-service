@@ -1,9 +1,9 @@
 """
-Tests the methods within the flask-script file manage.py
+Tests the methods within the flask cli file cli.py
 """
 
 import unittest
-from biblib.manage import DeleteObsoleteVersionsNumber, DeleteStaleUsers, DeleteObsoleteVersionsTime
+from biblib.cli import syncdb, clean_versions_time, clean_versions_number
 from biblib.models import User, Library, Permissions, Notes
 from sqlalchemy.orm.exc import NoResultFound
 from biblib.tests.base import TestCaseDatabase
@@ -16,12 +16,9 @@ from biblib.tests.base import TestCaseDatabase, MockSolrQueryService
 from biblib.tests.stubdata.stub_data import LibraryShop
 from biblib.views import DocumentView
 
-class TestManagePy(TestCaseDatabase):
+class TestCli(TestCaseDatabase):
     """
-    Class for testing the behaviour of the custom manage scripts
-    """
-    """
-    Base test class for when databases are being used.
+    Class for testing the behaviour of the custom cli scripts
     """
     def __init__(self, *args, **kwargs):
         """
@@ -32,7 +29,7 @@ class TestManagePy(TestCaseDatabase):
 
         :return: no return
         """
-        super(TestManagePy, self).__init__(*args, **kwargs)
+        super(TestCli, self).__init__(*args, **kwargs)
 
         self.document_view = DocumentView
 
@@ -45,7 +42,7 @@ class TestManagePy(TestCaseDatabase):
 
     def test_delete_stale_users(self):
         """
-        Tests that the DeleteStaleUsers action that propogates the deletion of
+        Tests that the syncdb action that propogates the deletion of
         users from the API database to that of the microservice.
 
         :return: no return
@@ -112,8 +109,10 @@ class TestManagePy(TestCaseDatabase):
                 library_1_id = library_1.id
                 library_2_id = library_2.id
 
-                # Now run the stale deletion
-                DeleteStaleUsers().run(app=self.app)
+                # Now run the stale deletion using the CLI runner
+                runner = self.app.test_cli_runner()
+                result = runner.invoke(syncdb)
+                self.assertEqual(result.exit_code, 0)
 
                 # Check the state of users, libraries and permissions
                 # User 2
@@ -176,7 +175,7 @@ class TestManagePy(TestCaseDatabase):
 
     def test_delete_obsolete_versions_number(self):
         """
-        Tests that the DeleteObsoleteVersionsNumber action that removes 
+        Tests that the clean_versions_number action that removes 
         LibraryVersions older than a given number of years.
 
         :return: no return
@@ -301,12 +300,16 @@ class TestManagePy(TestCaseDatabase):
                 NotesVersion = sqlalchemy_continuum.version_class(Notes)
                 notes = session.query(Notes).all()
                 notes_revision_lengths = []
-                for notes in notes: 
-                    revisions = session.query(NotesVersion).filter_by(id=notes.id).all() 
+                for n in notes: 
+                    revisions = session.query(NotesVersion).filter_by(id=n.id).all() 
                     notes_revision_lengths.append(len(revisions))
                 self.assertEqual(notes_revision_lengths, [2, 2])
-                # Now run the obsolete deletion
-                DeleteObsoleteVersionsNumber().run(app=self.app, n_revisions=self.n_revisions)
+                
+                # Now run the obsolete deletion using the CLI runner
+                runner = self.app.test_cli_runner()
+                result = runner.invoke(clean_versions_number, ['--revisions', self.n_revisions])
+                self.assertEqual(result.exit_code, 0)
+
                 service_user = user_1_id
                 permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
@@ -346,7 +349,7 @@ class TestManagePy(TestCaseDatabase):
 
     def test_delete_obsolete_versions_time(self):
         """
-        Tests that the DeleteObsoleteVersionsTime action that removes 
+        Tests that the clean_versions_time action that removes 
         LibraryVersions older than a given number of years.
 
         :return: no return
@@ -482,8 +485,11 @@ class TestManagePy(TestCaseDatabase):
                 # Now run the obsolete deletion acting as if we are 1 year in the future.
                 # Libraries and notes should persist because n_years is 2 
                 current_offset = datetime.now() + relativedelta(years=1)
+                runner = self.app.test_cli_runner()
                 with freezegun.freeze_time(current_offset):
-                    DeleteObsoleteVersionsTime().run(app=self.app, n_years=self.n_years)
+                    result = runner.invoke(clean_versions_time, ['--years', self.n_years])
+                    self.assertEqual(result.exit_code, 0)
+
                 service_user = user_1_id
                 permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
@@ -509,7 +515,9 @@ class TestManagePy(TestCaseDatabase):
                 # Libraries and notes should be deleted
                 current_offset = datetime.now() + relativedelta(years=2, days=1)
                 with freezegun.freeze_time(current_offset):
-                    DeleteObsoleteVersionsTime().run(app=self.app, n_years=self.n_years)
+                    result = runner.invoke(clean_versions_time, ['--years', self.n_years])
+                    self.assertEqual(result.exit_code, 0)
+
                 service_user = user_1_id
                 permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
@@ -541,5 +549,4 @@ class TestManagePy(TestCaseDatabase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
-
 
