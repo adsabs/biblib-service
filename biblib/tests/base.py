@@ -301,12 +301,14 @@ class MockSolrQueryService(MockADSWSAPI):
                     }
             
             else:
-                if self.kwargs.get('canonical_bibcode'):
+                if 'canonical_bibcode' in self.kwargs:
                     docs = []
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                    #Sets all odd indexed bibcodes as valid, all other bibcodes are invalid.        
+                    if isinstance(canonical_bibcodes, dict):
+                        canonical_bibcodes = list(canonical_bibcodes.keys())
+                    #Sets all odd indexed bibcodes as valid, all other bibcodes are invalid.
                     for i in range(len(canonical_bibcodes)):
-                        if i%2-1 == 0:
+                        if i % 2 == 1:
                             docs.append({'bibcode': canonical_bibcodes[i]})
                     input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
                     params = {
