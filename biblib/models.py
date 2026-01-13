@@ -36,6 +36,7 @@ class GUID(TypeDecorator):
     as Flask cannot serialise UUIDs correctly.
 
     """
+    cache_ok = True
     # Refers to the class of type being decorated
     impl = CHAR
 

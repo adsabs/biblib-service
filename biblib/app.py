@@ -70,6 +70,10 @@ def create_app(**config):
                      methods=['GET']
                      )
 
+    # Register CLI commands
+    from biblib.cli import biblib
+    app.cli.add_command(biblib)
+
     return app
 
 

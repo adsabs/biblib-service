@@ -173,16 +173,20 @@ class MockSolrBigqueryService(MockADSWSAPI):
             if self.kwargs.get('solr_docs'):
                 docs = self.kwargs['solr_docs']
                 
-            elif self.kwargs.get('canonical_bibcode'):
+            elif 'canonical_bibcode' in self.kwargs:
                 if not self.kwargs.get('invalid'):
                     docs = []
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    if isinstance(canonical_bibcodes, dict):
+                        canonical_bibcodes = list(canonical_bibcodes.keys())
                     for i in range(self.page*self.page_size, min(len(canonical_bibcodes), (self.page + 1)*self.page_size)):
                         docs.append({'bibcode': canonical_bibcodes[i]})
                 else:
                     #This treats every other odd bibcode as valid.
                     docs = []
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    if isinstance(canonical_bibcodes, dict):
+                        canonical_bibcodes = list(canonical_bibcodes.keys())
                     i = self.page*self.page_size
                     while len(docs) <  min(len(canonical_bibcodes), (self.page + 1)*self.page_size) and i < len(canonical_bibcodes):
                         if i%4-1 == 0:                        
@@ -273,9 +277,11 @@ class MockSolrQueryService(MockADSWSAPI):
             """
             if not self.kwargs.get('invalid'):
                 #Sets all generated bibcodes as valid
-                if self.kwargs.get('canonical_bibcode'):
+                if 'canonical_bibcode' in self.kwargs:
                     docs = []
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
+                    if isinstance(canonical_bibcodes, dict):
+                        canonical_bibcodes = list(canonical_bibcodes.keys())
                     for i in range(len(canonical_bibcodes)):
                         docs.append({'bibcode': canonical_bibcodes[i]})
                     input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
@@ -544,7 +550,7 @@ class MockEndPoint(object):
 
         HTTPretty.register_uri(
             HTTPretty.GET,
-            re.compile('{0}/\w+'.format(
+            re.compile(r'{0}/\w+'.format(
                 current_app.config['BIBLIB_USER_EMAIL_ADSWS_API_URL'])
             ),
             body=request_callback,

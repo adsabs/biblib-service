@@ -376,9 +376,13 @@ class TestUserViews(TestCaseDatabase):
         number_of_libs = 100
         for i in range(number_of_libs):
             stub_library = LibraryShop()
+            # Ensure name is unique by appending the index to avoid Faker name collisions
+            library_data = stub_library.user_view_post_data.copy()
+            library_data['name'] = '{0} {1}'.format(library_data['name'], i)
+
             self.user_view.create_library(
                 service_uid=user.id,
-                library_data=stub_library.user_view_post_data
+                library_data=library_data
             )
 
         # Get the library created
@@ -410,9 +414,13 @@ class TestUserViews(TestCaseDatabase):
         number_of_libs = 100
         for i in range(number_of_libs):
             stub_library = LibraryShop()
+            # Ensure name is unique by appending the index to avoid Faker name collisions
+            library_data = stub_library.user_view_post_data.copy()
+            library_data['name'] = '{0} {1}'.format(library_data['name'], i)
+
             self.user_view.create_library(
                 service_uid=user.id,
-                library_data=stub_library.user_view_post_data
+                library_data=library_data
             )
         with MockEmailService(self.stub_user, end_type='uid'):
             libraries_full = self.user_view.get_libraries(
@@ -452,9 +460,13 @@ class TestUserViews(TestCaseDatabase):
         number_of_libs = 100
         for i in range(number_of_libs):
             stub_library = LibraryShop()
+            # Ensure name is unique by appending the index to avoid Faker name collisions
+            library_data = stub_library.user_view_post_data.copy()
+            library_data['name'] = '{0} {1}'.format(library_data['name'], i)
+
             self.user_view.create_library(
                 service_uid=user.id,
-                library_data=stub_library.user_view_post_data
+                library_data=library_data
             )
         with MockEmailService(self.stub_user, end_type='uid'):
             libraries_full = self.user_view.get_libraries(
