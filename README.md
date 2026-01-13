@@ -21,15 +21,14 @@ To load and enter the VM: `vagrant up && vagrant ssh`
 
 Run the tests using `pytest`:
 ```bash
-# Setup postgres (using docker for example)
 docker run -d --name postgres -e POSTGRES_USER="postgres" -e POSTGRES_PASSWORD="postgres" -p 5432:5432 postgres:12.6
 
 # Setup environment
 python3 -m venv python
 source python/bin/activate
 
-# Install with legacy build support (requires pip < 23.1 and specific setuptools)
-python -m pip install "pip<23.1" setuptools==57.5.0 wheel
+# Install with legacy build support (requires pip 24 and specific setuptools)
+python -m pip install "pip==24" setuptools==57.5.0 wheel
 pip install -e ".[dev]"
 
 # Run tests

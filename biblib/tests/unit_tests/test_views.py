@@ -479,15 +479,18 @@ class TestUserViews(TestCaseDatabase):
         libraries = []
         total_libraries = 0
         with MockEmailService(self.stub_user, end_type='uid'):
-            for start in range(number_of_libs):
+            for start in range(0, number_of_libs, 10):
                 curr_libraries = self.user_view.get_libraries(
                     service_uid=user.id,
-                    absolute_uid=user.absolute_uid, start=start*10,
+                    absolute_uid=user.absolute_uid, start=start,
                     rows=10
                 )
                 libraries += curr_libraries['libraries']
                 total_libraries = curr_libraries['count']
         self.assertEqual(total_libraries, 100)
+        # Sort by id to ensure order-independent comparison
+        libraries_full.sort(key=lambda x: x['id'])
+        libraries.sort(key=lambda x: x['id'])
         self.assertEqual(libraries_full, libraries)
 
     def test_user_can_retrieve_library_when_uid_does_not_exist(self):

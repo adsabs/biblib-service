@@ -177,16 +177,16 @@ class MockSolrBigqueryService(MockADSWSAPI):
                 if not self.kwargs.get('invalid'):
                     docs = []
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                    if isinstance(canonical_bibcodes, dict):
-                        canonical_bibcodes = list(canonical_bibcodes.keys())
+                    if not isinstance(canonical_bibcodes, list):
+                        canonical_bibcodes = list(canonical_bibcodes)
                     for i in range(self.page*self.page_size, min(len(canonical_bibcodes), (self.page + 1)*self.page_size)):
                         docs.append({'bibcode': canonical_bibcodes[i]})
                 else:
                     #This treats every other odd bibcode as valid.
                     docs = []
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                    if isinstance(canonical_bibcodes, dict):
-                        canonical_bibcodes = list(canonical_bibcodes.keys())
+                    if not isinstance(canonical_bibcodes, list):
+                        canonical_bibcodes = list(canonical_bibcodes)
                     i = self.page*self.page_size
                     while len(docs) <  min(len(canonical_bibcodes), (self.page + 1)*self.page_size) and i < len(canonical_bibcodes):
                         if i%4-1 == 0:                        
@@ -244,10 +244,10 @@ class MockSolrBigqueryService(MockADSWSAPI):
         :param traceback: the traceback for the exit
         :return: no return
         """
-        #adding this allows for checking pagination calls.
-        return self.page
         HTTPretty.reset()
         HTTPretty.disable()
+        #adding this allows for checking pagination calls.
+        return self.page
 
 
 class MockSolrQueryService(MockADSWSAPI):
@@ -280,8 +280,8 @@ class MockSolrQueryService(MockADSWSAPI):
                 if 'canonical_bibcode' in self.kwargs:
                     docs = []
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                    if isinstance(canonical_bibcodes, dict):
-                        canonical_bibcodes = list(canonical_bibcodes.keys())
+                    if not isinstance(canonical_bibcodes, list):
+                        canonical_bibcodes = list(canonical_bibcodes)
                     for i in range(len(canonical_bibcodes)):
                         docs.append({'bibcode': canonical_bibcodes[i]})
                     input_query ="identifier:("+" OR ".join(canonical_bibcodes)+")"
@@ -304,8 +304,8 @@ class MockSolrQueryService(MockADSWSAPI):
                 if 'canonical_bibcode' in self.kwargs:
                     docs = []
                     canonical_bibcodes = self.kwargs.get('canonical_bibcode')
-                    if isinstance(canonical_bibcodes, dict):
-                        canonical_bibcodes = list(canonical_bibcodes.keys())
+                    if not isinstance(canonical_bibcodes, list):
+                        canonical_bibcodes = list(canonical_bibcodes)
                     #Sets all odd indexed bibcodes as valid, all other bibcodes are invalid.
                     for i in range(len(canonical_bibcodes)):
                         if i % 2 == 1:

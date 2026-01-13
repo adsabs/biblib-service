@@ -191,7 +191,7 @@ class TestWebservices(TestCaseDatabase):
         url = url_for('libraryview', library=library_id)
 
         with MockSolrBigqueryService(
-                canonical_bibcode=full_bibcodes) as BQ, \
+                canonical_bibcode=stub_library.bibcode) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
@@ -1131,7 +1131,7 @@ class TestWebservices(TestCaseDatabase):
         # Check the library was created and documents exist
         url = url_for('libraryview', library=library_id)
         with MockSolrBigqueryService(
-                canonical_bibcode=full_bibcodes) as BQ, \
+                canonical_bibcode=stub_library.bibcode) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
@@ -1490,7 +1490,7 @@ class TestWebservices(TestCaseDatabase):
         # Check the library was created and documents exist
         url = url_for('libraryview', library=library_id)
         with MockSolrBigqueryService(
-                canonical_bibcode=full_bibcodes) as BQ, \
+                canonical_bibcode=stub_library.bibcode) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
@@ -1652,7 +1652,7 @@ class TestWebservices(TestCaseDatabase):
         # Check the library was created and documents exist
         url = url_for('libraryview', library=library_id)
         with MockSolrBigqueryService(
-                canonical_bibcode=full_bibcodes) as BQ, \
+                canonical_bibcode=stub_library.bibcode) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
