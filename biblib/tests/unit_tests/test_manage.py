@@ -482,7 +482,7 @@ class TestManagePy(TestCaseDatabase):
                 # Libraries and notes should persist because n_years is 2 
                 current_offset = datetime.now() + relativedelta(years=1)
                 with freezegun.freeze_time(current_offset):
-                    DeleteObsoleteVersionsTime().run(app=self.app, years=self.n_years)
+                    DeleteObsoleteVersionsTime().run(app=self.app, n_years=self.n_years)
                 service_user = user_1_id
                 permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
@@ -508,7 +508,7 @@ class TestManagePy(TestCaseDatabase):
                 # Libraries and notes should be deleted
                 current_offset = datetime.now() + relativedelta(years=2, days=1)
                 with freezegun.freeze_time(current_offset):
-                    DeleteObsoleteVersionsTime().run(app=self.app, years=self.n_years)
+                    DeleteObsoleteVersionsTime().run(app=self.app, n_years=self.n_years)
                 service_user = user_1_id
                 permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
