@@ -37,11 +37,11 @@ pytest
 
 ### Layout
 
-Tests are split into three stages:
-  1. Functional tests (`biblib/tests/functional_tests/`): this tests a *workflow*, for example, a user adding a library and then trying to delete it - and testing everything behaves as expected via the REST work flow
-  2. Unit tests, level 1 (`biblib/tests/unit_tests/test_webservices.py`): this tests the above *workflow* on the REST end points
-  3. Unit tests, level 2 (`biblib/tests/unit_tests/test_views.py`): this tests the logic of functions that are used within views (end points), and is usually the most fine grained testing
-  4. Maintenance CLI tests: tests for the `flask biblib` commands are in `biblib/tests/unit_tests/test_cli.py`.
+Tests are split into three (excessive) stages:
+  1. Functional tests (*biblib/tests/functional_tests/*): this tests a *workflow*, for example, a user adding a library and then trying to delete it - and testing everything behaves as expected via the REST work flow
+  2. Unit tests, level 1 (*biblib/tests/unit_tests/test_webservices.py*): this tests the above *workflow* on the REST end points
+  3. Unit tests, level 2 (*biblib/tests/unit_tests/test_views.py*): this tests the logic of functions that are used within views (end points), and is usually the most fine grained testing
+  4. Other unit testing: other tests that are testing other parts, such as *manage* scripts are in their own unit tests, e.g., *biblib/tests/unit_tests/test_manage.py*.
 
 All tests have been written top down, or in a Test-Driven Development approach, so keep this in mind when reading the tests. All the logic has been built based on these tests, so if you were to add something, I'd advise you first create a test for your expected behaviour, and build the logic until it works.
 
@@ -56,10 +56,12 @@ docker run -d -e POSTGRES_USER="postgres" -e POSTGRES_PASSWORD="postgres" -p 543
 docker exec -it postgres psql -U postgres -c "CREATE ROLE biblib_service WITH LOGIN PASSWORD 'biblib_service';"
 docker exec -it postgres psql -U postgres -c "CREATE DATABASE biblib_service;"
 docker exec -it postgres psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE biblib_service TO biblib_service;"
+```
 
 # Run migrations
-export FLASK_APP=biblib/app.py
-flask biblib syncdb  # This will sync users and can be used to initialize schema via alembic indirectly or directly:
+# In order for alembic to have access to the models metadata, the biblib-service directory must be added to the PYTHONPATH
+export PYTHONPATH=$(pwd):$PYTHONPATH
+python biblib/manage.py syncdb  # This will sync users and can be used to initialize schema via alembic indirectly or directly:
 alembic upgrade head
 ```
 
@@ -72,6 +74,23 @@ or via the legacy entrypoint:
 ```bash
 python wsgi.py
 ```
+
+### Database versioning
+
+Database versioning is managed using Alembic. You can upgrade to the latest revision or downgrade to a previous one using the following commands:
+
+```bash
+# Upgrade to latest revision
+alembic upgrade head
+
+# Downgrade revision
+alembic downgrade <revision>
+
+# Create a new revision
+alembic revision --autogenerate -m "revision description"
+```
+
+New revisions of libraries and notes are created automatically by `sqlalchemy-continuum` whenever a record is updated and committed to the database.
 
 ## deployment
 

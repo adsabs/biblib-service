@@ -20,6 +20,9 @@ class TestManagePy(TestCaseDatabase):
     """
     Class for testing the behaviour of the custom manage scripts
     """
+    """
+    Base test class for when databases are being used.
+    """
     def __init__(self, *args, **kwargs):
         """
         Constructor of the class
@@ -302,17 +305,14 @@ class TestManagePy(TestCaseDatabase):
                     revisions = session.query(NotesVersion).filter_by(id=note.id).all() 
                     notes_revision_lengths.append(len(revisions))
                 self.assertEqual(notes_revision_lengths, [2, 2])
-                
                 # Now run the obsolete deletion
                 DeleteObsoleteVersionsNumber().run(app=self.app, n_revisions=self.n_revisions)
-
                 service_user = user_1_id
                 permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
                 LibraryVersion = sqlalchemy_continuum.version_class(Library)
                 updated_revision_lengths = []
-                
-                
+                   
                 #confirm most recent remaining revision matches current state of library
                 for library in libraries:
                     updated_revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
@@ -483,7 +483,6 @@ class TestManagePy(TestCaseDatabase):
                 current_offset = datetime.now() + relativedelta(years=1)
                 with freezegun.freeze_time(current_offset):
                     DeleteObsoleteVersionsTime().run(app=self.app, years=self.n_years)
-
                 service_user = user_1_id
                 permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
@@ -510,7 +509,6 @@ class TestManagePy(TestCaseDatabase):
                 current_offset = datetime.now() + relativedelta(years=2, days=1)
                 with freezegun.freeze_time(current_offset):
                     DeleteObsoleteVersionsTime().run(app=self.app, years=self.n_years)
-
                 service_user = user_1_id
                 permissions = session.query(Permissions).filter(Permissions.user_id == service_user).all()
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
