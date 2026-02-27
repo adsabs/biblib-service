@@ -1179,10 +1179,10 @@ class TestWebservices(TestCaseDatabase):
 
         self.assertEqual(response.status_code, 400)
 
-        # Check the library was created and documents exist
+        # Check the library was created and documents do not exist (it should be empty)
         url = url_for('libraryview', library=library_id)
         with MockSolrBigqueryService(
-                canonical_bibcode=stub_library.bibcode) as BQ, \
+                canonical_bibcode=[]) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
@@ -1190,8 +1190,7 @@ class TestWebservices(TestCaseDatabase):
             )
 
         self.assertEqual(response.status_code, 200, response)
-        self.assertNotEqual(stub_library.get_bibcodes(),
-                         response.json['documents'])
+        self.assertEqual(response.json['documents'], [])
 
     def test_add_some_invalid_documents_to_library(self):
         """
@@ -1236,15 +1235,17 @@ class TestWebservices(TestCaseDatabase):
         
         # Check the library was created and documents exist
         url = url_for('libraryview', library=library_id)
+        # We only expect the second bibcode to be in the library
+        valid_bibcodes = [json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')[1]]
         with MockSolrBigqueryService(
-                canonical_bibcode=stub_library.bibcode) as BQ, \
+                canonical_bibcode=valid_bibcodes) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
                 headers=stub_user.headers
             )
         #Check that the expected bibcode and only the expected bibcode is in the libary.
-        self.assertIn(json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')[1], response.json['documents'])
+        self.assertIn(valid_bibcodes[0], response.json['documents'])
         self.assertNotIn(json.loads(stub_library.document_view_post_data_json('add')).get('bibcode')[0], response.json['documents'])
 
         #Check that the library makes sense.
@@ -1417,7 +1418,7 @@ class TestWebservices(TestCaseDatabase):
         url = url_for('libraryview', library=library_id)
 
         with MockSolrBigqueryService(
-                canonical_bibcode=stub_library.bibcode) as BQ, \
+                canonical_bibcode=full_bibcodes) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,
@@ -1433,7 +1434,7 @@ class TestWebservices(TestCaseDatabase):
                          response.json['documents'])
         
         with MockSolrBigqueryService(
-                canonical_bibcode=stub_library.bibcode) as BQ, \
+                canonical_bibcode=full_bibcodes) as BQ, \
                 MockEmailService(stub_user, end_type='uid') as ES:
             response = self.client.get(
                 url,

@@ -19,14 +19,20 @@ To load and enter the VM: `vagrant up && vagrant ssh`
 
 ### tests
 
-Run the tests using `py.test`:
+Run the tests using `pytest`:
 ```bash
-docker run --name some-postgres -e POSTGRES_USER="postgres" POSTGRES_PASSWORD="postgres" -p 5432:5432 --name postgres
-virtualenv python
+docker run -d --name postgres -e POSTGRES_USER="postgres" -e POSTGRES_PASSWORD="postgres" -p 5432:5432 postgres:12.6
+
+# Setup environment
+python3 -m venv python
 source python/bin/activate
-pip install -r requirements.txt
-pip install -r dev-requirements.txt
-py.tests biblib/tests/
+
+# Install with legacy build support (requires pip 24 and specific setuptools)
+python -m pip install "pip==24" setuptools==57.5.0 wheel
+pip install -e ".[dev]"
+
+# Run tests
+pytest
 ```
 
 ### Layout
@@ -42,32 +48,49 @@ All tests have been written top down, or in a Test-Driven Development approach, 
 ### Running Biblib Locally
 
 To run a version of Biblib locally, a postgres database needs to be created and properly formatted for use with Biblib. This can be done with a local postgres instance or in a docker container using the following commands.
-`config.py` must also be copied to `local_config.py` and the environment variables must be adjusted to reflect the local environment.
+`local_config.py` should be created in `biblib/` and the environment variables must be adjusted to reflect the local environment.
+
 ```bash
-docker run -d -e POSTGRES_USER="postgres" -e POSTGRES_PASSWORD="postgres" -p 5432:5432 --name postgres  postgres:12.6
-docker exec -it postgres bash -c "psql -c \"CREATE ROLE biblib_service WITH LOGIN PASSWORD 'biblib_service';\""
-docker exec -it postgres bash -c "psql -c \"CREATE DATABASE biblib_service;\""
-docker exec -it postgres bash -c "psql -c \"GRANT CREATE ON DATABASE biblib_service TO biblib_service;\""
+# Setup database
+docker run -d -e POSTGRES_USER="postgres" -e POSTGRES_PASSWORD="postgres" -p 5432:5432 --name postgres postgres:12.6
+docker exec -it postgres psql -U postgres -c "CREATE ROLE biblib_service WITH LOGIN PASSWORD 'biblib_service';"
+docker exec -it postgres psql -U postgres -c "CREATE DATABASE biblib_service;"
+docker exec -it postgres psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE biblib_service TO biblib_service;"
 ```
 
-Once the database has been created, `alembic` can be used to upgrade the database to the correct alembic revision
-```bash
-#In order for alembic to have access to the models metadata, the biblib-service directory must be added to the PYTHONPATH
+# Run migrations
+# In order for alembic to have access to the models metadata, the biblib-service directory must be added to the PYTHONPATH
 export PYTHONPATH=$(pwd):$PYTHONPATH
+python biblib/manage.py syncdb  # This will sync users and can be used to initialize schema via alembic indirectly or directly:
 alembic upgrade head
 ```
 
-A new revision can be created by doing the following:
+A test version of the microservice can then be deployed using:
 ```bash
-#In order for alembic to have access to the models metadata, the biblib-service directory must be added to the PYTHONPATH
-export PYTHONPATH=$(pwd):$PYTHONPATH
-alembic revision -m "<revision-name>" --autogenerate
+export FLASK_APP=biblib/app.py
+flask run --port 4000
+```
+or via the legacy entrypoint:
+```bash
+python wsgi.py
 ```
 
-A test version of the microservice can then be deployed using
+### Database versioning
+
+Database versioning is managed using Alembic. You can upgrade to the latest revision or downgrade to a previous one using the following commands:
+
 ```bash
-python3 wsgi.py
+# Upgrade to latest revision
+alembic upgrade head
+
+# Downgrade revision
+alembic downgrade <revision>
+
+# Create a new revision
+alembic revision --autogenerate -m "revision description"
 ```
+
+New revisions of libraries and notes are created automatically by `sqlalchemy-continuum` whenever a record is updated and committed to the database.
 
 ## deployment
 

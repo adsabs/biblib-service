@@ -301,8 +301,8 @@ class TestManagePy(TestCaseDatabase):
                 NotesVersion = sqlalchemy_continuum.version_class(Notes)
                 notes = session.query(Notes).all()
                 notes_revision_lengths = []
-                for notes in notes: 
-                    revisions = session.query(NotesVersion).filter_by(id=notes.id).all() 
+                for note in notes: 
+                    revisions = session.query(NotesVersion).filter_by(id=note.id).all() 
                     notes_revision_lengths.append(len(revisions))
                 self.assertEqual(notes_revision_lengths, [2, 2])
                 # Now run the obsolete deletion
@@ -312,8 +312,7 @@ class TestManagePy(TestCaseDatabase):
                 libraries = [session.query(Library).filter(Library.id == permission.library_id).one() for permission in permissions if permission.permissions['owner']]
                 LibraryVersion = sqlalchemy_continuum.version_class(Library)
                 updated_revision_lengths = []
-                
-                
+                   
                 #confirm most recent remaining revision matches current state of library
                 for library in libraries:
                     updated_revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
@@ -541,5 +540,3 @@ class TestManagePy(TestCaseDatabase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
-
-

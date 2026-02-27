@@ -20,3 +20,9 @@ python
 docker-compose*
 Dockerfile
 scripts/pytest/*
+build/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.tox/
+dist/
