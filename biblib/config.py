@@ -17,6 +17,7 @@ if not os.path.isdir(LOG_PATH):
     os.mkdir(LOG_PATH)
 
 # For running tests on TravisCI
+SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://postgres:postgres@localhost:5432/test_biblib'
 SQLALCHEMY_BINDS = {
     'libraries': 'postgresql+psycopg2://postgres:postgres@localhost:5432/test_biblib'
 }
