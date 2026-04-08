@@ -6,6 +6,7 @@ import unittest
 from biblib.manage import DeleteObsoleteVersionsNumber, DeleteStaleUsers, DeleteObsoleteVersionsTime
 from biblib.models import User, Library, Permissions, Notes
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy import text
 from biblib.tests.base import TestCaseDatabase
 import sqlalchemy_continuum
 import freezegun
@@ -53,8 +54,8 @@ class TestManagePy(TestCaseDatabase):
 
         with self.app.session_scope() as session:
             # We do not add user 1 to the API database
-            session.execute('create table users (id integer, random integer);')
-            session.execute('insert into users (id, random) values (2, 7);')
+            session.execute(text('create table users (id integer, random integer);'))
+            session.execute(text('insert into users (id, random) values (2, 7);'))
             session.commit()
 
         with self.app.session_scope() as session:
@@ -171,7 +172,7 @@ class TestManagePy(TestCaseDatabase):
                 raise
             finally:
                 # Destroy the tables
-                session.execute('drop table users;')
+                session.execute(text('drop table users;'))
                 pass
 
     def test_delete_obsolete_versions_number(self):
@@ -184,8 +185,8 @@ class TestManagePy(TestCaseDatabase):
 
         with self.app.session_scope() as session:
             # We do not add user 1 to the API database
-            session.execute('create table users (id integer, random integer);')
-            session.execute('insert into users (id, random) values (2, 7);')
+            session.execute(text('create table users (id integer, random integer);'))
+            session.execute(text('insert into users (id, random) values (2, 7);'))
             session.commit()
 
         with self.app.session_scope() as session:
@@ -340,7 +341,7 @@ class TestManagePy(TestCaseDatabase):
                 raise
             finally:
                 # Destroy the tables
-                session.execute('drop table users;')
+                session.execute(text('drop table users;'))
                 pass
 
     def test_delete_obsolete_versions_time(self):
@@ -353,8 +354,8 @@ class TestManagePy(TestCaseDatabase):
 
         with self.app.session_scope() as session:
             # We do not add user 1 to the API database
-            session.execute('create table users (id integer, random integer);')
-            session.execute('insert into users (id, random) values (2, 7);')
+            session.execute(text('create table users (id integer, random integer);'))
+            session.execute(text('insert into users (id, random) values (2, 7);'))
             session.commit()
 
         with self.app.session_scope() as session:
@@ -535,7 +536,7 @@ class TestManagePy(TestCaseDatabase):
                 raise
             finally:
                 # Destroy the tables
-                session.execute('drop table users;')
+                session.execute(text('drop table users;'))
                 pass
 
 if __name__ == '__main__':
