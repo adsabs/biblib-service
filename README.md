@@ -27,8 +27,7 @@ docker run -d --name postgres -e POSTGRES_USER="postgres" -e POSTGRES_PASSWORD="
 python3 -m venv python
 source python/bin/activate
 
-# Install with legacy build support (requires pip 24 and specific setuptools)
-python -m pip install "pip==24" setuptools==57.5.0 wheel
+# Install the project and dev dependencies
 pip install -e ".[dev]"
 
 # Run tests
@@ -48,7 +47,7 @@ All tests have been written top down, or in a Test-Driven Development approach, 
 ### Running Biblib Locally
 
 To run a version of Biblib locally, a postgres database needs to be created and properly formatted for use with Biblib. This can be done with a local postgres instance or in a docker container using the following commands.
-`local_config.py` should be created in `biblib/` and the environment variables must be adjusted to reflect the local environment.
+`local_config.py` should be created at the repo root (next to `config.py`) and the environment variables must be adjusted to reflect the local environment.
 
 ```bash
 # Setup database

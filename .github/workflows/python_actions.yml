@@ -15,7 +15,6 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install "pip==24" "setuptools>=62.0.0,<70.0.0" wheel
         pip install ".[dev]"
 
     - name: Test with pytest

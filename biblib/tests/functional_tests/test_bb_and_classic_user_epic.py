@@ -14,7 +14,7 @@ from biblib.tests.stubdata.stub_data import UserShop, LibraryShop
 from biblib.tests.base import TestCaseDatabase, MockEmailService, \
     MockSolrBigqueryService, MockEndPoint, MockClassicService
 from biblib.views.http_errors import NO_CLASSIC_ACCOUNT
-from biblib.config import BIBLIB_CLASSIC_SERVICE_URL
+from config import BIBLIB_CLASSIC_SERVICE_URL
 
 
 class TestBBClassicUserEpic(TestCaseDatabase):
