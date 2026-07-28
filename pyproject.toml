@@ -7,7 +7,7 @@ license = { text = "MIT" }
 readme = "README.md"
 packages = ["biblib"]
 dependencies = [
-    "adsmutils @ git+https://github.com/femalves/ADSMicroserviceUtils.git@de1108d",
+    "adsmutils @ git+https://github.com/adsabs/ADSMicroserviceUtils.git@v2.0.0",
     "alembic==1.18.5",
     "psycopg2-binary==2.9.12",
     "sqlalchemy-continuum==1.6.0",
