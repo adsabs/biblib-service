@@ -492,10 +492,10 @@ class TestManagePy(TestCaseDatabase):
                 
                 #Confirm most recent remaining revision matches current state of library
                 for library in libraries:
-                    updated_revisions = session.query(LibraryVersion).filter_by(id=library.id).all()
+                    updated_revisions = session.query(LibraryVersion).filter_by(id=library.id).order_by(LibraryVersion.date_last_modified.asc()).all()
                     updated_revision_lengths.append(len(updated_revisions))
-                    self.assertUnsortedEqual(library.bibcode, updated_revisions[-1].bibcode) 
-                
+                    self.assertUnsortedEqual(library.bibcode, updated_revisions[-1].bibcode)
+
                 NotesVersion = sqlalchemy_continuum.version_class(Notes)
                 notes = session.query(Notes).all()
                 updated_notes_revision_lengths = []
