@@ -73,9 +73,22 @@ class BaseView(Resource):
         :return: library_uuid: unique identifier for the library
         """
 
-        library_uuid = (library_slug + '==').replace('_', '/')
-        library_uuid = library_uuid.encode('ascii')
-        library_uuid = uuid.UUID(bytes=base64.urlsafe_b64decode(library_uuid))
+        try:
+            library_uuid = (library_slug + '==').replace('_', '/')
+            library_uuid = library_uuid.encode('ascii')
+            library_uuid = uuid.UUID(bytes=base64.urlsafe_b64decode(library_uuid))
+        except (ValueError, TypeError) as error:
+            # A malformed slug should be reported as a bad request, not crash
+            # the endpoint. Under Python 2 an undecodable slug raised
+            # TypeError('Incorrect padding'), which every caller catches and
+            # turns into a 400 BAD_LIBRARY_ID_ERROR. Under Python 3 the same
+            # input instead raises binascii.Error (bad base64 padding, a
+            # ValueError subclass), ValueError (decoded bytes are not a valid
+            # 16-byte UUID) or UnicodeEncodeError (non-ASCII slug, also a
+            # ValueError subclass), none of which are TypeError, so the guards
+            # stopped firing and these requests began returning 500. Re-raise
+            # as TypeError to restore that contract (see issue #89).
+            raise TypeError('Malformed library ID: {0}'.format(error))
         current_app.logger.info('Converted slug: {0} to uuid: {1}'
                                 .format(library_slug, library_uuid))
         return str(library_uuid)

@@ -37,6 +37,24 @@ class TestBaseViews(TestCaseDatabase):
 
         self.assertEqual(expected_uuid, output_uuid)
 
+    def test_slug_to_uuid_malformed_raises_typeerror(self):
+        """
+        Test that a malformed slug (one that cannot be decoded back into a
+        UUID) raises TypeError rather than a bare binascii.Error / ValueError /
+        UnicodeEncodeError. The views rely on this to translate a bad library
+        ID into a 400 response instead of a 500. Regression test for issue #89.
+
+        :return: no return
+        """
+        # 21 chars (bad base64 padding, the case reported in the issue), a
+        # value that decodes but is not a valid 16-byte UUID, and a
+        # non-ASCII slug.
+        for bad_slug in ['NH0KuBgSU2KgrmgyisIYQ',
+                         'foo',
+                         u'\xe9nvalid']:
+            with self.assertRaises(TypeError):
+                BaseView.helper_slug_to_uuid(bad_slug)
+
     def test_uuid_to_slug(self):
         """
         Test the conversion of UUID to a base64 URL encoded string behaves as
