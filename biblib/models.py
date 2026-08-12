@@ -6,11 +6,11 @@ to be passed to the app creator within the Flask blueprint.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.types import TypeDecorator, CHAR, String as StringType
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, UnicodeText, UniqueConstraint
 from sqlalchemy.orm import relationship, configure_mappers
 from sqlalchemy_continuum import make_versioned
@@ -189,13 +189,13 @@ class Notes(Base):
     date_created = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
     date_last_modified = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
 
     def __repr__(self):
@@ -251,13 +251,13 @@ class Library(Base):
     date_created = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
     date_last_modified = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
     permissions = relationship('Permissions',
                                   backref='library',

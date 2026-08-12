@@ -6,6 +6,7 @@ from biblib.models import User, Permissions, Library, Notes
 from flask import current_app
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import text
 import sqlalchemy_continuum
 
 class DeleteStaleUsers:
@@ -19,7 +20,7 @@ class DeleteStaleUsers:
         with app.app_context():
             with current_app.session_scope() as session:
                 # Obtain the list of API users
-                postgres_search_text = 'SELECT id FROM users;'
+                postgres_search_text = text('SELECT id FROM users;')
                 result = session.execute(postgres_search_text).fetchall()
                 list_of_api_users = [int(r[0]) for r in result]
 
