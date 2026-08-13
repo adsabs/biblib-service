@@ -10,7 +10,8 @@ from biblib.views.http_errors import DUPLICATE_LIBRARY_NAME_ERROR, \
     MISSING_LIBRARY_ERROR, MISSING_USERNAME_ERROR, \
     NO_PERMISSION_ERROR, WRONG_TYPE_ERROR, \
     API_MISSING_USER_EMAIL, SOLR_RESPONSE_MISMATCH_ERROR, NO_CLASSIC_ACCOUNT, \
-    NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR
+    NO_LIBRARY_SPECIFIED_ERROR, TOO_MANY_LIBRARIES_SPECIFIED_ERROR, \
+    BAD_LIBRARY_ID_ERROR
 from biblib.tests.stubdata.stub_data import LibraryShop, UserShop, fake_biblist
 from biblib.tests.base import MockEmailService, MockSolrBigqueryService,\
     TestCaseDatabase, MockEndPoint, MockClassicService, MockSolrQueryService
@@ -86,6 +87,41 @@ class TestWebservices(TestCaseDatabase):
                          MISSING_USERNAME_ERROR['number'])
         self.assertEqual(response.json['error'],
                          MISSING_USERNAME_ERROR['body'])
+
+    def test_malformed_library_id_returns_bad_request(self):
+        """
+        Test the /libraries/<library_uuid> route
+
+        A syntactically malformed library ID (one that cannot be decoded back
+        into a UUID) should be reported as a 400 bad request rather than
+        crashing the endpoint with a 500. Regression test for issue #89, where
+        the Python 2 -> 3 migration changed the exception raised by the slug
+        decoder so the existing guards stopped catching it.
+
+        :return: no return
+        """
+
+        stub_user = UserShop()
+
+        # A selection of malformed IDs: 21 characters (bad base64 padding, the
+        # case reported in the issue), a value that decodes but is not a valid
+        # 16-byte UUID, and one containing non-ASCII characters.
+        for bad_library_id in ['NH0KuBgSU2KgrmgyisIYQ',
+                               'foo',
+                               u'\xe9nvalid']:
+            url = url_for('libraryview', library=bad_library_id)
+            with MockSolrBigqueryService(), \
+                    MockEmailService(stub_user, end_type='uid'):
+                response = self.client.get(url, headers=stub_user.headers)
+
+            self.assertEqual(response.status_code,
+                             BAD_LIBRARY_ID_ERROR['number'],
+                             msg='Library ID {0!r} should give {1}, got {2}'
+                             .format(bad_library_id,
+                                     BAD_LIBRARY_ID_ERROR['number'],
+                                     response.status_code))
+            self.assertEqual(response.json['error'],
+                             BAD_LIBRARY_ID_ERROR['body'])
 
     def test_create_library_resource(self):
         """
